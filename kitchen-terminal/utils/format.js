@@ -3,11 +3,11 @@ export function fmtClock(d = new Date()) {
   return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
 
-/** @returns {string} e.g. "понедельник, 09 апреля 2024г." */
+/** @returns {string} e.g. "понедельник, 09 апреля 2024 г." */
 export function fmtDateLong(d = new Date()) {
   const weekday = d.toLocaleDateString('ru-RU', { weekday: 'long' });
-  const rest = d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
-  return `${weekday}, ${rest}г.`;
+  const rest = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  return `${weekday}, ${rest}`;
 }
 
 /**
