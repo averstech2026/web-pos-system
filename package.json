@@ -1,0 +1,26 @@
+{
+  "name": "web-pos-system",
+  "version": "0.1.0",
+  "description": "Demo POS system and personal lunch ordering account",
+  "type": "module",
+  "scripts": {
+    "dev:lk": "vite client-lk --config client-lk/vite.config.js",
+    "dev:admin": "vite admin --config admin/vite.config.js --port 3002",
+    "dev:kitchen": "vite kitchen-terminal --config kitchen-terminal/vite.config.js --port 3003",
+    "dev:delivery": "vite delivery-terminal --config delivery-terminal/vite.config.js --port 3004",
+    "dev:queue": "vite queue-screen --config queue-screen/vite.config.js --port 3005",
+    "build:lk": "vite build client-lk --outDir ../dist/client-lk && cp -r products dist/client-lk/products",
+    "build:admin": "vite build admin --outDir ../dist/admin",
+    "build:kitchen": "vite build kitchen-terminal --outDir ../dist/kitchen-terminal",
+    "build:delivery": "vite build delivery-terminal --outDir ../dist/delivery-terminal",
+    "build:queue": "vite build queue-screen --outDir ../dist/queue-screen"
+  },
+  "dependencies": {
+    "firebase": "^11.0.0",
+    "html5-qrcode": "^2.3.8",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

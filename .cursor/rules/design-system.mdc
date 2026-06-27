@@ -1,0 +1,68 @@
+---
+description: Kiosk design system — colors, typography, components for all UI
+globs: "**/*.{css,html,js}"
+alwaysApply: false
+---
+
+# Kiosk Design System (iFCM)
+
+All interfaces must match the self-service kiosk visual language. Source of truth: `shared/styles.css` (tokens in `:root`) and `shared/global.css` (utilities).
+
+## Palette (strict)
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--color-navy` | `#1E1B4B` | Primary buttons, prices, headings |
+| `--color-danger` | `#E11D48` | Cancel, destructive actions |
+| `--color-bg` | `#F3F4F6` | Page background |
+| `--color-text-muted` | `#6b7280` | Secondary text, labels |
+
+Never use `#1A3B6E`, orange accent, or ad-hoc colors.
+
+## Typography
+
+- Font: `Montserrat` via Google Fonts
+- Headings/CTAs: `font-weight: 700–800`, `letter-spacing: 0.03–0.06em`, `text-transform: uppercase` for section titles and primary buttons
+- Prices: `font-weight: 800`, `color: var(--color-navy)`, `font-variant-numeric: tabular-nums`
+
+## Components
+
+- **Cards**: `border-radius: 16px`, `box-shadow: var(--shadow-card)`
+- **Primary CTA**: navy pill (`border-radius: 9999px`), `box-shadow: var(--shadow-btn-navy)`, class `btn btn-primary btn-pill btn-press`
+- **Cancel**: white + rose border (`btn-outline-danger`)
+- **Tabs/switchers**: pill container, active segment = navy fill (see `.auth-tabs`, `.cat-tab`)
+- **Footers**: sticky bottom bar with `box-shadow: var(--shadow-footer)`
+- **Touch feedback**: always add `btn-press` on interactive elements
+
+## Imports
+
+```js
+import '../shared/global.css'; // includes styles.css tokens
+import './style.css';
+```
+
+HTML: include Montserrat from Google Fonts (see `client-lk/index.html`).
+
+## Layout & spacing (UI/UX)
+
+- Interface must feel **airy, clean, modern** — avoid cramped layouts.
+- **Spacing grid**: multiples of 4px/8px. Use tokens: `--space-sm` (8px), `--space-md` (16px), `--space-lg` (24px).
+- **Form blocks**: inputs must never stick to buttons or neighbors. Minimum gap between form sections — **16–24px**.
+- **Label → input**: `--space-sm` (8px). **Between form groups**: `--space-md` (16px). **Last input → CTA button**: `--space-md` + `--space-sm` = **24px**.
+- Use flex/grid containers with explicit `gap`, not margin hacks on individual fields.
+- **Touch targets**: inputs and buttons `min-height: 44–48px` on mobile.
+
+### Form pattern
+
+```html
+<div class="auth-fields"> <!-- or .form-stack -->
+  <div class="form-group">...</div>
+  <button class="btn btn-primary btn-pill">Submit</button>
+</div>
+```
+
+```css
+.auth-fields { display: flex; flex-direction: column; gap: var(--space-md); }
+.auth-fields .btn { margin-top: var(--space-sm); } /* +8px → 24px before CTA */
+.form-group { gap: var(--space-sm); }
+```

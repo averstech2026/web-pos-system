@@ -1,0 +1,113 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isRole(role) {
+      return isAuth() && getUserRole() == role;
+    }
+
+    function isStaff() {
+      return isAuth() && getUserRole() in ['cook', 'cashier', 'manager', 'admin'];
+    }
+
+    // ── users ────────────────────────────────────────────────
+    match /users/{userId} {
+      // Any authenticated user can read their own doc.
+      // Staff/admin can read all.
+      allow read: if isOwner(userId) || isStaff();
+
+      // User can create/update their own doc (registration).
+      // Admin can update anyone.
+      allow create: if isAuth();
+      allow update: if isOwner(userId) || isRole('admin') || isRole('manager');
+      allow delete: if isRole('admin');
+    }
+
+    // ── items (menu) ─────────────────────────────────────────
+    match /items/{itemId} {
+      allow read: if isAuth();
+      allow create, delete: if isRole('admin') || isRole('manager');
+      // Staff manage menu; any auth user may patch imageUrl only (dev seed helper).
+      allow update: if isRole('admin') || isRole('manager') || (
+        isAuth() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageUrl'])
+      );
+    }
+
+    function isOrderOwner() {
+      return isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    function isUnpaidPendingOrder() {
+      return resource.data.paymentStatus == 'unpaid'
+        && resource.data.status == 'pending';
+    }
+
+    function isClientOrderCancel() {
+      return isOrderOwner()
+        && isUnpaidPendingOrder()
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.paymentStatus == 'unpaid'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+    }
+
+    function isClientOrderItemsUpdate() {
+      return isOrderOwner()
+        && isUnpaidPendingOrder()
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.paymentStatus == resource.data.paymentStatus
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items']);
+    }
+
+    // ── orders ───────────────────────────────────────────────
+    match /orders/{orderId} {
+      // Client reads own orders; staff reads all.
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid || isStaff()
+      );
+      // Client creates orders; staff updates status.
+      allow create: if isAuth();
+      allow update: if isStaff() || isClientOrderCancel() || isClientOrderItemsUpdate();
+      allow delete: if isRole('admin');
+    }
+
+    // ── checks ───────────────────────────────────────────────
+    match /checks/{checkId} {
+      allow read: if isAuth() && (
+        resource.data.userId == request.auth.uid || isStaff()
+      );
+      // Created only server-side via transaction — allow from client for demo
+      allow create: if isAuth();
+      allow update, delete: if isRole('admin');
+    }
+
+    // ── transactions ─────────────────────────────────────────
+    match /transactions/{txId} {
+      allow read: if isStaff();
+      allow create: if isAuth();
+      allow update, delete: if isRole('admin');
+    }
+
+    // ── notifications ────────────────────────────────────────
+    match /notifications/{notifId} {
+      allow read: if isAuth() && resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow delete: if isRole('admin');
+    }
+  }
+}
