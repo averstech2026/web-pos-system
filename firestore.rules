@@ -114,10 +114,19 @@ service cloud.firestore {
       allow update, delete: if isRole('admin');
     }
 
+    function isStaffOrderNotification() {
+      return isStaff()
+        && request.resource.data.type == 'order'
+        && request.resource.data.keys().hasAll(['userId', 'type', 'title', 'body', 'read', 'createdAt']);
+    }
+
     // ── notifications ────────────────────────────────────────
     match /notifications/{notifId} {
       allow read: if isAuth() && resource.data.userId == request.auth.uid;
-      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
+      allow create: if isAuth() && (
+        request.resource.data.userId == request.auth.uid
+        || isStaffOrderNotification()
+      );
       allow update: if isAuth() && resource.data.userId == request.auth.uid;
       allow delete: if isRole('admin');
     }

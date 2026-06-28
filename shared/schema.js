@@ -188,3 +188,13 @@ export function createNotificationDoc({ userId, type, title, body, read = false 
     createdAt: serverTimestamp(),
   };
 }
+
+/** Notification sent to the client when kitchen marks an order ready. */
+export function createOrderReadyNotificationDoc({ userId, orderNumber }) {
+  return createNotificationDoc({
+    userId,
+    type: NOTIF_TYPE.ORDER,
+    title: 'Заказ готов к выдаче',
+    body: `Ваш заказ №${orderNumber} готов. Покажите QR-код на кассе.`,
+  });
+}

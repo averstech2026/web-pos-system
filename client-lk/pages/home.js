@@ -7,13 +7,9 @@ import { COL, ORDER_STATUS } from '../../shared/schema.js';
 import { cancelUnpaidOrder } from '../../shared/orders.js';
 import { cart } from '../store.js';
 import { fmtDate, fmtMoney, orderStatusIcon, orderStatusLabel, orderTotal } from '../utils/format.js';
+import { qrDataUrl } from '../utils/qr.js';
 import { openOrderDetailModal } from '../components/order-detail.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
-
-/** QR image via free public API (no library needed) */
-function qrSrc(data, size = 200) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}&bgcolor=f3f4f6&color=1E1B4B&margin=10`;
-}
 
 /** Next N working dates (Mon–Fri), starting from tomorrow */
 function getDateOptions(n = 7) {
@@ -50,6 +46,12 @@ export class HomePage {
       ? snap.data()
       : { name: this.user.email.split('@')[0], balance: 0, role: 'client' };
 
+    const qrData = `LK:${this.user.uid}`;
+    [this.qrSmall, this.qrLarge] = await Promise.all([
+      qrDataUrl(qrData, 72),
+      qrDataUrl(qrData, 220),
+    ]);
+
     this.renderShell();
     this.subscribeOrders();
     this.subscribeUnreadCount();
@@ -57,7 +59,6 @@ export class HomePage {
 
   renderShell() {
     const u = this.userData;
-    const qrData = `LK:${this.user.uid}`;
     const shortCode = this.user.uid.slice(0, 12).toUpperCase();
     const balanceFmt = fmtMoney(u.balance ?? 0);
 
@@ -98,7 +99,7 @@ export class HomePage {
                 </div>
               </div>
               <button class="id-card-qr btn-press" id="btn-show-qr-icon" type="button" aria-label="Показать QR-код">
-                <img src="${qrSrc(qrData, 72)}" alt="QR-код" loading="lazy" />
+                <img src="${this.qrSmall}" alt="QR-код" loading="lazy" />
               </button>
             </div>
           </div>
@@ -140,7 +141,7 @@ export class HomePage {
             <div class="qr-modal-body">
               <p class="modal-subtitle">Покажите QR на кассе, чтобы получить заказ</p>
               <div class="qr-large-wrap">
-                <img src="${qrSrc(qrData, 220)}" alt="QR-код" />
+                <img src="${this.qrLarge}" alt="QR-код" />
               </div>
               <div class="qr-code-row">
                 <span class="qr-code-text">${shortCode}</span>
