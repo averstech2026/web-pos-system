@@ -1,3 +1,5 @@
+import { normalizeGroupAvailability } from './group-availability.js';
+
 /** Default product categories (menu groups). */
 export const DEFAULT_CATEGORIES = [
   'Первые блюда',
@@ -6,6 +8,128 @@ export const DEFAULT_CATEGORIES = [
   'Напитки',
   'Выпечка',
 ];
+
+/**
+ * @typedef {object} CategoryGroup
+ * @property {string} id
+ * @property {string} name
+ * @property {string|null} [imageUrl]
+ * @property {string|null} [availableFrom] - HH:MM (legacy, first rule)
+ * @property {string|null} [availableTo] - HH:MM (legacy, first rule)
+ * @property {boolean} [availabilityRestricted]
+ * @property {import('./group-availability.js').CategoryAvailabilityRule[]} [availabilityRules]
+ */
+
+/** @param {string} name */
+export function slugFromCategoryName(name) {
+  const map = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '',
+    'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+  };
+  const slug = String(name || '')
+    .trim()
+    .toLowerCase()
+    .split('')
+    .map(ch => map[ch] ?? ch)
+    .join('')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return slug || 'category';
+}
+
+/** @param {Partial<CategoryGroup>|string|null|undefined} raw @param {string} [fallbackName] */
+export function normalizeCategoryGroup(raw, fallbackName = '') {
+  if (typeof raw === 'string') {
+    const name = raw.trim();
+    return normalizeCategoryGroup({
+      id: slugFromCategoryName(name),
+      name,
+      imageUrl: null,
+      availableFrom: null,
+      availableTo: null,
+      availabilityRestricted: false,
+      availabilityRules: [],
+    });
+  }
+  const name = String(raw?.name || fallbackName || '').trim();
+  const base = {
+    id: String(raw?.id || slugFromCategoryName(name)).trim() || slugFromCategoryName(name),
+    name,
+    imageUrl: raw?.imageUrl || null,
+    availableFrom: raw?.availableFrom || null,
+    availableTo: raw?.availableTo || null,
+    availabilityRestricted: raw?.availabilityRestricted,
+    availabilityRules: Array.isArray(raw?.availabilityRules) ? raw.availabilityRules : [],
+  };
+  const avail = normalizeGroupAvailability(base);
+  return {
+    ...base,
+    availabilityRestricted: avail.restricted,
+    availabilityRules: avail.restricted ? avail.rules : [],
+    availableFrom: avail.restricted && avail.rules[0] ? avail.rules[0].timeFrom : null,
+    availableTo: avail.restricted && avail.rules[0] ? avail.rules[0].timeTo : null,
+  };
+}
+
+/** @param {CategoryGroup[]} groups */
+export function categoryGroupsToNames(groups) {
+  return groups.map(g => g.name).filter(Boolean);
+}
+
+/**
+ * @param {Array<CategoryGroup|object|string>|null|undefined} stored
+ * @param {string[]} [fromItems]
+ * @returns {CategoryGroup[]}
+ */
+export function mergeCategoryGroups(stored, fromItems = []) {
+  const byName = new Map();
+
+  for (const name of DEFAULT_CATEGORIES) {
+    byName.set(name, normalizeCategoryGroup(name));
+  }
+
+  for (const raw of stored || []) {
+    const g = normalizeCategoryGroup(raw);
+    if (!g.name) continue;
+    const prev = byName.get(g.name);
+    byName.set(g.name, prev ? { ...prev, ...g, id: prev.id || g.id } : g);
+  }
+
+  for (const name of fromItems) {
+    if (!name || byName.has(name)) continue;
+    byName.set(name, normalizeCategoryGroup(name));
+  }
+
+  const ordered = DEFAULT_CATEGORIES
+    .filter(name => byName.has(name))
+    .map(name => byName.get(name));
+
+  const rest = [...byName.values()]
+    .filter(g => !DEFAULT_CATEGORIES.includes(g.name))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+
+  return [...ordered, ...rest];
+}
+
+/** @param {string} [from] @param {string} [to] */
+export function formatCategorySchedule(from, to) {
+  if (!from || !to) return 'Весь день';
+  return `${from}–${to}`;
+}
+
+/** @param {CategoryGroup[]} [stored] @param {string[]} [fromItems] */
+export function mergeCategories(stored, fromItems = []) {
+  if (stored?.length && typeof stored[0] === 'object' && stored[0]?.name) {
+    return categoryGroupsToNames(mergeCategoryGroups(stored, fromItems));
+  }
+  const set = new Set([...DEFAULT_CATEGORIES, ...(stored || []), ...fromItems].filter(Boolean));
+  const ordered = DEFAULT_CATEGORIES.filter(c => set.has(c));
+  const rest = [...set].filter(c => !DEFAULT_CATEGORIES.includes(c)).sort((a, b) => a.localeCompare(b, 'ru'));
+  return [...ordered, ...rest];
+}
 
 /** @typedef {{ id: string, name: string }} Allergen */
 
@@ -31,12 +155,4 @@ export function mergeAllergens(stored) {
     if (a?.id && a?.name) byId.set(a.id, { id: a.id, name: a.name });
   }
   return [...byId.values()];
-}
-
-/** @param {string[]} [stored] @param {string[]} [fromItems] */
-export function mergeCategories(stored, fromItems = []) {
-  const set = new Set([...DEFAULT_CATEGORIES, ...(stored || []), ...fromItems].filter(Boolean));
-  const ordered = DEFAULT_CATEGORIES.filter(c => set.has(c));
-  const rest = [...set].filter(c => !DEFAULT_CATEGORIES.includes(c)).sort((a, b) => a.localeCompare(b, 'ru'));
-  return [...ordered, ...rest];
 }

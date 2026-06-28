@@ -4,35 +4,66 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../shared/firebase.js';
 import { COL } from '../../shared/schema.js';
-import { DEFAULT_ALLERGENS, mergeAllergens, mergeCategories } from '../../shared/menu-catalog.js';
+import {
+  DEFAULT_ALLERGENS,
+  categoryGroupsToNames,
+  mergeAllergens,
+  mergeCategoryGroups,
+  normalizeCategoryGroup,
+} from '../../shared/menu-catalog.js';
 
 const MENU_SETTINGS_ID = 'menu';
 
 /**
- * @returns {Promise<{ categories: string[], allergens: Array<{ id: string, name: string }> }>}
+ * @param {object} data
+ * @param {string[]} itemCategories
+ */
+function resolveCategoryGroups(data, itemCategories) {
+  if (data.categoryGroups?.length) {
+    return mergeCategoryGroups(data.categoryGroups, itemCategories);
+  }
+  return mergeCategoryGroups(data.categories, itemCategories);
+}
+
+/**
+ * @returns {Promise<{
+ *   categories: string[],
+ *   categoryGroups: import('../../shared/menu-catalog.js').CategoryGroup[],
+ *   allergens: Array<{ id: string, name: string }>
+ * }>}
  */
 export async function fetchMenuSettings(itemCategories = []) {
   const snap = await getDoc(doc(db, COL.SETTINGS, MENU_SETTINGS_ID));
   const data = snap.exists() ? snap.data() : {};
+  const categoryGroups = resolveCategoryGroups(data, itemCategories);
 
   return {
-    categories: mergeCategories(data.categories, itemCategories),
+    categoryGroups,
+    categories: categoryGroupsToNames(categoryGroups),
     allergens: mergeAllergens(data.allergens),
   };
 }
 
-/** @param {string[]} categories */
-export async function saveCategories(categories) {
+/** @param {import('../../shared/menu-catalog.js').CategoryGroup[]} categoryGroups */
+export async function saveCategoryGroups(categoryGroups) {
+  const groups = categoryGroups.map(g => normalizeCategoryGroup(g)).filter(g => g.name);
   await setDoc(
     doc(db, COL.SETTINGS, MENU_SETTINGS_ID),
-    { categories },
+    {
+      categoryGroups: groups,
+      categories: categoryGroupsToNames(groups),
+    },
     { merge: true },
   );
+}
+
+/** @param {string[]} categories @deprecated use saveCategoryGroups */
+export async function saveCategories(categories) {
+  await saveCategoryGroups(categories.map(name => normalizeCategoryGroup(name)));
 }
 
 /** @param {Array<{ id: string, name: string }>} allergens */
@@ -84,8 +115,39 @@ export async function deleteCategoryOnItems(name, moveTo = 'Прочее') {
   return count;
 }
 
+/**
+ * @param {import('../../shared/menu-catalog.js').CategoryGroup[]} groups
+ * @param {Record<string, Set<string>|string[]>} memberIdsByGroupId
+ */
+export async function syncCategoryMembership(groups, memberIdsByGroupId) {
+  const snap = await getDocs(collection(db, COL.ITEMS));
+  const batch = writeBatch(db);
+  let count = 0;
+
+  for (const group of groups) {
+    const raw = memberIdsByGroupId[group.id];
+    const ids = new Set(Array.isArray(raw) ? raw : [...(raw || [])]);
+
+    for (const d of snap.docs) {
+      const category = d.data().category;
+      if (ids.has(d.id) && category !== group.name) {
+        batch.update(d.ref, { category: group.name });
+        count += 1;
+      } else if (!ids.has(d.id) && category === group.name) {
+        batch.update(d.ref, { category: 'Прочее' });
+        count += 1;
+      }
+    }
+  }
+
+  if (count) await batch.commit();
+  return count;
+}
+
 /** @param {string} category */
 export async function countItemsInCategory(category) {
   const snap = await getDocs(collection(db, COL.ITEMS));
   return snap.docs.filter(d => d.data().category === category).length;
 }
+
+export { DEFAULT_ALLERGENS };

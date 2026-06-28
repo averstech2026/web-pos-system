@@ -6,10 +6,12 @@ import {
   doc,
   getDocs,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../shared/firebase.js';
 import { COL, createItemDoc } from '../../shared/schema.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
+import { buildAvailabilityFromForm, normalizeItemAvailability } from '../../shared/item-availability.js';
 import { mergeCategories } from '../../shared/menu-catalog.js';
 
 export { DEFAULT_CATEGORIES } from '../../shared/menu-catalog.js';
@@ -36,14 +38,19 @@ export function collectCategories(catalogCategories, items) {
 
 /**
  * @param {Array<object>} items
- * @param {{ categories?: string[], search?: string, availability?: string }} filters
+ * @param {{ categories?: string[], allergens?: string[], search?: string, availability?: string }} filters
  */
-export function filterItems(items, { categories = [], search = '', availability = 'all' } = {}) {
+export function filterItems(items, { categories = [], allergens = [], search = '', availability = 'all' } = {}) {
   let result = items;
 
   if (categories?.length) {
     const set = new Set(categories);
     result = result.filter(i => set.has(i.category));
+  }
+
+  if (allergens?.length) {
+    const set = new Set(allergens);
+    result = result.filter(i => Array.isArray(i.allergens) && i.allergens.some(id => set.has(id)));
   }
 
   const q = search.trim().toLowerCase();
@@ -93,6 +100,9 @@ export function buildItemPayload(data) {
   const isAvailable = data.isAvailable !== false;
   const allergens = Array.isArray(data.allergens) ? data.allergens.filter(Boolean) : [];
   const nutrition = parseNutrition(data);
+  const availability = data.availability != null
+    ? normalizeItemAvailability(data.availability)
+    : normalizeItemAvailability(null);
 
   const payload = createItemDoc({
     name,
@@ -100,6 +110,7 @@ export function buildItemPayload(data) {
     price,
     category,
     isAvailable,
+    availability,
     imageUrl: data.imageUrl || getItemImageUrl(name) || null,
     nutrition: nutrition || undefined,
     allergens,
@@ -134,6 +145,10 @@ export async function updateItem(id, data, existing = {}) {
     update.allergens = deleteField();
   }
 
+  if (!merged.availability?.restricted) {
+    update.availability = deleteField();
+  }
+
   await updateDoc(doc(db, COL.ITEMS, id), update);
   return { id, ...update };
 }
@@ -146,4 +161,61 @@ export async function deleteItem(id) {
 /** @param {string} id @param {boolean} isAvailable */
 export async function setItemAvailability(id, isAvailable) {
   await updateDoc(doc(db, COL.ITEMS, id), { isAvailable });
+}
+
+/** @param {Array<{ id: string, category: string }>} updates */
+export async function batchSetItemCategories(updates) {
+  if (!updates.length) return 0;
+  await commitItemUpdates(updates.map(({ id, category }) => ({ id, data: { category } })));
+  return updates.length;
+}
+
+const BATCH_LIMIT = 500;
+
+/** @param {Array<{ id: string, data: object }>} updates */
+async function commitItemUpdates(updates) {
+  if (!updates.length) return;
+
+  for (let i = 0; i < updates.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(db);
+    for (const { id, data } of updates.slice(i, i + BATCH_LIMIT)) {
+      batch.update(doc(db, COL.ITEMS, id), data);
+    }
+    await batch.commit();
+  }
+}
+
+/** @param {string[]} itemIds @param {string} category */
+export async function bulkSetCategory(itemIds, category) {
+  const updates = itemIds.map(id => ({ id, data: { category } }));
+  await commitItemUpdates(updates);
+  return itemIds.length;
+}
+
+/**
+ * @param {Array<{ id: string, allergens?: string[] }>} items
+ * @param {string[]} allergenIds
+ * @param {'union'|'overwrite'} mode
+ */
+export async function bulkSetAllergens(items, allergenIds, mode) {
+  const updates = items.map(item => {
+    const merged = mode === 'union'
+      ? [...new Set([...(item.allergens || []), ...allergenIds])]
+      : [...allergenIds];
+
+    return {
+      id: item.id,
+      data: merged.length ? { allergens: merged } : { allergens: deleteField() },
+    };
+  });
+
+  await commitItemUpdates(updates);
+  return items.length;
+}
+
+/** @param {string[]} itemIds @param {boolean} isAvailable */
+export async function bulkSetAvailability(itemIds, isAvailable) {
+  const updates = itemIds.map(id => ({ id, data: { isAvailable } }));
+  await commitItemUpdates(updates);
+  return itemIds.length;
 }

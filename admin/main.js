@@ -70,6 +70,7 @@ async function renderRoute(path) {
     '/dashboard': () => import('./pages/dashboard.js').then(m => m.DashboardPage),
     '/orders': () => import('./pages/orders.js').then(m => m.OrdersPage),
     '/products': () => import('./pages/products.js').then(m => m.ProductsPage),
+    '/groups': () => import('./pages/category-groups.js').then(m => m.CategoryGroupsPage),
     '/users': () => import('./pages/users.js').then(m => m.UsersPage),
     '/reports': () => import('./pages/reports.js').then(m => m.ReportsPage),
   };

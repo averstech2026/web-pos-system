@@ -8,6 +8,7 @@ import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-image
 import { cart } from '../store.js';
 import { openItemDetailModal } from '../components/item-detail.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
+import { isItemAvailableAt } from '../../shared/item-availability.js';
 
 function resolveImageUrl(item) {
   return resolveProductImageUrl(item.imageUrl) || getItemImageUrl(item.name);
@@ -79,7 +80,10 @@ export class MenuPage {
         ...data,
         nutrition: resolveItemNutrition(data),
       };
-    });
+    }).filter(item => isItemAvailableAt(item, {
+      date: cart.dateSlot,
+      time: cart.timeSlot,
+    }));
 
     // Preserve a nice category order
     const order = ['Первые блюда', 'Вторые блюда', 'Салаты', 'Напитки', 'Выпечка'];

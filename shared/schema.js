@@ -97,14 +97,18 @@ export function createUserDoc({
  * @param {number} p.price
  * @param {string} p.category
  * @param {boolean} [p.isAvailable=true]
+ * @param {import('./item-availability.js').ItemAvailabilityRules} [p.availability]
  * @param {string|null} [p.imageUrl=null] - local path, e.g. '/products/caesar.jpg'
  * @param {{ protein?: number, fat?: number, carbs?: number, kcal?: number }|null} [p.nutrition=null]
  * @param {string[]} [p.allergens=[]] - allergen ids from settings/menu
  */
 export function createItemDoc({
-  name, description, price, category, isAvailable = true, imageUrl = null, nutrition = null, allergens = [],
+  name, description, price, category, isAvailable = true, availability = null,
+  imageUrl = null, nutrition = null, allergens = [],
 }) {
   const doc = { name, description, price, category, isAvailable };
+  const rules = availability?.restricted ? availability : null;
+  if (rules) doc.availability = rules;
   if (imageUrl) doc.imageUrl = imageUrl;
   if (nutrition) doc.nutrition = nutrition;
   if (allergens?.length) doc.allergens = allergens;

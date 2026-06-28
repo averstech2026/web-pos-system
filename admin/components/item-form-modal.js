@@ -2,15 +2,29 @@ import { createItem, updateItem } from '../services/products-data.js';
 import { productThumbHtml } from '../utils/product-image.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
+import {
+  DAY_LABELS,
+  DAY_MODE_OPTIONS,
+  DAY_VALUES,
+  buildAvailabilityFromForm,
+  normalizeItemAvailability,
+} from '../../shared/item-availability.js';
 
 /**
  * @param {object} p
  * @param {object|null} [p.item]
  * @param {string[]} [p.categories]
  * @param {Array<{ id: string, name: string }>} [p.allergens]
- * @param {() => void|Promise<void>} [p.onSaved]
+ * @param {string|null} [p.lockedCategory]
+ * @param {(saved: object) => void|Promise<void>} [p.onSaved]
  */
-export function openItemFormModal({ item = null, categories = [], allergens = [], onSaved }) {
+export function openItemFormModal({
+  item = null,
+  categories = [],
+  allergens = [],
+  lockedCategory = null,
+  onSaved,
+}) {
   document.getElementById('item-form-modal')?.remove();
 
   const isEdit = !!item?.id;
@@ -21,11 +35,12 @@ export function openItemFormModal({ item = null, categories = [], allergens = []
   overlay.setAttribute('aria-modal', 'true');
 
   const nutrition = resolveItemNutrition(item || {});
+  const availability = normalizeItemAvailability(item?.availability);
 
   const state = {
     name: item?.name || '',
     description: item?.description || '',
-    category: item?.category || categories[0] || '',
+    category: lockedCategory || item?.category || categories[0] || '',
     price: item?.price ?? '',
     isAvailable: item?.isAvailable !== false,
     protein: nutrition?.protein ?? '',
@@ -35,6 +50,17 @@ export function openItemFormModal({ item = null, categories = [], allergens = []
     allergens: [...(item?.allergens || [])],
     imageUrl: item?.imageUrl || getItemImageUrl(item?.name || '') || '',
     previewObjectUrl: null,
+    availability: {
+      restricted: availability.restricted,
+      timeEnabled: !!(availability.timeFrom && availability.timeTo),
+      timeFrom: availability.timeFrom || '08:00',
+      timeTo: availability.timeTo || '11:00',
+      dayMode: availability.dayMode || 'all',
+      customDays: [...(availability.customDays || [])],
+      dateRangeEnabled: !!availability.dateRangeEnabled,
+      dateFrom: availability.dateFrom || '',
+      dateTo: availability.dateTo || '',
+    },
   };
 
   const categoryOptions = [...new Set([...categories, state.category].filter(Boolean))];
@@ -64,49 +90,39 @@ export function openItemFormModal({ item = null, categories = [], allergens = []
     el.innerHTML = productThumbHtml(previewItem());
   }
 
-  function bindModalScrollFade() {
-    const body = overlay.querySelector('.admin-modal-body');
-    const fade = overlay.querySelector('.admin-modal-scroll-fade');
-    if (!body || !fade) return;
-
-    const update = () => {
-      const hasOverflow = body.scrollHeight > body.clientHeight + 8;
-      const atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 8;
-      fade.hidden = !hasOverflow || atBottom;
-    };
-
-    body.addEventListener('scroll', update, { passive: true });
-    requestAnimationFrame(update);
-    setTimeout(update, 120);
-  }
-
   overlay.innerHTML = `
-    <div class="admin-modal card admin-modal--md" role="document">
+    <div class="admin-modal card admin-modal--lg" role="document">
       <div class="admin-modal-head">
         <h2 class="admin-modal-title">${isEdit ? 'Редактировать товар' : 'Новый товар'}</h2>
         <button type="button" class="admin-modal-close btn-press" id="ifm-close" aria-label="Закрыть">✕</button>
       </div>
 
-      <div class="admin-modal-body-shell">
-        <div class="admin-modal-body">
-          <div class="ifm-form">
+      <div class="admin-modal-body">
+        <div class="ifm-form">
+            <label class="ifm-check ifm-check--top">
+              <input type="checkbox" id="ifm-available" ${state.isAvailable ? 'checked' : ''} />
+              <span>Доступен в меню</span>
+            </label>
+
             <div class="ifm-photo-row">
               <div class="ifm-preview" id="ifm-preview">
                 ${productThumbHtml({ name: state.name, imageUrl: state.imageUrl })}
               </div>
               <div class="ifm-photo-controls">
-                <label class="btn btn-outline btn-press ifm-photo-btn">
-                  Выбрать файл
-                  <input type="file" id="ifm-photo-file" accept="image/jpeg,image/png,image/webp" hidden />
-                </label>
-                <button type="button" class="btn btn-outline btn-press ifm-photo-btn" id="ifm-photo-by-name">
-                  По названию
-                </button>
-                <label class="ifm-field ifm-field--wide">
+                <div class="ifm-photo-actions">
+                  <label class="btn btn-outline btn-press ifm-photo-btn">
+                    Выбрать файл
+                    <input type="file" id="ifm-photo-file" accept="image/jpeg,image/png,image/webp" hidden />
+                  </label>
+                  <button type="button" class="btn btn-outline btn-press ifm-photo-btn" id="ifm-photo-by-name">
+                    По названию
+                  </button>
+                </div>
+                <label class="ifm-field ifm-field--wide ifm-field--compact">
                   <span>Путь к фото</span>
                   <input type="text" id="ifm-image-url" value="${escAttr(state.imageUrl)}" placeholder="/products/dish.jpg" />
                 </label>
-                <p class="ifm-hint">Файлы хранятся в папке <code>products/</code> проекта.</p>
+                <p class="ifm-hint ifm-hint--inline">Файлы в папке <code>products/</code></p>
               </div>
             </div>
 
@@ -123,11 +139,22 @@ export function openItemFormModal({ item = null, categories = [], allergens = []
             <div class="ifm-form-row ifm-form-row--2">
               <label class="ifm-field">
                 <span>Группа (категория)</span>
-                <select id="ifm-category">
-                  ${categoryOptions.map(c => `
-                    <option value="${escAttr(c)}" ${c === state.category ? 'selected' : ''}>${esc(c)}</option>
-                  `).join('')}
-                </select>
+                ${lockedCategory ? `
+                  <input
+                    type="text"
+                    class="ifm-category-locked"
+                    value="${escAttr(lockedCategory)}"
+                    disabled
+                    aria-readonly="true"
+                  />
+                  <input type="hidden" id="ifm-category" value="${escAttr(lockedCategory)}" />
+                ` : `
+                  <select id="ifm-category">
+                    ${categoryOptions.map(c => `
+                      <option value="${escAttr(c)}" ${c === state.category ? 'selected' : ''}>${esc(c)}</option>
+                    `).join('')}
+                  </select>
+                `}
               </label>
 
               <label class="ifm-field">
@@ -178,15 +205,82 @@ export function openItemFormModal({ item = null, categories = [], allergens = []
               <p class="ifm-hint">Справочник аллергенов пуст — добавьте записи через кнопку «Аллергены» на странице товаров.</p>
             `}
 
-            <label class="ifm-check">
-              <input type="checkbox" id="ifm-available" ${state.isAvailable ? 'checked' : ''} />
-              <span>Доступен в меню</span>
-            </label>
+            <fieldset class="ifm-fieldset ifm-availability">
+              <legend>Матрица ограничений</legend>
+              <label class="ifm-check ifm-check--inline">
+                <input type="checkbox" id="ifm-avail-restricted" ${state.availability.restricted ? 'checked' : ''} />
+                <span>Ограничить период доступности</span>
+              </label>
+
+              <div class="ifm-availability-body" id="ifm-availability-body" ${state.availability.restricted ? '' : 'hidden'}>
+                <div class="ifm-avail-block">
+                  <span class="ifm-avail-label">Часы</span>
+                  <label class="ifm-check ifm-check--inline">
+                    <input type="checkbox" id="ifm-avail-time-enabled" ${state.availability.timeEnabled ? 'checked' : ''} />
+                    <span>Только в указанные часы</span>
+                  </label>
+                  <div class="ifm-avail-time-row" id="ifm-avail-time-row" ${state.availability.timeEnabled ? '' : 'hidden'}>
+                    <label class="ifm-field ifm-field--compact">
+                      <span>С</span>
+                      <input type="time" id="ifm-avail-time-from" value="${escAttr(state.availability.timeFrom)}" />
+                    </label>
+                    <label class="ifm-field ifm-field--compact">
+                      <span>До</span>
+                      <input type="time" id="ifm-avail-time-to" value="${escAttr(state.availability.timeTo)}" />
+                    </label>
+                  </div>
+                </div>
+
+                <div class="ifm-avail-block">
+                  <span class="ifm-avail-label">Дни недели</span>
+                  <div class="products-chip-group ifm-avail-day-modes" id="ifm-avail-day-modes">
+                    ${DAY_MODE_OPTIONS.map(o => `
+                      <button
+                        type="button"
+                        class="products-chip btn-press ${state.availability.dayMode === o.id ? 'products-chip--active' : ''}"
+                        data-day-mode="${o.id}"
+                      >${o.label}</button>
+                    `).join('')}
+                  </div>
+                  <div class="ifm-avail-custom-days" id="ifm-avail-custom-days" ${state.availability.dayMode === 'custom' ? '' : 'hidden'}>
+                    ${DAY_VALUES.map((day, i) => `
+                      <label class="ifm-allergen">
+                        <input
+                          type="checkbox"
+                          value="${day}"
+                          data-custom-day
+                          ${state.availability.customDays.includes(day) ? 'checked' : ''}
+                        />
+                        <span>${DAY_LABELS[i]}</span>
+                      </label>
+                    `).join('')}
+                  </div>
+                </div>
+
+                <div class="ifm-avail-block">
+                  <span class="ifm-avail-label">Диапазон дат</span>
+                  <label class="ifm-check ifm-check--inline">
+                    <input type="checkbox" id="ifm-avail-date-enabled" ${state.availability.dateRangeEnabled ? 'checked' : ''} />
+                    <span>Ограничить датами (с … по …)</span>
+                  </label>
+                  <div class="ifm-avail-date-row" id="ifm-avail-date-row" ${state.availability.dateRangeEnabled ? '' : 'hidden'}>
+                    <label class="ifm-field ifm-field--compact">
+                      <span>С</span>
+                      <input type="date" id="ifm-avail-date-from" value="${escAttr(state.availability.dateFrom)}" />
+                    </label>
+                    <label class="ifm-field ifm-field--compact">
+                      <span>По</span>
+                      <input type="date" id="ifm-avail-date-to" value="${escAttr(state.availability.dateTo)}" />
+                    </label>
+                  </div>
+                </div>
+
+                <p class="ifm-hint ifm-hint--inline">Ограничения суммируются: товар виден только когда совпадают и день, и часы, и период дат (если заданы).</p>
+              </div>
+            </fieldset>
 
             <p class="ifm-error" id="ifm-error" hidden></p>
           </div>
-        </div>
-        <div class="admin-modal-scroll-fade" hidden aria-hidden="true"></div>
       </div>
 
       <div class="admin-modal-foot">
@@ -232,13 +326,38 @@ export function openItemFormModal({ item = null, categories = [], allergens = []
     updatePreview();
   });
 
+  overlay.querySelector('#ifm-avail-restricted')?.addEventListener('change', e => {
+    const body = overlay.querySelector('#ifm-availability-body');
+    if (body) body.hidden = !e.target.checked;
+  });
+
+  overlay.querySelector('#ifm-avail-time-enabled')?.addEventListener('change', e => {
+    const row = overlay.querySelector('#ifm-avail-time-row');
+    if (row) row.hidden = !e.target.checked;
+  });
+
+  overlay.querySelector('#ifm-avail-date-enabled')?.addEventListener('change', e => {
+    const row = overlay.querySelector('#ifm-avail-date-row');
+    if (row) row.hidden = !e.target.checked;
+  });
+
+  overlay.querySelector('#ifm-avail-day-modes')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-day-mode]');
+    if (!btn) return;
+    const mode = btn.dataset.dayMode;
+    overlay.querySelectorAll('#ifm-avail-day-modes .products-chip').forEach(chip => {
+      chip.classList.toggle('products-chip--active', chip.dataset.dayMode === mode);
+    });
+    const custom = overlay.querySelector('#ifm-avail-custom-days');
+    if (custom) custom.hidden = mode !== 'custom';
+  });
+
   dialog?.addEventListener('click', e => e.stopPropagation());
   overlay.addEventListener('click', e => {
     if (e.target === overlay) close();
   });
 
   document.addEventListener('keydown', onKeydown);
-  bindModalScrollFade();
   document.body.appendChild(overlay);
 
   requestAnimationFrame(() => {
@@ -263,6 +382,24 @@ export function openItemFormModal({ item = null, categories = [], allergens = []
       imageUrl: overlay.querySelector('#ifm-image-url')?.value.trim() || getItemImageUrl(overlay.querySelector('#ifm-name')?.value.trim()),
     };
 
+    try {
+      const dayModeBtn = overlay.querySelector('#ifm-avail-day-modes .products-chip--active');
+      data.availability = buildAvailabilityFromForm({
+        restricted: overlay.querySelector('#ifm-avail-restricted')?.checked,
+        timeEnabled: overlay.querySelector('#ifm-avail-time-enabled')?.checked,
+        timeFrom: overlay.querySelector('#ifm-avail-time-from')?.value,
+        timeTo: overlay.querySelector('#ifm-avail-time-to')?.value,
+        dayMode: dayModeBtn?.dataset.dayMode || 'all',
+        customDays: [...overlay.querySelectorAll('[data-custom-day]:checked')].map(el => Number(el.value)),
+        dateRangeEnabled: overlay.querySelector('#ifm-avail-date-enabled')?.checked,
+        dateFrom: overlay.querySelector('#ifm-avail-date-from')?.value || null,
+        dateTo: overlay.querySelector('#ifm-avail-date-to')?.value || null,
+      });
+    } catch (err) {
+      showError(err.message || 'Проверьте настройки доступности');
+      return;
+    }
+
     if (!data.name.trim()) {
       showError('Укажите название');
       return;
@@ -280,13 +417,14 @@ export function openItemFormModal({ item = null, categories = [], allergens = []
     errEl.hidden = true;
 
     try {
+      let saved;
       if (isEdit) {
-        await updateItem(item.id, data, item);
+        saved = await updateItem(item.id, data, item);
       } else {
-        await createItem(data);
+        saved = await createItem(data);
       }
       close();
-      await onSaved?.();
+      await onSaved?.(saved);
     } catch (err) {
       console.error('[item-form]', err);
       showError(err.message || 'Не удалось сохранить товар');

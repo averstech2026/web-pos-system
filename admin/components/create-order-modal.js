@@ -7,6 +7,7 @@ import { processOrderPayment } from '../../shared/payment.js';
 import { fmtMoney } from '../utils/format.js';
 import { orderTotal } from '../utils/order-format.js';
 import { toDateInputValue } from '../utils/dates.js';
+import { isItemAvailableAt } from '../../shared/item-availability.js';
 
 const TIME_SLOTS = ['11:30', '12:00', '12:30', '13:00', '13:30'];
 
@@ -21,16 +22,21 @@ function orderNum() {
  * @param {() => void} [p.onCreated]
  */
 export function openCreateOrderModal({ clients, items, onCreated }) {
-  const available = items.filter(i => i.isAvailable !== false);
-  const categories = [...new Set(available.map(i => i.category))];
-
   const state = {
     userId: clients[0]?.id || '',
     dateSlot: toDateInputValue(),
     timeSlot: TIME_SLOTS[1],
     cart: new Map(),
     useBalance: true,
+    activeCategory: null,
   };
+
+  function getAvailableItems() {
+    return items.filter(i =>
+      i.isAvailable !== false
+      && isItemAvailableAt(i, { date: state.dateSlot, time: state.timeSlot }),
+    );
+  }
 
   const overlay = document.createElement('div');
   overlay.className = 'admin-modal-overlay';
@@ -47,6 +53,11 @@ export function openCreateOrderModal({ clients, items, onCreated }) {
     const total = orderTotal(lines);
     const client = clients.find(c => c.id === state.userId);
     const balance = client?.balance ?? 0;
+    const available = getAvailableItems();
+    const categories = [...new Set(available.map(i => i.category))];
+    if (!state.activeCategory || !categories.includes(state.activeCategory)) {
+      state.activeCategory = categories[0] || null;
+    }
 
     overlay.innerHTML = `
       <div class="admin-modal card">
@@ -83,8 +94,8 @@ export function openCreateOrderModal({ clients, items, onCreated }) {
 
           <div class="com-menu">
             <div class="com-cats" id="com-cats">
-              ${categories.map((cat, i) => `
-                <button type="button" class="com-cat btn-press ${i === 0 ? 'com-cat--active' : ''}" data-cat="${cat}">${cat}</button>
+              ${categories.map(cat => `
+                <button type="button" class="com-cat btn-press ${cat === state.activeCategory ? 'com-cat--active' : ''}" data-cat="${cat}">${cat}</button>
               `).join('')}
             </div>
             <div class="com-items" id="com-items"></div>
@@ -125,14 +136,14 @@ export function openCreateOrderModal({ clients, items, onCreated }) {
       </div>
     `;
 
-    renderItems(categories[0]);
+    renderItems(state.activeCategory);
     bindModalEvents();
   }
 
   function renderItems(activeCat) {
     const grid = overlay.querySelector('#com-items');
     if (!grid) return;
-    const list = available.filter(i => i.category === activeCat);
+    const list = getAvailableItems().filter(i => i.category === activeCat);
     grid.innerHTML = list.map(item => `
       <button type="button" class="com-item btn-press" data-add="${item.id}">
         <span class="com-item-name">${item.name}</span>
@@ -151,9 +162,11 @@ export function openCreateOrderModal({ clients, items, onCreated }) {
     });
     overlay.querySelector('#com-date')?.addEventListener('change', e => {
       state.dateSlot = e.target.value;
+      render();
     });
     overlay.querySelector('#com-time')?.addEventListener('change', e => {
       state.timeSlot = e.target.value;
+      render();
     });
     overlay.querySelector('#com-use-balance')?.addEventListener('change', e => {
       state.useBalance = e.target.checked;
@@ -164,6 +177,7 @@ export function openCreateOrderModal({ clients, items, onCreated }) {
       if (!btn) return;
       overlay.querySelectorAll('.com-cat').forEach(el => el.classList.remove('com-cat--active'));
       btn.classList.add('com-cat--active');
+      state.activeCategory = btn.dataset.cat;
       renderItems(btn.dataset.cat);
     });
 
@@ -184,7 +198,7 @@ export function openCreateOrderModal({ clients, items, onCreated }) {
   }
 
   function addItem(itemId) {
-    const item = available.find(i => i.id === itemId);
+    const item = getAvailableItems().find(i => i.id === itemId);
     if (!item) return;
     const existing = state.cart.get(itemId);
     if (existing) {
