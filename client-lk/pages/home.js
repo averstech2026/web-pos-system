@@ -107,9 +107,11 @@ export class HomePage {
           <div id="orders-list" class="orders-list">
             <div class="loading-text">Загрузка…</div>
           </div>
-
-          <button class="btn btn-primary btn-pill btn-press new-order-btn" id="btn-new-order">Новый заказ</button>
         </main>
+
+        <div class="lk-bottom-bar">
+          <button class="btn btn-primary btn-pill btn-press new-order-btn" id="btn-new-order">Новый заказ</button>
+        </div>
 
         <!-- Side drawer -->
         <div class="drawer-overlay" id="drawer-overlay" style="display:none"></div>

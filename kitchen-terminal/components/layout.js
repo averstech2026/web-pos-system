@@ -13,16 +13,17 @@ import { fmtClock, fmtDateLong } from '../utils/format.js';
 export function renderKitchenShell({ title, activeTab, toolbarHtml = '', bodyHtml }) {
   return `
     <div class="kt-shell">
-      <header class="kt-header">
-        <img class="kt-logo" src="${logoUrl}" alt="iFCM TECH" />
-        <h1 class="kt-title">${title}</h1>
-        <div class="kt-clock">
-          <span class="kt-clock-time" id="kt-clock-time">${fmtClock()}</span>
-          <span class="kt-clock-date" id="kt-clock-date">${fmtDateLong()}</span>
-        </div>
-      </header>
-
-      ${toolbarHtml ? `<div class="kt-toolbar">${toolbarHtml}</div>` : ''}
+      <div class="kt-top-fixed">
+        <header class="kt-header">
+          <img class="kt-logo" src="${logoUrl}" alt="iFCM TECH" />
+          <h1 class="kt-title">${title}</h1>
+          <div class="kt-clock">
+            <span class="kt-clock-time" id="kt-clock-time">${fmtClock()}</span>
+            <span class="kt-clock-date" id="kt-clock-date">${fmtDateLong()}</span>
+          </div>
+        </header>
+        ${toolbarHtml ? `<div class="kt-toolbar">${toolbarHtml}</div>` : ''}
+      </div>
 
       <main class="kt-main kiosk-scroll" id="kt-main">${bodyHtml}</main>
 

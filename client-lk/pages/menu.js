@@ -114,8 +114,8 @@ export class MenuPage {
         <!-- Sticky cart bar -->
         <div class="cart-bar" id="cart-bar" style="display:none">
           <button class="btn btn-primary btn-pill btn-press cart-bar-btn" id="btn-checkout">
-            <span id="cart-bar-label">Оформить заказ</span>
-            <span class="cart-bar-badge" id="cart-bar-total">0 р.</span>
+            <span class="cart-bar-btn-text" id="cart-bar-label">Оформить заказ</span>
+            <span class="cart-bar-amount" id="cart-bar-total">0 р.</span>
           </button>
         </div>
 
@@ -244,8 +244,9 @@ export class MenuPage {
       bar.style.display = 'none';
     } else {
       bar.style.display = 'block';
-      label.textContent = `Оформить заказ (${count} ${pluralItem(count)})`;
+      label.textContent = `Оформить заказ ${count} ${pluralItem(count)}`;
       total.textContent = `${cart.total().toLocaleString('ru-RU')} р.`;
+      total.style.display = '';
     }
   }
 
@@ -256,6 +257,7 @@ export class MenuPage {
 
     btn.disabled = true;
     btn.querySelector('#cart-bar-label').textContent = 'Создаём заказ…';
+    btn.querySelector('#cart-bar-total').style.display = 'none';
 
     try {
       const user = auth.currentUser;
@@ -277,6 +279,7 @@ export class MenuPage {
       console.error('Create order error:', err);
       alert('Не удалось создать заказ. Попробуйте ещё раз.');
       btn.disabled = false;
+      btn.querySelector('#cart-bar-total').style.display = '';
       this.updateCartBar();
     }
   }

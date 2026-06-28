@@ -73,6 +73,18 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['items']);
     }
 
+    function isClientOrderPayment() {
+      return isOrderOwner()
+        && isUnpaidPendingOrder()
+        && request.resource.data.paymentStatus == 'paid'
+        && request.resource.data.status == 'cooking'
+        && request.resource.data.checkId is string
+        && request.resource.data.checkId.size() > 0
+        && request.resource.data.items == resource.data.items
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkId', 'paymentStatus', 'status']);
+    }
+
     // ── orders ───────────────────────────────────────────────
     match /orders/{orderId} {
       // Client reads own orders; staff reads all.
@@ -81,7 +93,7 @@ service cloud.firestore {
       );
       // Client creates orders; staff updates status.
       allow create: if isAuth();
-      allow update: if isStaff() || isClientOrderCancel() || isClientOrderItemsUpdate();
+      allow update: if isStaff() || isClientOrderCancel() || isClientOrderItemsUpdate() || isClientOrderPayment();
       allow delete: if isRole('admin');
     }
 

@@ -163,12 +163,17 @@ export class AssemblyPage {
       <section class="kt-assembly-section card">
         <h2 class="kt-assembly-title">${category.toUpperCase()}</h2>
         <ul class="kt-assembly-list">
+          <li class="kt-assembly-header">
+            <span class="kt-assembly-col-name">название</span>
+            <span class="kt-assembly-col-qty">кол-во</span>
+            <span class="kt-assembly-col-orders">номер заказа</span>
+          </li>
           ${rows.map(row => `
             <li class="kt-assembly-row">
               <span class="kt-assembly-name">${row.name}</span>
               <span class="kt-assembly-badge">${row.count}</span>
               <span class="kt-assembly-orders" title="Номера заказов">
-                ${[...row.orderNumbers].slice(0, 5).join(', ')}
+                ${[...row.orderNumbers].sort((a, b) => Number(a) - Number(b)).join(', ')}
               </span>
             </li>
           `).join('')}

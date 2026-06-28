@@ -6,6 +6,8 @@ import { STAFF_DEMO_PASSWORD } from '../../shared/seed.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
 const STAFF_ROLES = [ROLES.COOK, ROLES.ADMIN, ROLES.MANAGER];
+const DEMO_EMAIL = 'cook@ifcm.demo';
+const DEMO_PASSWORD = STAFF_DEMO_PASSWORD;
 
 function authErrorMessage(err) {
   const code = err?.code;
@@ -41,12 +43,12 @@ export class AuthPage {
             <div class="form-group">
               <label for="kt-email">Email</label>
               <input id="kt-email" type="email" autocomplete="username"
-                     value="cook@ifcm.demo" placeholder="cook@ifcm.demo" />
+                     placeholder="cook@ifcm.demo" />
             </div>
             <div class="form-group">
               <label for="kt-pass">Пароль</label>
               <input id="kt-pass" type="password" autocomplete="current-password"
-                     value="${STAFF_DEMO_PASSWORD}" placeholder="demo1234" />
+                     placeholder="demo1234" />
             </div>
             <div id="kt-auth-error" class="auth-error" hidden></div>
             <button class="btn btn-primary btn-pill btn-press" id="kt-login" type="button">
@@ -56,7 +58,10 @@ export class AuthPage {
         </div>
 
         <p class="kt-auth-hint">
-          Демо: <strong>cook@ifcm.demo</strong> / <strong>${STAFF_DEMO_PASSWORD}</strong>
+          Демо:
+          <button type="button" class="kt-auth-demo-btn" id="kt-demo-fill" aria-label="Заполнить демо-данные">
+            <code>${DEMO_EMAIL}</code> / <code>${DEMO_PASSWORD}</code>
+          </button>
         </p>
       </div>
     `;
@@ -64,6 +69,12 @@ export class AuthPage {
     document.getElementById('kt-login').addEventListener('click', () => this.submit());
     document.getElementById('kt-pass').addEventListener('keydown', e => {
       if (e.key === 'Enter') this.submit();
+    });
+    document.getElementById('kt-demo-fill')?.addEventListener('click', () => {
+      document.getElementById('kt-email').value = DEMO_EMAIL;
+      document.getElementById('kt-pass').value = DEMO_PASSWORD;
+      const errEl = document.getElementById('kt-auth-error');
+      errEl.hidden = true;
     });
   }
 

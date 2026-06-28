@@ -6,8 +6,17 @@
 
 .kt-shell {
   min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
+}
+
+/* Fixed top: header + optional toolbar */
+.kt-top-fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  background: var(--color-surface);
+  box-shadow: 0 2px 12px rgba(30, 27, 75, 0.06);
 }
 
 /* Header */
@@ -19,7 +28,6 @@
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
-  box-shadow: 0 2px 12px rgba(30, 27, 75, 0.06);
 }
 
 .kt-logo {
@@ -102,11 +110,21 @@
   font-size: var(--font-size-xs);
 }
 
-/* Main content */
+/* Main content — scrolls between fixed header and nav */
 .kt-main {
-  flex: 1;
+  min-height: 100dvh;
   overflow-y: auto;
   padding: var(--space-md) var(--space-lg);
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+}
+
+.kt-shell:not(:has(.kt-toolbar)) .kt-main {
+  padding-top: calc(68px + var(--space-md));
+}
+
+.kt-shell:has(.kt-toolbar) .kt-main {
+  padding-top: calc(124px + var(--space-md));
 }
 
 .kt-empty {
@@ -148,38 +166,83 @@
 }
 
 .kt-order-head {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto;
-  gap: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding: var(--space-sm) var(--space-md);
   background: #4b5563;
   color: #fff;
   font-size: var(--font-size-sm);
 }
 
+.kt-order-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.kt-order-head-row--meta {
+  align-items: center;
+  gap: 4px;
+}
+
 .kt-order-num {
   font-weight: 800;
-  grid-column: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.kt-order-head-status {
+  flex-shrink: 0;
+  background: #22c55e;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 2px 5px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .kt-order-time {
-  grid-column: 1 / -1;
-  font-size: var(--font-size-xs);
-  opacity: 0.9;
+  font-size: 9px;
+  opacity: 0.85;
+  line-height: 1.2;
+  min-width: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kt-order-timers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .kt-order-timer {
-  grid-column: 2;
-  grid-row: 1;
+  flex-shrink: 0;
   background: #22c55e;
   color: #fff;
   font-weight: 800;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: var(--radius-pill);
   font-variant-numeric: tabular-nums;
-  align-self: start;
-  justify-self: end;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.kt-order-timer--frozen {
+  background: #64748b;
+}
+
+.kt-order-timer--issue {
+  background: #22c55e;
 }
 
 .kt-order-items {
@@ -195,6 +258,15 @@
   gap: var(--space-sm);
   padding: 6px 0;
   border-bottom: 1px solid var(--color-border);
+}
+
+.kt-order-line--issue {
+  grid-template-columns: 32px 1fr auto auto;
+}
+
+.kt-order-line--issued .kt-line-name {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
 }
 
 .kt-order-line:last-child {
@@ -225,6 +297,42 @@
   border-color: #22c55e;
 }
 
+.kt-check--readonly {
+  cursor: default;
+  pointer-events: none;
+}
+
+.kt-check--done {
+  background: #22c55e;
+  border-color: #22c55e;
+}
+
+.kt-issue-btn {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-navy);
+  font-family: var(--font-base);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.kt-issue-btn--done {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.kt-issue-btn:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
 .kt-line-name {
   font-size: var(--font-size-sm);
   font-weight: 600;
@@ -237,22 +345,35 @@
   color: var(--color-text-muted);
 }
 
-.kt-ready-btn {
-  margin: var(--space-sm) var(--space-md) var(--space-md);
-  width: calc(100% - var(--space-md) * 2);
-  min-height: 44px;
-  font-size: var(--font-size-sm);
+.kt-order-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: 0 var(--space-md) var(--space-md);
 }
 
-.kt-ready-badge {
-  margin: var(--space-sm) var(--space-md) var(--space-md);
-  padding: var(--space-sm);
+.kt-order-action {
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-md);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  background: #dcfce7;
-  color: #166534;
-  font-weight: 800;
-  font-size: var(--font-size-sm);
-  border-radius: var(--radius-sm);
+}
+
+.kt-issue-all-btn {
+  min-height: 52px;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-width: 2px;
 }
 
 /* Assembly sections */
@@ -279,16 +400,53 @@
 
 .kt-assembly-list {
   list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 48px minmax(0, 1fr);
+  column-gap: var(--space-sm);
+  row-gap: 0;
+}
+
+.kt-assembly-header,
+.kt-assembly-row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+  font-size: var(--font-size-sm);
+}
+
+.kt-assembly-header {
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.kt-assembly-col-name {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+}
+
+.kt-assembly-col-qty {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: center;
+  text-transform: lowercase;
+}
+
+.kt-assembly-col-orders {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: right;
+  text-transform: lowercase;
 }
 
 .kt-assembly-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: var(--space-sm);
-  align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid var(--color-border);
-  font-size: var(--font-size-sm);
 }
 
 .kt-assembly-row:last-child {
@@ -297,11 +455,13 @@
 
 .kt-assembly-name {
   font-weight: 600;
+  min-width: 0;
 }
 
 .kt-assembly-badge {
-  min-width: 32px;
+  width: 32px;
   height: 32px;
+  justify-self: center;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -315,15 +475,18 @@
 .kt-assembly-orders {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
-  max-width: 80px;
   text-align: right;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
-/* Bottom navigation */
+/* Bottom navigation — fixed */
 .kt-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: var(--space-sm);
@@ -331,6 +494,7 @@
   background: var(--color-surface);
   border-top: 1px solid rgba(229, 231, 235, 0.65);
   box-shadow: var(--shadow-footer);
+  z-index: 30;
 }
 
 .kt-nav-btn {
@@ -395,9 +559,15 @@
   gap: var(--space-lg);
 }
 
+.kt-auth-logo {
+  text-align: center;
+}
+
 .kt-auth-logo img {
   height: 56px;
   width: auto;
+  display: inline-block;
+  object-fit: contain;
 }
 
 .kt-auth-sub {
@@ -429,6 +599,28 @@
   color: var(--color-text-muted);
   text-align: center;
   max-width: 400px;
+}
+.kt-auth-demo-btn {
+  display: inline;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.kt-auth-demo-btn:hover code,
+.kt-auth-demo-btn:focus-visible code {
+  background: var(--color-indigo-soft);
+}
+.kt-auth-hint code {
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: 12px;
+  color: var(--color-navy);
+  transition: background 0.15s;
 }
 
 .auth-error {

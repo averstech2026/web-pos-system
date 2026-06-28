@@ -7,7 +7,10 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../../shared/schema.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
-const DEMO_HINT = `<code>ivanov@ifcm.demo</code> / <code>demo1234</code>`;
+import { STAFF_DEMO_PASSWORD } from '../../shared/seed.js';
+
+const DEMO_EMAIL = 'ivanov@ifcm.demo';
+const DEMO_PASSWORD = STAFF_DEMO_PASSWORD;
 
 export class AuthPage {
   constructor(container, navigate) {
@@ -56,7 +59,13 @@ export class AuthPage {
           </div>
         </div>
 
-        ${this.mode === 'login' ? `<p class="auth-hint">Демо: ${DEMO_HINT}</p>` : ''}
+        ${this.mode === 'login' ? `
+        <p class="auth-hint">
+          Демо:
+          <button type="button" class="auth-demo-btn" id="auth-demo-fill" aria-label="Заполнить демо-данные">
+            <code>${DEMO_EMAIL}</code> / <code>${DEMO_PASSWORD}</code>
+          </button>
+        </p>` : ''}
       </div>
     `;
 
@@ -74,6 +83,12 @@ export class AuthPage {
     document.getElementById('auth-submit').addEventListener('click', () => this.submit());
     document.getElementById('auth-password').addEventListener('keydown', e => {
       if (e.key === 'Enter') this.submit();
+    });
+
+    document.getElementById('auth-demo-fill')?.addEventListener('click', () => {
+      document.getElementById('auth-email').value = DEMO_EMAIL;
+      document.getElementById('auth-password').value = DEMO_PASSWORD;
+      document.getElementById('auth-error').style.display = 'none';
     });
   }
 
