@@ -6,8 +6,9 @@ export function fmtClock(d = new Date()) {
 /** @returns {string} e.g. "понедельник, 09 апреля 2024 г." */
 export function fmtDateLong(d = new Date()) {
   const weekday = d.toLocaleDateString('ru-RU', { weekday: 'long' });
+  const weekdayCap = weekday.charAt(0).toUpperCase() + weekday.slice(1);
   const rest = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-  return `${weekday}, ${rest}`;
+  return `${weekdayCap}, ${rest}`;
 }
 
 /**
