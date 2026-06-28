@@ -1,4 +1,4 @@
-import { normalizeGroupAvailability } from './group-availability.js';
+import { formatAvailabilityRuleShort } from './availability-rules.js';
 
 /** Default product categories (menu groups). */
 export const DEFAULT_CATEGORIES = [
@@ -14,10 +14,7 @@ export const DEFAULT_CATEGORIES = [
  * @property {string} id
  * @property {string} name
  * @property {string|null} [imageUrl]
- * @property {string|null} [availableFrom] - HH:MM (legacy, first rule)
- * @property {string|null} [availableTo] - HH:MM (legacy, first rule)
- * @property {boolean} [availabilityRestricted]
- * @property {import('./group-availability.js').CategoryAvailabilityRule[]} [availabilityRules]
+ * @property {string|null} [availabilityRuleId] - ref to availability_rules/{id}; null = always available
  */
 
 /** @param {string} name */
@@ -48,29 +45,17 @@ export function normalizeCategoryGroup(raw, fallbackName = '') {
       id: slugFromCategoryName(name),
       name,
       imageUrl: null,
-      availableFrom: null,
-      availableTo: null,
-      availabilityRestricted: false,
-      availabilityRules: [],
+      availabilityRuleId: null,
     });
   }
   const name = String(raw?.name || fallbackName || '').trim();
-  const base = {
+  const ruleId = raw?.availabilityRuleId || null;
+
+  return {
     id: String(raw?.id || slugFromCategoryName(name)).trim() || slugFromCategoryName(name),
     name,
     imageUrl: raw?.imageUrl || null,
-    availableFrom: raw?.availableFrom || null,
-    availableTo: raw?.availableTo || null,
-    availabilityRestricted: raw?.availabilityRestricted,
-    availabilityRules: Array.isArray(raw?.availabilityRules) ? raw.availabilityRules : [],
-  };
-  const avail = normalizeGroupAvailability(base);
-  return {
-    ...base,
-    availabilityRestricted: avail.restricted,
-    availabilityRules: avail.restricted ? avail.rules : [],
-    availableFrom: avail.restricted && avail.rules[0] ? avail.rules[0].timeFrom : null,
-    availableTo: avail.restricted && avail.rules[0] ? avail.rules[0].timeTo : null,
+    availabilityRuleId: ruleId,
   };
 }
 
@@ -114,10 +99,14 @@ export function mergeCategoryGroups(stored, fromItems = []) {
   return [...ordered, ...rest];
 }
 
-/** @param {string} [from] @param {string} [to] */
-export function formatCategorySchedule(from, to) {
-  if (!from || !to) return 'Весь день';
-  return `${from}–${to}`;
+/**
+ * @param {CategoryGroup} group
+ * @param {import('./availability-rules.js').AvailabilityRuleDoc|null|undefined} [rule]
+ */
+export function formatGroupScheduleSummary(group, rule = null) {
+  if (!group?.availabilityRuleId) return 'Весь день';
+  if (rule) return formatAvailabilityRuleShort(rule);
+  return 'По расписанию';
 }
 
 /** @param {CategoryGroup[]} [stored] @param {string[]} [fromItems] */

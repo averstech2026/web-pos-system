@@ -2,19 +2,14 @@ import { createItem, updateItem } from '../services/products-data.js';
 import { productThumbHtml } from '../utils/product-image.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
-import {
-  DAY_LABELS,
-  DAY_MODE_OPTIONS,
-  DAY_VALUES,
-  buildAvailabilityFromForm,
-  normalizeItemAvailability,
-} from '../../shared/item-availability.js';
+import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.js';
 
 /**
  * @param {object} p
  * @param {object|null} [p.item]
  * @param {string[]} [p.categories]
  * @param {Array<{ id: string, name: string }>} [p.allergens]
+ * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} [p.availabilityRules]
  * @param {string|null} [p.lockedCategory]
  * @param {(saved: object) => void|Promise<void>} [p.onSaved]
  */
@@ -22,6 +17,7 @@ export function openItemFormModal({
   item = null,
   categories = [],
   allergens = [],
+  availabilityRules = [],
   lockedCategory = null,
   onSaved,
 }) {
@@ -35,7 +31,8 @@ export function openItemFormModal({
   overlay.setAttribute('aria-modal', 'true');
 
   const nutrition = resolveItemNutrition(item || {});
-  const availability = normalizeItemAvailability(item?.availability);
+  const rulesMap = new Map(availabilityRules.map(r => [r.id, r]));
+  const selectedRuleId = item?.availabilityRuleId || '';
 
   const state = {
     name: item?.name || '',
@@ -50,20 +47,16 @@ export function openItemFormModal({
     allergens: [...(item?.allergens || [])],
     imageUrl: item?.imageUrl || getItemImageUrl(item?.name || '') || '',
     previewObjectUrl: null,
-    availability: {
-      restricted: availability.restricted,
-      timeEnabled: !!(availability.timeFrom && availability.timeTo),
-      timeFrom: availability.timeFrom || '08:00',
-      timeTo: availability.timeTo || '11:00',
-      dayMode: availability.dayMode || 'all',
-      customDays: [...(availability.customDays || [])],
-      dateRangeEnabled: !!availability.dateRangeEnabled,
-      dateFrom: availability.dateFrom || '',
-      dateTo: availability.dateTo || '',
-    },
+    availabilityRuleId: selectedRuleId,
   };
 
   const categoryOptions = [...new Set([...categories, state.category].filter(Boolean))];
+  const ruleOptions = availabilityRules.map(r => `
+    <option value="${escAttr(r.id)}" ${r.id === selectedRuleId ? 'selected' : ''}>${esc(r.name)}</option>
+  `).join('');
+  const initialSummary = selectedRuleId && rulesMap.get(selectedRuleId)
+    ? formatAvailabilityRuleSummary(rulesMap.get(selectedRuleId))
+    : '';
 
   function close() {
     if (state.previewObjectUrl) URL.revokeObjectURL(state.previewObjectUrl);
@@ -206,77 +199,15 @@ export function openItemFormModal({
             `}
 
             <fieldset class="ifm-fieldset ifm-availability">
-              <legend>Матрица ограничений</legend>
-              <label class="ifm-check ifm-check--inline">
-                <input type="checkbox" id="ifm-avail-restricted" ${state.availability.restricted ? 'checked' : ''} />
-                <span>Ограничить период доступности</span>
+              <legend>Время доступности</legend>
+              <label class="ifm-field">
+                <span>Шаблон расписания</span>
+                <select id="ifm-availability-rule-id" class="ifm-select">
+                  <option value="" ${!selectedRuleId ? 'selected' : ''}>Доступно всегда (Без ограничений)</option>
+                  ${ruleOptions}
+                </select>
               </label>
-
-              <div class="ifm-availability-body" id="ifm-availability-body" ${state.availability.restricted ? '' : 'hidden'}>
-                <div class="ifm-avail-block">
-                  <span class="ifm-avail-label">Часы</span>
-                  <label class="ifm-check ifm-check--inline">
-                    <input type="checkbox" id="ifm-avail-time-enabled" ${state.availability.timeEnabled ? 'checked' : ''} />
-                    <span>Только в указанные часы</span>
-                  </label>
-                  <div class="ifm-avail-time-row" id="ifm-avail-time-row" ${state.availability.timeEnabled ? '' : 'hidden'}>
-                    <label class="ifm-field ifm-field--compact">
-                      <span>С</span>
-                      <input type="time" id="ifm-avail-time-from" value="${escAttr(state.availability.timeFrom)}" />
-                    </label>
-                    <label class="ifm-field ifm-field--compact">
-                      <span>До</span>
-                      <input type="time" id="ifm-avail-time-to" value="${escAttr(state.availability.timeTo)}" />
-                    </label>
-                  </div>
-                </div>
-
-                <div class="ifm-avail-block">
-                  <span class="ifm-avail-label">Дни недели</span>
-                  <div class="products-chip-group ifm-avail-day-modes" id="ifm-avail-day-modes">
-                    ${DAY_MODE_OPTIONS.map(o => `
-                      <button
-                        type="button"
-                        class="products-chip btn-press ${state.availability.dayMode === o.id ? 'products-chip--active' : ''}"
-                        data-day-mode="${o.id}"
-                      >${o.label}</button>
-                    `).join('')}
-                  </div>
-                  <div class="ifm-avail-custom-days" id="ifm-avail-custom-days" ${state.availability.dayMode === 'custom' ? '' : 'hidden'}>
-                    ${DAY_VALUES.map((day, i) => `
-                      <label class="ifm-allergen">
-                        <input
-                          type="checkbox"
-                          value="${day}"
-                          data-custom-day
-                          ${state.availability.customDays.includes(day) ? 'checked' : ''}
-                        />
-                        <span>${DAY_LABELS[i]}</span>
-                      </label>
-                    `).join('')}
-                  </div>
-                </div>
-
-                <div class="ifm-avail-block">
-                  <span class="ifm-avail-label">Диапазон дат</span>
-                  <label class="ifm-check ifm-check--inline">
-                    <input type="checkbox" id="ifm-avail-date-enabled" ${state.availability.dateRangeEnabled ? 'checked' : ''} />
-                    <span>Ограничить датами (с … по …)</span>
-                  </label>
-                  <div class="ifm-avail-date-row" id="ifm-avail-date-row" ${state.availability.dateRangeEnabled ? '' : 'hidden'}>
-                    <label class="ifm-field ifm-field--compact">
-                      <span>С</span>
-                      <input type="date" id="ifm-avail-date-from" value="${escAttr(state.availability.dateFrom)}" />
-                    </label>
-                    <label class="ifm-field ifm-field--compact">
-                      <span>По</span>
-                      <input type="date" id="ifm-avail-date-to" value="${escAttr(state.availability.dateTo)}" />
-                    </label>
-                  </div>
-                </div>
-
-                <p class="ifm-hint ifm-hint--inline">Ограничения суммируются: товар виден только когда совпадают и день, и часы, и период дат (если заданы).</p>
-              </div>
+              <p class="ifm-hint ifm-avail-rule-summary" id="ifm-avail-rule-summary" ${initialSummary ? '' : 'hidden'}>${esc(initialSummary)}</p>
             </fieldset>
 
             <p class="ifm-error" id="ifm-error" hidden></p>
@@ -326,30 +257,15 @@ export function openItemFormModal({
     updatePreview();
   });
 
-  overlay.querySelector('#ifm-avail-restricted')?.addEventListener('change', e => {
-    const body = overlay.querySelector('#ifm-availability-body');
-    if (body) body.hidden = !e.target.checked;
-  });
-
-  overlay.querySelector('#ifm-avail-time-enabled')?.addEventListener('change', e => {
-    const row = overlay.querySelector('#ifm-avail-time-row');
-    if (row) row.hidden = !e.target.checked;
-  });
-
-  overlay.querySelector('#ifm-avail-date-enabled')?.addEventListener('change', e => {
-    const row = overlay.querySelector('#ifm-avail-date-row');
-    if (row) row.hidden = !e.target.checked;
-  });
-
-  overlay.querySelector('#ifm-avail-day-modes')?.addEventListener('click', e => {
-    const btn = e.target.closest('[data-day-mode]');
-    if (!btn) return;
-    const mode = btn.dataset.dayMode;
-    overlay.querySelectorAll('#ifm-avail-day-modes .products-chip').forEach(chip => {
-      chip.classList.toggle('products-chip--active', chip.dataset.dayMode === mode);
-    });
-    const custom = overlay.querySelector('#ifm-avail-custom-days');
-    if (custom) custom.hidden = mode !== 'custom';
+  overlay.querySelector('#ifm-availability-rule-id')?.addEventListener('change', e => {
+    const ruleId = e.target.value;
+    const summaryEl = overlay.querySelector('#ifm-avail-rule-summary');
+    const rule = ruleId ? rulesMap.get(ruleId) : null;
+    const summary = rule ? formatAvailabilityRuleSummary(rule) : '';
+    if (summaryEl) {
+      summaryEl.textContent = summary;
+      summaryEl.hidden = !summary;
+    }
   });
 
   dialog?.addEventListener('click', e => e.stopPropagation());
@@ -380,25 +296,8 @@ export function openItemFormModal({
       isAvailable: overlay.querySelector('#ifm-available')?.checked,
       allergens: [...overlay.querySelectorAll('.ifm-allergens input:checked')].map(el => el.value),
       imageUrl: overlay.querySelector('#ifm-image-url')?.value.trim() || getItemImageUrl(overlay.querySelector('#ifm-name')?.value.trim()),
+      availabilityRuleId: overlay.querySelector('#ifm-availability-rule-id')?.value || null,
     };
-
-    try {
-      const dayModeBtn = overlay.querySelector('#ifm-avail-day-modes .products-chip--active');
-      data.availability = buildAvailabilityFromForm({
-        restricted: overlay.querySelector('#ifm-avail-restricted')?.checked,
-        timeEnabled: overlay.querySelector('#ifm-avail-time-enabled')?.checked,
-        timeFrom: overlay.querySelector('#ifm-avail-time-from')?.value,
-        timeTo: overlay.querySelector('#ifm-avail-time-to')?.value,
-        dayMode: dayModeBtn?.dataset.dayMode || 'all',
-        customDays: [...overlay.querySelectorAll('[data-custom-day]:checked')].map(el => Number(el.value)),
-        dateRangeEnabled: overlay.querySelector('#ifm-avail-date-enabled')?.checked,
-        dateFrom: overlay.querySelector('#ifm-avail-date-from')?.value || null,
-        dateTo: overlay.querySelector('#ifm-avail-date-to')?.value || null,
-      });
-    } catch (err) {
-      showError(err.message || 'Проверьте настройки доступности');
-      return;
-    }
 
     if (!data.name.trim()) {
       showError('Укажите название');

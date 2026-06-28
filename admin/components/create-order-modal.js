@@ -7,7 +7,7 @@ import { processOrderPayment } from '../../shared/payment.js';
 import { fmtMoney } from '../utils/format.js';
 import { orderTotal } from '../utils/order-format.js';
 import { toDateInputValue } from '../utils/dates.js';
-import { isItemAvailableAt } from '../../shared/item-availability.js';
+import { isMenuItemAvailableAt } from '../../shared/availability-rules.js';
 
 const TIME_SLOTS = ['11:30', '12:00', '12:30', '13:00', '13:30'];
 
@@ -18,10 +18,12 @@ function orderNum() {
 /**
  * @param {object} p
  * @param {Array<{ id: string, name: string, email?: string, balance?: number }>} p.clients
- * @param {Array<{ id: string, name: string, price: number, category: string, isAvailable?: boolean }>} p.items
+ * @param {Array<{ id: string, name: string, price: number, category: string, isAvailable?: boolean, availabilityRuleId?: string|null }>} p.items
+ * @param {Map<string, { availabilityRuleId?: string|null }>} [p.groupsByName]
+ * @param {Partial<import('../../shared/availability-rules.js').AvailabilityRuleDoc>[]} [p.allRules]
  * @param {() => void} [p.onCreated]
  */
-export function openCreateOrderModal({ clients, items, onCreated }) {
+export function openCreateOrderModal({ clients, items, groupsByName = new Map(), allRules = [], onCreated }) {
   const state = {
     userId: clients[0]?.id || '',
     dateSlot: toDateInputValue(),
@@ -33,8 +35,10 @@ export function openCreateOrderModal({ clients, items, onCreated }) {
 
   function getAvailableItems() {
     return items.filter(i =>
-      i.isAvailable !== false
-      && isItemAvailableAt(i, { date: state.dateSlot, time: state.timeSlot }),
+      isMenuItemAvailableAt(i, groupsByName, allRules, {
+        date: state.dateSlot,
+        time: state.timeSlot,
+      }),
     );
   }
 

@@ -10,17 +10,9 @@ import { productThumbHtml } from '../utils/product-image.js';
 import {
   normalizeCategoryGroup,
   slugFromCategoryName,
-} from '../../shared/menu-catalog.js';
-import {
-  buildCategoryGroupAvailabilityPayload,
-  createDefaultAvailabilityRule,
-  DAY_LABELS,
-  DAY_VALUES,
   formatGroupScheduleSummary,
-  normalizeAvailabilityRule,
-  normalizeGroupAvailability,
-  validateGroupAvailability,
-} from '../../shared/group-availability.js';
+} from '../../shared/menu-catalog.js';
+import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.js';
 
 /**
  * @param {HTMLElement} host
@@ -28,17 +20,23 @@ import {
  * @param {import('../../shared/menu-catalog.js').CategoryGroup[]} p.categoryGroups
  * @param {Array<{ id: string, name?: string, category?: string, isAvailable?: boolean }>} p.items
  * @param {Array<{ id: string, name: string }>} [p.allergens]
+ * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} p.availabilityRules
  * @param {() => void|Promise<void>} [p.onSaved]
  */
-export function createCategoryGroupsEditor(host, { categoryGroups, items: initialItems, allergens = [], onSaved }) {
+export function createCategoryGroupsEditor(host, { categoryGroups, items: initialItems, allergens = [], availabilityRules = [], onSaved }) {
   /** @type {import('../../shared/menu-catalog.js').CategoryGroup[]} */
   let groups = categoryGroups.map(g => ({ ...normalizeCategoryGroup(g) }));
   /** @type {Array<{ id: string, name?: string, category?: string, isAvailable?: boolean }>} */
   let items = [...initialItems];
   const originalNames = new Set(groups.map(g => g.name));
   const originalNameById = new Map(groups.map(g => [g.id, g.name]));
+  /** @type {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} */
+  let rules = [...availabilityRules];
+  /** @type {Map<string, import('../../shared/availability-rules.js').AvailabilityRuleDoc>} */
+  let rulesMap = new Map(rules.map(r => [r.id, r]));
   /** @type {string|null} */
   let selectedId = null;
+
   /** @type {Record<string, string>} */
   let previewObjectUrls = {};
 
@@ -67,104 +65,61 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     return groups.find(g => g.id === selectedId) || null;
   }
 
-  function readRulesFromPanel(panel) {
-    return [...panel.querySelectorAll('.cgr-avail-rule')].map(row => normalizeAvailabilityRule({
-      id: row.dataset.ruleId,
-      days: [...row.querySelectorAll('.cgr-day-chip--active')].map(btn => Number(btn.dataset.day)),
-      timeFrom: row.querySelector('[data-field="time-from"]')?.value,
-      timeTo: row.querySelector('[data-field="time-to"]')?.value,
-      dateRangeEnabled: row.querySelector('[data-field="date-range-on"]')?.checked,
-      dateFrom: row.querySelector('[data-field="date-from"]')?.value || null,
-      dateTo: row.querySelector('[data-field="date-to"]')?.value || null,
-    }));
-  }
-
   function syncSidebarToState() {
     const panel = host.querySelector('#cgr-detail-panel');
     if (!selectedId || !panel) return;
 
-    const scheduleOn = panel.querySelector('[data-field="schedule-on"]')?.checked;
-    const rules = scheduleOn ? readRulesFromPanel(panel) : [];
-    const availPayload = buildCategoryGroupAvailabilityPayload(!!scheduleOn, rules);
+    const ruleSelect = panel.querySelector('[data-field="availability-rule-id"]');
+    const ruleId = ruleSelect?.value || null;
 
     const updated = normalizeCategoryGroup({
       ...groups.find(g => g.id === selectedId),
       id: selectedId,
       name: panel.querySelector('[data-field="name"]')?.value.trim() || '',
       imageUrl: panel.querySelector('[data-field="image-url"]')?.value.trim() || null,
-      ...availPayload,
+      availabilityRuleId: ruleId || null,
     });
 
     groups = groups.map(g => (g.id === selectedId ? updated : g));
   }
 
-  function renderAvailabilityRule(rule) {
-    return `
-      <div class="cgr-avail-rule" data-rule-id="${escAttr(rule.id)}">
-        <div class="cgr-avail-rule-main">
-          <div class="cgr-avail-rule-days" role="group" aria-label="Дни недели">
-            ${DAY_VALUES.map((day, i) => `
-              <button
-                type="button"
-                class="cgr-day-chip btn-press ${rule.days.includes(day) ? 'cgr-day-chip--active' : ''}"
-                data-day="${day}"
-                aria-pressed="${rule.days.includes(day)}"
-              >${DAY_LABELS[i]}</button>
-            `).join('')}
-          </div>
-          <div class="cgr-avail-rule-times">
-            <label class="cgr-time-field">
-              <span class="cgr-time-label">с</span>
-              <input type="time" data-field="time-from" value="${escAttr(rule.timeFrom)}" />
-            </label>
-            <label class="cgr-time-field">
-              <span class="cgr-time-label">до</span>
-              <input type="time" data-field="time-to" value="${escAttr(rule.timeTo)}" />
-            </label>
-          </div>
-          <div class="cgr-avail-rule-dates">
-            <label class="cgr-schedule-toggle cgr-schedule-toggle--inline">
-              <input type="checkbox" data-field="date-range-on" ${rule.dateRangeEnabled ? 'checked' : ''} />
-              <span>Ограничить период дат</span>
-            </label>
-            <div class="cgr-avail-date-row" data-date-fields ${rule.dateRangeEnabled ? '' : 'hidden'}>
-              <label class="cgr-time-field">
-                <span class="cgr-time-label">с</span>
-                <input type="date" data-field="date-from" value="${escAttr(rule.dateFrom || '')}" />
-              </label>
-              <label class="cgr-time-field">
-                <span class="cgr-time-label">до</span>
-                <input type="date" data-field="date-to" value="${escAttr(rule.dateTo || '')}" />
-              </label>
-            </div>
-          </div>
-        </div>
-        <button type="button" class="cgr-avail-rule-delete btn-press" data-action="delete-rule" title="Удалить правило" aria-label="Удалить правило">🗑</button>
-      </div>
-    `;
-  }
-
   function renderAvailabilitySection(group) {
-    const { restricted, rules } = normalizeGroupAvailability(group);
+    const selectedRuleId = group.availabilityRuleId || '';
+    const selectedRule = selectedRuleId ? rulesMap.get(selectedRuleId) : null;
+    const summary = selectedRule ? formatAvailabilityRuleSummary(selectedRule) : '';
+
+    const options = rules.map(r => `
+      <option value="${escAttr(r.id)}" ${r.id === selectedRuleId ? 'selected' : ''}>${esc(r.name)}</option>
+    `).join('');
 
     return `
       <div class="cgr-detail-subsection" id="cgr-availability-section">
         <h4 class="cgr-detail-section-title">Время доступности</h4>
-        <label class="cgr-schedule-toggle cgr-schedule-toggle--block">
-          <input type="checkbox" data-field="schedule-on" ${restricted ? 'checked' : ''} />
-          <span>Ограничить по времени</span>
+        <label class="cgr-avail-select-field">
+          <select class="cgr-avail-select" data-field="availability-rule-id">
+            <option value="" ${!selectedRuleId ? 'selected' : ''}>Доступно всегда (Без ограничений)</option>
+            ${options}
+          </select>
         </label>
-        <div class="cgr-avail-rules-wrap" data-schedule-fields ${restricted ? '' : 'hidden'}>
-          <div class="cgr-avail-rules" id="cgr-avail-rules">
-            ${rules.map(rule => renderAvailabilityRule(rule)).join('')}
-          </div>
-          <button type="button" class="btn btn-outline btn-press cgr-avail-add-rule" data-action="add-rule">
-            + Добавить правило
-          </button>
-        </div>
-        <p class="cgr-detail-hint">Группа видна в меню, когда выполняется хотя бы одно правило. Без ограничения — доступна весь день.</p>
+        <p class="cgr-avail-rule-summary" id="cgr-avail-rule-summary" ${summary ? '' : 'hidden'}>${esc(summary)}</p>
       </div>
     `;
+  }
+
+  function refreshAvailabilitySummary() {
+    const group = selectedGroup();
+    const summaryEl = host.querySelector('#cgr-avail-rule-summary');
+    if (!group || !summaryEl) return;
+    const ruleId = group.availabilityRuleId;
+    const rule = ruleId ? rulesMap.get(ruleId) : null;
+    const summary = rule ? formatAvailabilityRuleSummary(rule) : '';
+    summaryEl.textContent = summary;
+    summaryEl.hidden = !summary;
+  }
+
+  function scheduleSummaryForGroup(group) {
+    const rule = group.availabilityRuleId ? rulesMap.get(group.availabilityRuleId) : null;
+    return formatGroupScheduleSummary(group, rule);
   }
 
   function refreshAvailabilitySection() {
@@ -172,6 +127,15 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     const section = host.querySelector('#cgr-availability-section');
     if (!group || !section) return;
     section.outerHTML = renderAvailabilitySection(group);
+    bindAvailabilitySelect();
+  }
+
+  function bindAvailabilitySelect() {
+    host.querySelector('[data-field="availability-rule-id"]')?.addEventListener('change', e => {
+      syncSidebarToState();
+      refreshAvailabilitySummary();
+      updateListRowMeta(selectedId);
+    });
   }
 
   function renderProductList(group) {
@@ -223,7 +187,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
           <span class="cgr-row-thumb">${productThumbHtml({ name: group.name, imageUrl: group.imageUrl })}</span>
           <span class="cgr-row-info">
             <span class="cgr-row-name">${esc(group.name)}</span>
-            <span class="cgr-row-meta">${memberCount(group.id)} шт. · ${esc(formatGroupScheduleSummary(group))}</span>
+            <span class="cgr-row-meta">${memberCount(group.id)} шт. · ${esc(scheduleSummaryForGroup(group))}</span>
           </span>
         </button>
       </li>
@@ -346,7 +310,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     if (!row || !group) return;
     row.querySelector('.cgr-row-name')?.replaceChildren(document.createTextNode(group.name));
     row.querySelector('.cgr-row-meta')?.replaceChildren(
-      document.createTextNode(`${memberCount(id)} шт. · ${formatGroupScheduleSummary(group)}`),
+      document.createTextNode(`${memberCount(id)} шт. · ${scheduleSummaryForGroup(group)}`),
     );
     row.querySelector('.cgr-row-thumb')?.replaceChildren();
     row.querySelector('.cgr-row-thumb')?.insertAdjacentHTML(
@@ -411,45 +375,9 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
         }
         return;
       }
-
-      if (e.target.closest('[data-action="add-rule"]')) {
-        syncSidebarToState();
-        const group = selectedGroup();
-        if (!group) return;
-        const rules = normalizeGroupAvailability(group).rules;
-        rules.push(createDefaultAvailabilityRule());
-        groups = groups.map(g => (g.id === selectedId
-          ? normalizeCategoryGroup({ ...g, availabilityRestricted: true, availabilityRules: rules })
-          : g));
-        refreshAvailabilitySection();
-        updateListRowMeta(selectedId);
-        return;
-      }
-
-      const deleteRuleBtn = e.target.closest('[data-action="delete-rule"]');
-      if (deleteRuleBtn) {
-        syncSidebarToState();
-        const group = selectedGroup();
-        if (!group) return;
-        const ruleId = deleteRuleBtn.closest('.cgr-avail-rule')?.dataset.ruleId;
-        let rules = normalizeGroupAvailability(group).rules.filter(r => r.id !== ruleId);
-        if (!rules.length) rules = [createDefaultAvailabilityRule()];
-        groups = groups.map(g => (g.id === selectedId
-          ? normalizeCategoryGroup({ ...g, availabilityRestricted: true, availabilityRules: rules })
-          : g));
-        refreshAvailabilitySection();
-        updateListRowMeta(selectedId);
-        return;
-      }
-
-      const dayChip = e.target.closest('.cgr-day-chip');
-      if (dayChip) {
-        dayChip.classList.toggle('cgr-day-chip--active');
-        dayChip.setAttribute('aria-pressed', String(dayChip.classList.contains('cgr-day-chip--active')));
-        syncSidebarToState();
-        updateListRowMeta(selectedId);
-      }
     });
+
+    bindAvailabilitySelect();
 
     host.querySelector('#cgr-detail-panel')?.addEventListener('input', e => {
       if (!selectedId) return;
@@ -463,42 +391,6 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
 
     host.querySelector('#cgr-detail-panel')?.addEventListener('change', async e => {
       if (!selectedId) return;
-
-      if (e.target.matches('[data-field="schedule-on"]')) {
-        const fields = host.querySelector('[data-schedule-fields]');
-        if (fields) fields.hidden = !e.target.checked;
-        if (e.target.checked) {
-          const group = selectedGroup();
-          if (group && !normalizeGroupAvailability(group).rules.length) {
-            groups = groups.map(g => (g.id === selectedId
-              ? normalizeCategoryGroup({
-                ...g,
-                availabilityRestricted: true,
-                availabilityRules: [createDefaultAvailabilityRule()],
-              })
-              : g));
-            refreshAvailabilitySection();
-          }
-        }
-        syncSidebarToState();
-        updateListRowMeta(selectedId);
-        return;
-      }
-
-      if (e.target.matches('[data-field="date-range-on"]')) {
-        const row = e.target.closest('.cgr-avail-rule');
-        const dateFields = row?.querySelector('[data-date-fields]');
-        if (dateFields) dateFields.hidden = !e.target.checked;
-        syncSidebarToState();
-        updateListRowMeta(selectedId);
-        return;
-      }
-
-      if (e.target.matches('[data-field="time-from"], [data-field="time-to"], [data-field="date-from"], [data-field="date-to"]')) {
-        syncSidebarToState();
-        updateListRowMeta(selectedId);
-        return;
-      }
 
       if (e.target.matches('[data-photo-file]')) {
         const file = e.target.files?.[0];
@@ -565,6 +457,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     openItemFormModal({
       categories: groups.map(g => g.name),
       allergens,
+      availabilityRules: rules,
       lockedCategory: group.name,
       onSaved: saved => {
         if (!saved?.id) return;
@@ -637,17 +530,10 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
         if (names.has(name)) throw new Error(`Группа «${name}» указана дважды`);
         names.add(name);
 
-        const availPayload = buildCategoryGroupAvailabilityPayload(
-          !!g.availabilityRestricted,
-          g.availabilityRules || [],
-        );
-        if (availPayload.availabilityRestricted) {
-          validateGroupAvailability(true, availPayload.availabilityRules);
-        }
         const normalized = normalizeCategoryGroup({
           ...g,
           name,
-          ...availPayload,
+          availabilityRuleId: g.availabilityRuleId || null,
         });
 
         const oldName = originalNameById.get(g.id);

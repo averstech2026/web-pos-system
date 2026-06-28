@@ -1,7 +1,6 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   deleteField,
   doc,
   getDocs,
@@ -11,7 +10,6 @@ import {
 import { db } from '../../shared/firebase.js';
 import { COL, createItemDoc } from '../../shared/schema.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
-import { buildAvailabilityFromForm, normalizeItemAvailability } from '../../shared/item-availability.js';
 import { mergeCategories } from '../../shared/menu-catalog.js';
 
 export { DEFAULT_CATEGORIES } from '../../shared/menu-catalog.js';
@@ -100,9 +98,7 @@ export function buildItemPayload(data) {
   const isAvailable = data.isAvailable !== false;
   const allergens = Array.isArray(data.allergens) ? data.allergens.filter(Boolean) : [];
   const nutrition = parseNutrition(data);
-  const availability = data.availability != null
-    ? normalizeItemAvailability(data.availability)
-    : normalizeItemAvailability(null);
+  const availabilityRuleId = data.availabilityRuleId || null;
 
   const payload = createItemDoc({
     name,
@@ -110,7 +106,7 @@ export function buildItemPayload(data) {
     price,
     category,
     isAvailable,
-    availability,
+    availabilityRuleId,
     imageUrl: data.imageUrl || getItemImageUrl(name) || null,
     nutrition: nutrition || undefined,
     allergens,
@@ -145,7 +141,10 @@ export async function updateItem(id, data, existing = {}) {
     update.allergens = deleteField();
   }
 
-  if (!merged.availability?.restricted) {
+  if (!merged.availabilityRuleId) {
+    update.availabilityRuleId = deleteField();
+    update.availability = deleteField();
+  } else {
     update.availability = deleteField();
   }
 
@@ -154,8 +153,11 @@ export async function updateItem(id, data, existing = {}) {
 }
 
 /** @param {string} id */
-export async function deleteItem(id) {
-  await deleteDoc(doc(db, COL.ITEMS, id));
+export async function archiveItem(id) {
+  await updateDoc(doc(db, COL.ITEMS, id), {
+    isArchived: true,
+    isAvailable: false,
+  });
 }
 
 /** @param {string} id @param {boolean} isAvailable */

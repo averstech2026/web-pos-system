@@ -19,6 +19,8 @@ import {
   paymentStatusLabel,
 } from '../utils/order-format.js';
 import { ORDER_STATUS } from '../../shared/schema.js';
+import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
+import { fetchMenuSettings } from '../services/menu-settings-data.js';
 
 const STATUS_OPTIONS = [
   { id: ORDER_STATUS.PENDING, label: 'Ожидает' },
@@ -42,6 +44,8 @@ export class OrdersPage {
     this.orders = [];
     this.clients = [];
     this.items = [];
+    this.allRules = [];
+    this.groupsByName = new Map();
     this.itemsById = new Map();
     this.usersById = new Map();
     this.loading = true;
@@ -133,6 +137,8 @@ export class OrdersPage {
       openCreateOrderModal({
         clients: this.clients,
         items: this.items,
+        groupsByName: this.groupsByName,
+        allRules: this.allRules,
         onCreated: () => this.loadData(),
       });
       return;
@@ -242,15 +248,21 @@ export class OrdersPage {
         ? { start: startOfDay(fromDateInputValue(this.customFrom)), end: endOfDay(fromDateInputValue(this.customTo)) }
         : resolvePeriod(this.periodPreset, this.customFrom, this.customTo);
 
-      const [orders, clients, items] = await Promise.all([
+      const [orders, clients, items, availabilityRules, menuSettings] = await Promise.all([
         fetchOrdersFiltered(period.start, period.end, this.dateField),
         this.clients.length ? Promise.resolve(this.clients) : fetchClients(),
         this.items.length ? Promise.resolve(this.items) : fetchMenuItems(),
+        fetchActiveAvailabilityRules(),
+        fetchMenuSettings([]),
       ]);
 
       this.orders = orders;
       this.clients = clients;
       this.items = items;
+      this.allRules = availabilityRules;
+      this.groupsByName = new Map(
+        (menuSettings.categoryGroups || []).map(g => [g.name, g]),
+      );
       this.itemsById = new Map(items.map(i => [i.id, i]));
       this.usersById = new Map(clients.map(c => [c.id, c]));
       this.error = null;

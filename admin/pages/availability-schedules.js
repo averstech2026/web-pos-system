@@ -1,16 +1,18 @@
 import { bindAdminShell, renderAdminShell } from '../components/layout.js';
-import { createCategoryGroupsEditor } from '../components/category-groups-editor.js';
-import { fetchMenuSettings } from '../services/menu-settings-data.js';
+import { createAvailabilityRulesEditor } from '../components/availability-rules-editor.js';
+import { fetchAllAvailabilityRules } from '../services/availability-rules-data.js';
 import { fetchAllItems } from '../services/products-data.js';
-import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
+import { fetchMenuSettings } from '../services/menu-settings-data.js';
 
-export class CategoryGroupsPage {
+export class AvailabilitySchedulesPage {
   constructor(container, navigate) {
     this.container = container;
     this.navigate = navigate;
     this.editor = null;
     this.loading = true;
     this.error = null;
+    this.items = [];
+    this.categoryGroups = [];
     this.init();
   }
 
@@ -25,20 +27,19 @@ export class CategoryGroupsPage {
     this.renderShell();
 
     try {
-      const [items, availabilityRules] = await Promise.all([
-        fetchAllItems(),
-        fetchActiveAvailabilityRules(),
+      const items = await fetchAllItems();
+      const [rules, settings] = await Promise.all([
+        fetchAllAvailabilityRules(),
+        fetchMenuSettings(items.map(i => i.category)),
       ]);
-      const settings = await fetchMenuSettings(items.map(i => i.category));
+      this.rules = rules;
       this.items = items;
       this.categoryGroups = settings.categoryGroups;
-      this.allergens = settings.allergens;
-      this.availabilityRules = availabilityRules;
       this.loading = false;
       this.renderShell();
     } catch (err) {
-      console.error('[category-groups]', err);
-      this.error = err.message || 'Не удалось загрузить группы';
+      console.error('[availability-schedules]', err);
+      this.error = err.message || 'Не удалось загрузить расписания';
       this.loading = false;
       this.renderShell();
     }
@@ -46,15 +47,15 @@ export class CategoryGroupsPage {
 
   renderShell() {
     const bodyHtml = this.loading
-      ? '<div class="admin-loading">Загрузка групп…</div>'
+      ? '<div class="admin-loading">Загрузка расписаний…</div>'
       : this.error
         ? `<div class="admin-error card">${this.error}</div>`
-        : '<div class="cgr-page card" id="cgr-editor-host"></div>';
+        : '<div class="avr-page card" id="avr-editor-host"></div>';
 
     this.container.innerHTML = renderAdminShell({
-      active: 'groups',
-      title: 'Группы товаров',
-      subtitle: 'Категории меню: состав, фото и время доступности',
+      active: 'schedules',
+      title: 'Расписания / Матрицы',
+      subtitle: 'Централизованные шаблоны доступности для групп и товаров',
       bodyHtml,
     });
 
@@ -67,14 +68,13 @@ export class CategoryGroupsPage {
 
   mountEditor() {
     this.editor?.destroy();
-    const host = this.container.querySelector('#cgr-editor-host');
+    const host = this.container.querySelector('#avr-editor-host');
     if (!host) return;
 
-    this.editor = createCategoryGroupsEditor(host, {
+    this.editor = createAvailabilityRulesEditor(host, {
+      rules: this.rules,
       categoryGroups: this.categoryGroups,
       items: this.items,
-      allergens: this.allergens,
-      availabilityRules: this.availabilityRules,
       onSaved: () => this.loadData(),
     });
   }

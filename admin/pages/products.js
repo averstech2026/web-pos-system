@@ -12,7 +12,7 @@ import {
   bulkSetAvailability,
   bulkSetCategory,
   collectCategories,
-  deleteItem,
+  archiveItem,
   fetchAllItems,
   filterItems,
   setItemAvailability,
@@ -21,7 +21,8 @@ import { fmtCount, fmtMoney } from '../utils/format.js';
 import { productThumbHtml } from '../utils/product-image.js';
 import { showToast } from '../utils/toast.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
-import { formatAvailabilitySummary } from '../../shared/item-availability.js';
+import { formatAvailabilityRuleShort, buildGroupsByName, matchesScheduleFilter } from '../../shared/availability-rules.js';
+import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
 
 const AVAILABILITY_OPTIONS = [
   { id: 'all', label: 'Все' },
@@ -37,6 +38,8 @@ export class ProductsPage {
     this.categories = [];
     this.categoryGroups = [];
     this.allergens = [];
+    this.availabilityRules = [];
+    this.rulesMap = new Map();
     this.selectedIds = new Set();
     this.bulkSaving = false;
     this.categoryFilters = [];
@@ -45,6 +48,8 @@ export class ProductsPage {
     this.allergenDropdownOpen = false;
     this.search = '';
     this.availabilityFilter = 'all';
+    this.scheduleFilter = 'all';
+    this.groupsByName = new Map();
     this.loading = true;
     this.error = null;
     this.savingId = null;
@@ -66,12 +71,18 @@ export class ProductsPage {
     this.renderShell();
 
     try {
-      const items = await fetchAllItems();
+      const [items, availabilityRules] = await Promise.all([
+        fetchAllItems(),
+        fetchActiveAvailabilityRules(),
+      ]);
       const settings = await fetchMenuSettings(items.map(i => i.category));
       this.items = items;
       this.categories = collectCategories(settings.categories, items);
       this.categoryGroups = settings.categoryGroups;
       this.allergens = settings.allergens;
+      this.availabilityRules = availabilityRules;
+      this.rulesMap = new Map(availabilityRules.map(r => [r.id, r]));
+      this.groupsByName = buildGroupsByName(this.categoryGroups);
       this.error = null;
     } catch (err) {
       console.error('[products]', err);
@@ -83,12 +94,32 @@ export class ProductsPage {
   }
 
   filteredItems() {
-    return filterItems(this.items, {
+    let result = this.items.filter(i => i.isArchived !== true);
+
+    result = filterItems(result, {
       categories: this.categoryFilters,
       allergens: this.allergenFilters,
       search: this.search,
       availability: this.availabilityFilter,
     });
+
+    if (this.scheduleFilter !== 'all') {
+      result = result.filter(item => matchesScheduleFilter(item, this.groupsByName, this.scheduleFilter));
+    }
+
+    return result;
+  }
+
+  filterCategories() {
+    if (this.scheduleFilter === 'all') return this.categories;
+
+    const set = new Set(this.filteredItems().map(i => i.category).filter(Boolean));
+    if (this.scheduleFilter !== 'none') {
+      for (const g of this.categoryGroups) {
+        if (g.availabilityRuleId === this.scheduleFilter) set.add(g.name);
+      }
+    }
+    return this.categories.filter(c => set.has(c));
   }
 
   itemsCountText() {
@@ -218,7 +249,10 @@ export class ProductsPage {
 
   openItemModal(opts) {
     this.closeFilterDropdowns();
-    openItemFormModal(opts);
+    openItemFormModal({
+      availabilityRules: this.availabilityRules,
+      ...opts,
+    });
   }
 
   renderShell() {
@@ -308,7 +342,7 @@ export class ProductsPage {
           <span class="orders-status-trigger-caret" aria-hidden="true">▾</span>
         </button>
         <div class="orders-status-menu" id="products-category-menu" role="listbox" ${this.categoryDropdownOpen ? '' : 'hidden'}>
-          ${this.categories.map(c => `
+          ${this.filterCategories().map(c => `
             <label class="orders-status-option">
               <input type="checkbox" data-category-filter="${escAttr(c)}" ${this.categoryFilters.includes(c) ? 'checked' : ''} />
               <span>${esc(c)}</span>
@@ -353,36 +387,51 @@ export class ProductsPage {
   renderFilters() {
     return `
       <section class="products-filters card">
+        <div class="products-filters-primary">
+          <div class="products-filter-inline products-filter-search">
+            <span class="products-filter-label">Поиск</span>
+            <input
+              type="search"
+              class="products-search-input"
+              id="products-search"
+              placeholder="Название или описание…"
+              value="${escAttr(this.search)}"
+            />
+          </div>
+
+          <div class="products-filter-inline">
+            <span class="products-filter-label">Категория</span>
+            ${this.renderCategoryDropdown()}
+          </div>
+
+          <div class="products-filter-inline">
+            <span class="products-filter-label">Аллергены</span>
+            ${this.renderAllergenDropdown()}
+          </div>
+
+          <div class="products-filter-inline products-filter-schedule">
+            <span class="products-filter-label">Расписание</span>
+            <select class="products-schedule-select" id="products-schedule-filter" aria-label="Фильтр по расписанию">
+              <option value="all" ${this.scheduleFilter === 'all' ? 'selected' : ''}>Все</option>
+              <option value="none" ${this.scheduleFilter === 'none' ? 'selected' : ''}>Доступно всегда (Без ограничений)</option>
+              ${this.availabilityRules.map(r => `
+                <option value="${escAttr(r.id)}" ${this.scheduleFilter === r.id ? 'selected' : ''}>${esc(r.name)}</option>
+              `).join('')}
+            </select>
+          </div>
+        </div>
+
         <div class="products-filters-toolbar">
-          <div class="products-filters-group">
-            <div class="products-filter-inline products-filter-search">
-              <span class="products-filter-label">Поиск</span>
-              <input
-                type="search"
-                class="products-search-input"
-                id="products-search"
-                placeholder="Название или описание…"
-                value="${escAttr(this.search)}"
-              />
-            </div>
+          <button type="button" class="btn btn-primary btn-press products-create-btn" id="products-create-btn">
+            + Добавить
+          </button>
 
-            <div class="products-filter-inline">
-              <span class="products-filter-label">Категория</span>
-              ${this.renderCategoryDropdown()}
-            </div>
-
-            <div class="products-filter-inline">
-              <span class="products-filter-label">Аллергены</span>
-              ${this.renderAllergenDropdown()}
-            </div>
-
-            <div class="products-filter-inline">
-              <span class="products-filter-label">Доступность</span>
-              <div class="products-chip-group">
-                ${AVAILABILITY_OPTIONS.map(o => `
-                  <button type="button" class="products-chip btn-press ${this.availabilityFilter === o.id ? 'products-chip--active' : ''}" data-availability="${o.id}">${o.label}</button>
-                `).join('')}
-              </div>
+          <div class="products-filter-inline">
+            <span class="products-filter-label">Доступность</span>
+            <div class="products-chip-group">
+              ${AVAILABILITY_OPTIONS.map(o => `
+                <button type="button" class="products-chip btn-press ${this.availabilityFilter === o.id ? 'products-chip--active' : ''}" data-availability="${o.id}">${o.label}</button>
+              `).join('')}
             </div>
           </div>
 
@@ -393,13 +442,8 @@ export class ProductsPage {
             <span class="products-count">${this.itemsCountText()}</span>
           </div>
 
-          <div class="products-filters-sep" aria-hidden="true"></div>
-
           <div class="products-filters-actions">
             <button type="button" class="btn btn-outline btn-press products-meta-btn" id="products-manage-allergens">Аллергены</button>
-            <button type="button" class="btn btn-primary btn-press products-create-btn" id="products-create-btn">
-              + Добавить
-            </button>
           </div>
         </div>
       </section>
@@ -454,7 +498,8 @@ export class ProductsPage {
     const available = item.isAvailable !== false;
     const isSaving = this.savingId === item.id;
     const allergenText = this.allergenLabels(item.allergens);
-    const scheduleText = formatAvailabilitySummary(item.availability);
+    const rule = item.availabilityRuleId ? this.rulesMap.get(item.availabilityRuleId) : null;
+    const scheduleText = rule ? formatAvailabilityRuleShort(rule) : '';
 
     return `
       <tr class="products-row ${this.selectedIds.has(item.id) ? 'products-row--selected' : ''}" data-item-id="${item.id}">
@@ -493,7 +538,7 @@ export class ProductsPage {
         <td class="products-td-actions">
           <div class="products-actions-inner">
             <button type="button" class="products-action btn-press" data-action="edit" data-item-id="${item.id}">Изменить</button>
-            <button type="button" class="products-action products-action--danger btn-press" data-action="delete" data-item-id="${item.id}">Удалить</button>
+            <button type="button" class="products-action products-action--danger btn-press" data-action="archive" data-item-id="${item.id}">В архив</button>
           </div>
         </td>
       </tr>
@@ -535,6 +580,14 @@ export class ProductsPage {
       if (rowCheck.checked) this.selectedIds.add(id);
       else this.selectedIds.delete(id);
       this.syncBulkUi();
+      return;
+    }
+
+    if (e.target.id === 'products-schedule-filter') {
+      this.scheduleFilter = e.target.value || 'all';
+      this.categoryFilters = this.categoryFilters.filter(c => this.filterCategories().includes(c));
+      this.closeFilterDropdowns();
+      this.renderShell();
       return;
     }
 
@@ -631,6 +684,8 @@ export class ProductsPage {
     if (e.target.closest('#products-category-menu')) return;
     if (e.target.closest('#products-allergen-menu')) return;
 
+    if (e.target.closest('#products-schedule-filter')) return;
+
     const bulkAction = e.target.closest('[data-bulk-action]');
     if (bulkAction) {
       this.handleBulkAction(bulkAction.dataset.bulkAction);
@@ -662,9 +717,9 @@ export class ProductsPage {
       return;
     }
 
-    if (actionBtn.dataset.action === 'delete') {
-      if (!confirm(`Удалить «${item.name}» из справочника?`)) return;
-      this.deleteItem(itemId);
+    if (actionBtn.dataset.action === 'archive') {
+      if (!confirm(`Переместить «${item.name}» в архив? Товар исчезнет из меню, но останется в истории заказов.`)) return;
+      this.archiveItem(itemId);
       return;
     }
 
@@ -817,13 +872,16 @@ export class ProductsPage {
     }
   }
 
-  async deleteItem(id) {
+  async archiveItem(id) {
     try {
-      await deleteItem(id);
-      await this.loadData();
+      await archiveItem(id);
+      this.items = this.items.filter(i => i.id !== id);
+      this.selectedIds.delete(id);
+      this.refreshTable();
+      showToast('Товар перемещён в архив');
     } catch (err) {
-      console.error('[products] delete', err);
-      alert(err.message || 'Не удалось удалить товар');
+      console.error('[products] archive', err);
+      alert(err.message || 'Не удалось переместить товар в архив');
     }
   }
 

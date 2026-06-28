@@ -1,6 +1,6 @@
 import { auth, db } from '../../shared/firebase.js';
 import {
-  collection, getDocs, addDoc, query, where,
+  collection, getDoc, getDocs, addDoc, query, where,
   serverTimestamp,
 } from 'firebase/firestore';
 import { COL, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
@@ -8,7 +8,8 @@ import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-image
 import { cart } from '../store.js';
 import { openItemDetailModal } from '../components/item-detail.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
-import { isItemAvailableAt } from '../../shared/item-availability.js';
+import { filterActiveRules, isMenuItemAvailableAt, normalizeAvailabilityRuleDoc } from '../../shared/availability-rules.js';
+import { mergeCategoryGroups } from '../../shared/menu-catalog.js';
 
 function resolveImageUrl(item) {
   return resolveProductImageUrl(item.imageUrl) || getItemImageUrl(item.name);
@@ -39,9 +40,11 @@ export class MenuPage {
   constructor(container, navigate) {
     this.container = container;
     this.navigate = navigate;
-    this.items = [];           // all Firestore items
-    this.categories = [];      // ordered unique category list
+    this.items = [];
+    this.categories = [];
     this.activeCategory = null;
+    this.allRules = [];
+    this.groupsByName = new Map();
     this._cartUnsub = null;
     this.init();
   }
@@ -70,22 +73,31 @@ export class MenuPage {
   }
 
   async fetchItems() {
-    const snap = await getDocs(
-      query(collection(db, COL.ITEMS), where('isAvailable', '==', true))
+    const [itemsSnap, rulesSnap, menuSnap] = await Promise.all([
+      getDocs(query(collection(db, COL.ITEMS), where('isAvailable', '==', true))),
+      getDocs(collection(db, COL.AVAILABILITY_RULES)),
+      getDoc(doc(db, COL.SETTINGS, 'menu')),
+    ]);
+
+    this.allRules = filterActiveRules(
+      rulesSnap.docs.map(d => normalizeAvailabilityRuleDoc({ id: d.id, ...d.data() }, d.id)),
     );
-    this.items = snap.docs.map(d => {
+
+    const menuData = menuSnap.exists() ? menuSnap.data() : {};
+    const groups = mergeCategoryGroups(menuData.categoryGroups || []);
+    this.groupsByName = new Map(groups.map(g => [g.name, g]));
+
+    const slot = { date: cart.dateSlot, time: cart.timeSlot };
+
+    this.items = itemsSnap.docs.map(d => {
       const data = d.data();
       return {
         id: d.id,
         ...data,
         nutrition: resolveItemNutrition(data),
       };
-    }).filter(item => isItemAvailableAt(item, {
-      date: cart.dateSlot,
-      time: cart.timeSlot,
-    }));
+    }).filter(item => isMenuItemAvailableAt(item, this.groupsByName, this.allRules, slot));
 
-    // Preserve a nice category order
     const order = ['Первые блюда', 'Вторые блюда', 'Салаты', 'Напитки', 'Выпечка'];
     const found = [...new Set(this.items.map(i => i.category))];
     this.categories = [
@@ -107,7 +119,6 @@ export class MenuPage {
           <span class="menu-title">Заказ на ${dateLabel}, ${timeLabel}</span>
         </header>
 
-        <!-- Category tabs -->
         <div class="cat-tabs-wrap">
           <div class="cat-tabs hide-scrollbar" id="cat-tabs">
             ${this.categories.map(c => `
@@ -118,12 +129,10 @@ export class MenuPage {
           </div>
         </div>
 
-        <!-- Items grid -->
         <div class="menu-scroll" id="menu-scroll">
           <div class="items-grid" id="items-grid"></div>
         </div>
 
-        <!-- Sticky cart bar -->
         <div class="cart-bar" id="cart-bar" style="display:none">
           <button class="btn btn-primary btn-pill btn-press cart-bar-btn" id="btn-checkout">
             <span class="cart-bar-btn-text" id="cart-bar-label">Оформить заказ</span>
