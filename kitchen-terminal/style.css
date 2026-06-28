@@ -269,8 +269,103 @@
   text-decoration: line-through;
 }
 
+.kt-order-line--select-all {
+  position: relative;
+  border-bottom: none;
+  margin-bottom: var(--space-sm);
+}
+
+.kt-order-line--select-all::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: calc(-1 * var(--space-sm));
+  background: var(--color-indigo-soft);
+  border-radius: var(--radius-sm);
+  z-index: 0;
+}
+
+.kt-select-all-hit {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  align-self: stretch;
+  width: 100%;
+  min-height: 40px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  z-index: 2;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.kt-select-all-hit:active {
+  opacity: 0.88;
+}
+
+.kt-order-line--select-all .kt-check {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.kt-order-line--select-all .kt-line-name {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.kt-order-line--select-all .kt-line-qty {
+  grid-column: 3;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.kt-order-line--select-all.kt-order-line--done .kt-check {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+
+.kt-line-name--select-all {
+  font-size: var(--font-size-md);
+  font-weight: 800;
+  color: var(--color-navy);
+  letter-spacing: 0.02em;
+}
+
+.kt-order-line--select-all .kt-line-qty {
+  color: var(--color-navy);
+  font-weight: 800;
+  font-size: var(--font-size-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.kt-check--partial {
+  background: #dcfce7;
+  border-color: #22c55e;
+  color: #15803d;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.kt-order-line--select-all.kt-order-line--done .kt-line-name--select-all {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
 .kt-order-line:last-child {
   border-bottom: none;
+}
+
+.kt-order-line > .kt-check {
+  justify-self: center;
 }
 
 .kt-order-line--done .kt-line-name {
@@ -281,6 +376,8 @@
 .kt-check {
   width: 28px;
   height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   border-radius: 50%;
   border: 2px solid var(--color-border-strong);
   background: var(--color-surface);
@@ -290,6 +387,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  box-sizing: border-box;
 }
 
 .kt-order-line--done .kt-check {

@@ -4,6 +4,8 @@ import { COL } from '../../shared/schema.js';
 import { processOrderPayment } from '../../shared/payment.js';
 import { cancelUnpaidOrder, canCancelOrder } from '../../shared/orders.js';
 import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-images.js';
+import { hasNutrition, renderNutritionGrid, sumNutrition } from '../../shared/nutrition.js';
+import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { cart } from '../store.js';
 
 function resolveItemImage(item) {
@@ -85,12 +87,21 @@ export class PaymentPage {
         cart.setSlot(this.order.dateSlot, this.order.timeSlot);
       }
 
+      await this.enrichOrderNutrition();
       this.render();
     } catch (err) {
       console.error('Payment init error:', err);
       alert('Не удалось загрузить данные заказа.');
       this.navigate('/home');
     }
+  }
+
+  enrichOrderNutrition() {
+    this.order.items = (this.order.items || []).map(item => {
+      if (hasNutrition(item.nutrition)) return item;
+      const nutrition = resolveItemNutrition(item);
+      return nutrition ? { ...item, nutrition } : item;
+    });
   }
 
   renderLoading() {
@@ -160,6 +171,10 @@ export class PaymentPage {
     const items = o.items || [];
     const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
     const balance = this.userData.balance || 0;
+    const orderNutrition = sumNutrition(items);
+    const nutritionHtml = orderNutrition
+      ? `<div class="pay-nutrition">${renderNutritionGrid(orderNutrition, { title: 'КБЖУ заказа' })}</div>`
+      : '';
 
     this.container.innerHTML = `
       <div class="pay-shell">
@@ -185,6 +200,7 @@ export class PaymentPage {
               <span>Итого</span>
               <span id="pay-subtotal">${subtotal.toLocaleString('ru-RU')} р.</span>
             </div>
+            ${nutritionHtml}
           </div>
 
           <!-- Balance toggle -->

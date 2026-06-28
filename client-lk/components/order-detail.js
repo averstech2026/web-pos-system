@@ -1,5 +1,6 @@
 import { fmtDate, fmtMoney, orderStatusIcon, orderStatusLabel, orderTotal } from '../utils/format.js';
 import { canCancelOrder } from '../../shared/orders.js';
+import { renderNutritionGrid, sumNutrition } from '../../shared/nutrition.js';
 
 /**
  * Render order detail modal HTML (caller must bind close + overlay click).
@@ -9,6 +10,10 @@ export function renderOrderDetailModal(order) {
   const o = order.data;
   const items = o.items || [];
   const total = orderTotal(items);
+  const orderNutrition = sumNutrition(items);
+  const nutritionHtml = orderNutrition
+    ? `<div class="pay-nutrition">${renderNutritionGrid(orderNutrition, { title: 'КБЖУ заказа' })}</div>`
+    : '';
   const icon = orderStatusIcon(o.status);
   const label = orderStatusLabel(o.status);
   const payLabel = o.paymentStatus === 'paid' ? 'Оплачен' : 'Не оплачен';
@@ -47,6 +52,7 @@ export function renderOrderDetailModal(order) {
             <span>Итого</span>
             <span>${fmtMoney(total)}</span>
           </div>
+          ${nutritionHtml}
         </div>
 
         ${canCancelOrder(o) ? `

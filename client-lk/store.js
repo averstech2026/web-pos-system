@@ -17,10 +17,15 @@ export const cart = {
     this._timeSlot = timeSlot;
   },
 
-  add(dishId, name, price) {
+  add(dishId, name, price, nutrition = null) {
     const ex = this._items.find(i => i.dishId === dishId);
-    if (ex) { ex.quantity += 1; }
-    else { this._items.push({ dishId, name, price, quantity: 1 }); }
+    if (ex) {
+      ex.quantity += 1;
+    } else {
+      const line = { dishId, name, price, quantity: 1 };
+      if (nutrition) line.nutrition = nutrition;
+      this._items.push(line);
+    }
     this._notify();
   },
 

@@ -8,14 +8,16 @@ import { onAuthStateChanged } from 'firebase/auth';
 // ── Dev helpers ───────────────────────────────────────────
 // In the browser console run: await seed()  or  await updateItemImages()
 if (import.meta.env.DEV) {
-  import('../shared/seed.js').then(({ seedDatabase, updateItemImages, seedStaffAuth }) => {
+  import('../shared/seed.js').then(({ seedDatabase, updateItemImages, updateItemNutrition, seedStaffAuth }) => {
     window.seed = seedDatabase;
     window.updateItemImages = updateItemImages;
+    window.updateItemNutrition = updateItemNutrition;
     window.seedStaffAuth = seedStaffAuth;
     console.info(
       '%c[DEV] Seed helpers loaded.\n' +
       'Run: await seed()\n' +
       'Run: await updateItemImages()\n' +
+      'Run: await updateItemNutrition()\n' +
       'Run: await seedStaffAuth()',
       'color:#1E1B4B;font-weight:bold'
     );

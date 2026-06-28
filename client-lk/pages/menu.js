@@ -7,6 +7,7 @@ import { COL, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
 import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-images.js';
 import { cart } from '../store.js';
 import { openItemDetailModal } from '../components/item-detail.js';
+import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 
 function resolveImageUrl(item) {
   return resolveProductImageUrl(item.imageUrl) || getItemImageUrl(item.name);
@@ -71,7 +72,14 @@ export class MenuPage {
     const snap = await getDocs(
       query(collection(db, COL.ITEMS), where('isAvailable', '==', true))
     );
-    this.items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    this.items = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        ...data,
+        nutrition: resolveItemNutrition(data),
+      };
+    });
 
     // Preserve a nice category order
     const order = ['Первые блюда', 'Вторые блюда', 'Салаты', 'Напитки', 'Выпечка'];
@@ -163,7 +171,10 @@ export class MenuPage {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       const { action, id, name, price } = btn.dataset;
-      if (action === 'add') { cart.add(id, name, Number(price)); }
+      if (action === 'add') {
+        const item = this.items.find(i => i.id === id);
+        cart.add(id, name, Number(price), item?.nutrition || null);
+      }
       if (action === 'dec') { cart.decrement(id); }
       this.renderItems();
     });
@@ -176,7 +187,7 @@ export class MenuPage {
       emoji,
       getQty: () => cart.qty(item.id),
       onAdd: () => {
-        cart.add(item.id, item.name, item.price);
+        cart.add(item.id, item.name, item.price, item.nutrition || null);
         this.renderItems();
         this.updateCartBar();
       },

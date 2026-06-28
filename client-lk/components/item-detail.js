@@ -3,6 +3,8 @@
  * @param {object} item — Firestore item doc
  * @param {{ imageUrl: string|null, emoji: string, getQty: () => number, onAdd: () => void, onDec: () => void }} ctx
  */
+import { renderNutritionGrid } from '../../shared/nutrition.js';
+
 export function renderItemDetailModal(item, { imageUrl, emoji, getQty }) {
   const qty = getQty();
   const media = imageUrl
@@ -39,7 +41,7 @@ export function renderItemDetailModal(item, { imageUrl, emoji, getQty }) {
             </div>
           ` : ''}
 
-          ${renderNutrition(item)}
+          ${renderNutritionSection(item)}
         </div>
 
         <div class="item-detail-footer" id="item-detail-action">${actionHtml}</div>
@@ -48,29 +50,13 @@ export function renderItemDetailModal(item, { imageUrl, emoji, getQty }) {
   `;
 }
 
-function renderNutrition(item) {
-  const n = item.nutrition;
-  if (!n) return '';
-
-  const cells = [
-    { label: 'белки', value: n.protein, icon: '🍗', tone: 'green' },
-    { label: 'жиры', value: n.fat, icon: '💧', tone: 'yellow' },
-    { label: 'углеводы', value: n.carbs, icon: '🌾', tone: 'blue' },
-    { label: 'ккал', value: n.kcal, icon: '🔥', tone: 'pink' },
-  ];
-
+function renderNutritionSection(item) {
+  const grid = renderNutritionGrid(item.nutrition);
+  if (!grid) return '';
   return `
     <div class="item-detail-section">
       <div class="item-detail-section-title">Пищевая ценность на порцию</div>
-      <div class="item-detail-nutrition">
-        ${cells.map(c => `
-          <div class="item-detail-nutrition-cell item-detail-nutrition-cell--${c.tone}">
-            <span class="item-detail-nutrition-icon">${c.icon}</span>
-            <span class="item-detail-nutrition-val">${c.value ?? '—'}</span>
-            <span class="item-detail-nutrition-label">${c.label}</span>
-          </div>
-        `).join('')}
-      </div>
+      ${grid}
     </div>
   `;
 }

@@ -250,11 +250,19 @@
 }
 
 .order-card-meta {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-navy);
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.order-card-submeta {
   font-size: var(--font-size-xs);
   font-weight: 500;
   color: var(--color-text-muted);
   line-height: 1.35;
-  letter-spacing: 0.01em;
+  opacity: 0.85;
 }
 
 .order-card-total {
@@ -1007,6 +1015,10 @@ button.order-status-pill {
   z-index: 20;
 }
 
+.cart-nutrition[hidden] {
+  display: none !important;
+}
+
 .cart-bar-btn {
   width: 100%;
   padding: 6px 6px 6px var(--space-lg);
@@ -1671,6 +1683,55 @@ button.order-status-pill {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-sm);
+}
+
+.nutrition-grid--compact {
+  gap: 4px;
+}
+
+.item-detail-section-title--compact {
+  font-size: 10px;
+  margin-bottom: 4px;
+  letter-spacing: 0.04em;
+}
+
+.nutrition-grid--compact .item-detail-nutrition-cell {
+  padding: 4px 2px;
+  border-radius: 8px;
+  gap: 1px;
+}
+
+.nutrition-grid--compact .item-detail-nutrition-icon {
+  font-size: 11px;
+}
+
+.nutrition-grid--compact .item-detail-nutrition-val {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nutrition-grid--compact .item-detail-nutrition-label {
+  font-size: 8px;
+}
+
+.cart-nutrition {
+  margin-bottom: var(--space-sm);
+}
+
+.cart-nutrition .item-detail-section-title--compact {
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.pay-nutrition {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.pay-nutrition .item-detail-section-title {
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-sm);
 }
 
 .item-detail-nutrition-cell {

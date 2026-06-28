@@ -22,6 +22,7 @@ import {
 import { auth, db } from './firebase.js';
 import { COL, ROLES, createItemDoc } from './schema.js';
 import { getItemImageUrl } from './item-images.js';
+import { DEMO_NUTRITION_BY_NAME } from './demo-nutrition.js';
 
 const DEMO_ITEMS = [
   { name: 'Борщ с мясом',          description: 'Традиционный борщ',       price: 180, category: 'Первые блюда' },
@@ -45,7 +46,10 @@ const DEMO_ITEMS = [
 
   { name: 'Хлеб бородинский',       description: '2 куска',                price: 20,  category: 'Выпечка' },
   { name: 'Блинчики с джемом',      description: 'Со сметаной',             price: 90,  category: 'Выпечка' },
-];
+].map(item => ({
+  ...item,
+  nutrition: DEMO_NUTRITION_BY_NAME[item.name] || null,
+}));
 
 const DEMO_USERS = [
   { id: 'demo-admin-001',   name: 'Администратор', email: 'admin@ifcm.demo',   role: ROLES.ADMIN,   balance: 0 },
@@ -119,6 +123,46 @@ export async function updateItemImages() {
   }
 
   if (updated) console.log(`[seed] Updated ${updated} item(s).`);
+  if (failed) console.warn(`[seed] ${failed} update(s) failed.`);
+}
+
+/**
+ * Patch nutrition on all existing menu items in Firestore.
+ * Run from the browser console:
+ *   import { updateItemNutrition } from './shared/seed.js';
+ *   await updateItemNutrition();
+ */
+export async function updateItemNutrition() {
+  const snap = await getDocs(collection(db, COL.ITEMS));
+  let updated = 0;
+  let failed = 0;
+
+  console.log(`[seed] Updating nutrition for ${snap.size} items...`);
+
+  for (const docSnap of snap.docs) {
+    const { name } = docSnap.data();
+    const nutrition = DEMO_NUTRITION_BY_NAME[name];
+    if (!nutrition) {
+      console.warn(`[seed] No nutrition mapping for "${name}"`);
+      continue;
+    }
+    try {
+      await updateDoc(doc(db, COL.ITEMS, docSnap.id), { nutrition });
+      updated += 1;
+    } catch (err) {
+      failed += 1;
+      if (err.code === 'permission-denied') {
+        console.error(
+          '[seed] Permission denied while writing item nutrition.\n' +
+          'Publish the updated firestore.rules to Firebase Console, then retry.'
+        );
+        break;
+      }
+      throw err;
+    }
+  }
+
+  if (updated) console.log(`[seed] Updated nutrition for ${updated} item(s).`);
   if (failed) console.warn(`[seed] ${failed} update(s) failed.`);
 }
 

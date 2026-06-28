@@ -66,6 +66,22 @@ export class OrdersPage {
     return list;
   }
 
+  renderSelectAllLine(order, lines, prepared) {
+    const allDone = allLinesPrepared(order.items, prepared);
+    const partial = !allDone && lines.some(l => isLinePrepared(prepared, l.key));
+    return `
+      <li class="kt-order-line kt-order-line--select-all ${allDone ? 'kt-order-line--done' : ''}">
+        <button class="kt-select-all-hit btn-press" type="button"
+                data-action="toggle-all-lines" data-orderid="${order.id}"
+                aria-label="${allDone ? 'Снять все отметки' : 'Отметить все блюда'}"></button>
+        <span class="kt-check ${allDone ? 'kt-check--done' : partial ? 'kt-check--partial' : ''}" aria-hidden="true">
+          ${allDone ? '✓' : partial ? '−' : ''}
+        </span>
+        <span class="kt-line-name kt-line-name--select-all">Все блюда</span>
+        <span class="kt-line-qty">${lines.length}</span>
+      </li>`;
+  }
+
   renderCookingLine(order, line, prepared) {
     const done = isLinePrepared(prepared, line.key);
     return `
@@ -140,6 +156,7 @@ export class OrdersPage {
           </div>
         </header>
         <ul class="kt-order-items ${isReady ? 'kt-order-items--issue' : ''}">
+          ${!isReady && lines.length > 0 ? this.renderSelectAllLine(order, lines, prepared) : ''}
           ${lines.map(line => (
             isReady
               ? this.renderIssueLine(order, line, issued)
@@ -258,9 +275,26 @@ export class OrdersPage {
     const { action, orderid, line } = btn.dataset;
 
     if (action === 'toggle-line') await this.toggleLine(orderid, line);
+    if (action === 'toggle-all-lines') await this.toggleAllLines(orderid);
     if (action === 'mark-ready') await this.markReady(orderid);
     if (action === 'toggle-issue') await this.toggleIssue(orderid, line);
     if (action === 'issue-all') await this.issueAll(orderid);
+  }
+
+  async toggleAllLines(orderId) {
+    const order = this.orders.find(o => o.id === orderId);
+    if (!order || order.status === ORDER_STATUS.READY) return;
+
+    const allKeys = expandItemLines(order.items).map(l => l.key);
+    const allDone = allLinesPrepared(order.items, order.preparedLines);
+    const prepared = allDone ? [] : allKeys;
+
+    try {
+      await updateDoc(doc(db, COL.ORDERS, orderId), { preparedLines: prepared });
+    } catch (err) {
+      console.error('Toggle all lines error:', err);
+      alert('Не удалось обновить позиции.');
+    }
   }
 
   async toggleLine(orderId, lineKey) {

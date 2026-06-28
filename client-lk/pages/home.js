@@ -6,7 +6,7 @@ import {
 import { COL, ORDER_STATUS } from '../../shared/schema.js';
 import { cancelUnpaidOrder } from '../../shared/orders.js';
 import { cart } from '../store.js';
-import { fmtDate, fmtMoney, orderStatusIcon, orderStatusLabel, orderTotal } from '../utils/format.js';
+import { fmtDate, fmtDateTime, fmtMoney, orderStatusIcon, orderStatusLabel, orderTotal } from '../utils/format.js';
 import { qrDataUrl } from '../utils/qr.js';
 import { openOrderDetailModal } from '../components/order-detail.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
@@ -278,14 +278,20 @@ export class HomePage {
       const el = document.getElementById('orders-list');
       if (!el) return;
 
-      this._orderDocs = snap.docs;
+      const docs = [...snap.docs].sort((a, b) => {
+        const ta = a.data().createdAt?.toMillis?.() ?? 0;
+        const tb = b.data().createdAt?.toMillis?.() ?? 0;
+        return tb - ta;
+      });
 
-      if (snap.empty) {
+      this._orderDocs = docs;
+
+      if (docs.length === 0) {
         el.innerHTML = `<p class="empty-text">Активных заказов нет</p>`;
         return;
       }
 
-      el.innerHTML = snap.docs.map(d => {
+      el.innerHTML = docs.map(d => {
         const o = d.data();
         const total = orderTotal(o.items);
         const icon = orderStatusIcon(o.status);
@@ -294,11 +300,15 @@ export class HomePage {
           ? `<button class="order-status-pill order-status-pill--pay btn-press" type="button" data-orderid="${d.id}">Оплатить</button>`
           : `<span class="order-status-pill order-status-pill--${o.status}">${label}</span>`;
 
+        const createdLabel = fmtDateTime(o.createdAt);
+        const pickupLabel = [fmtDate(o.dateSlot), o.timeSlot].filter(Boolean).join(', ');
+
         return `
           <div class="order-card card btn-press" data-orderid="${d.id}" role="button" tabindex="0">
             <div class="order-card-icon">${icon}</div>
             <div class="order-card-info">
-              <div class="order-card-meta">Заказ № ${o.orderNumber} · ${fmtDate(o.dateSlot)}, ${o.timeSlot || ''}</div>
+              <div class="order-card-meta">Заказ № ${o.orderNumber}${createdLabel ? ` · ${createdLabel}` : ''}</div>
+              ${pickupLabel ? `<div class="order-card-submeta">Выдача: ${pickupLabel}</div>` : ''}
               <div class="order-card-total">${fmtMoney(total)}</div>
             </div>
             <span class="order-card-action">${actionEl}</span>

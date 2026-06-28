@@ -97,10 +97,14 @@ export function createUserDoc({
  * @param {string} p.category
  * @param {boolean} [p.isAvailable=true]
  * @param {string|null} [p.imageUrl=null] - local path, e.g. '/products/caesar.jpg'
+ * @param {{ protein?: number, fat?: number, carbs?: number, kcal?: number }|null} [p.nutrition=null]
  */
-export function createItemDoc({ name, description, price, category, isAvailable = true, imageUrl = null }) {
+export function createItemDoc({
+  name, description, price, category, isAvailable = true, imageUrl = null, nutrition = null,
+}) {
   const doc = { name, description, price, category, isAvailable };
   if (imageUrl) doc.imageUrl = imageUrl;
+  if (nutrition) doc.nutrition = nutrition;
   return doc;
 }
 
@@ -111,7 +115,7 @@ export function createItemDoc({ name, description, price, category, isAvailable 
  * @param {string} p.userId
  * @param {string} p.dateSlot     - 'YYYY-MM-DD'
  * @param {string} p.timeSlot     - 'HH:MM'
- * @param {Array<{dishId:string, name:string, price:number, quantity:number}>} p.items
+ * @param {Array<{dishId:string, name:string, price:number, quantity:number, nutrition?:object}>} p.items
  */
 export function createOrderDoc({ orderNumber, userId, dateSlot, timeSlot, items }) {
   return {

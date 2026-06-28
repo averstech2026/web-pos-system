@@ -4,7 +4,7 @@ import {
 } from 'firebase/firestore';
 import { COL, ORDER_STATUS } from '../../shared/schema.js';
 import { cancelUnpaidOrder } from '../../shared/orders.js';
-import { fmtDate, fmtMoney, orderStatusIcon, orderTotal } from '../utils/format.js';
+import { fmtDate, fmtDateTime, fmtMoney, orderStatusIcon, orderTotal } from '../utils/format.js';
 import { openOrderDetailModal } from '../components/order-detail.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
@@ -73,12 +73,15 @@ export class HistoryPage {
         const total = orderTotal(o.items);
         const icon = orderStatusIcon(o.status);
         const cancelled = o.status === ORDER_STATUS.CANCELLED;
+        const createdLabel = fmtDateTime(o.createdAt);
+        const pickupLabel = [fmtDate(o.dateSlot), o.timeSlot].filter(Boolean).join(', ');
+
         return `
           <button class="history-card card btn-press${cancelled ? ' history-card--cancelled' : ''}" data-orderid="${d.id}" type="button">
             <div class="history-card-icon">${icon}</div>
             <div class="history-card-info">
-              <div class="history-card-num">Заказ № ${o.orderNumber} · ${fmtDate(o.dateSlot)}</div>
-              <div class="history-card-meta">${o.timeSlot || ''} · ${(o.items || []).length} поз.${cancelled ? ' · Отменён' : ''}</div>
+              <div class="history-card-num">Заказ № ${o.orderNumber}${createdLabel ? ` · ${createdLabel}` : ''}</div>
+              <div class="history-card-meta">${pickupLabel ? `Выдача: ${pickupLabel} · ` : ''}${(o.items || []).length} поз.${cancelled ? ' · Отменён' : ''}</div>
             </div>
             <div class="history-card-total">${cancelled ? '—' : fmtMoney(total)}</div>
           </button>

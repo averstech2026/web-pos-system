@@ -41,10 +41,12 @@ service cloud.firestore {
     match /items/{itemId} {
       allow read: if isAuth();
       allow create, delete: if isRole('admin') || isRole('manager');
-      // Staff manage menu; any auth user may patch imageUrl only (dev seed helper).
+      // Staff manage menu; any auth user may patch imageUrl or nutrition (dev seed helpers).
       allow update: if isRole('admin') || isRole('manager') || (
-        isAuth() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageUrl'])
+        isAuth() && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['imageUrl'])
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nutrition'])
+        )
       );
     }
 
