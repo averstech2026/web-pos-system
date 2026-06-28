@@ -49,3 +49,10 @@ function serveProducts(middlewares) {
 export const devServer = {
   host: true,
 };
+
+/** GitHub Pages base path; `/` locally, `/repo/app/` in CI (GITHUB_REPOSITORY). */
+export function pagesBase(appSlug) {
+  const repo = process.env.GITHUB_REPOSITORY?.split('/')[1];
+  if (repo) return `/${repo}/${appSlug}/`;
+  return '/';
+}

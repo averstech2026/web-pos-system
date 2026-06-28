@@ -4,12 +4,12 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { COL, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
-import { getItemImageUrl } from '../../shared/item-images.js';
+import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-images.js';
 import { cart } from '../store.js';
 import { openItemDetailModal } from '../components/item-detail.js';
 
 function resolveImageUrl(item) {
-  return item.imageUrl || getItemImageUrl(item.name);
+  return resolveProductImageUrl(item.imageUrl) || getItemImageUrl(item.name);
 }
 
 /** Emoji per category */

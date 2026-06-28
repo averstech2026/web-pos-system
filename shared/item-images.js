@@ -26,7 +26,16 @@ export const ITEM_IMAGE_BY_NAME = {
   'Блинчики с джемом':  '/products/pancakes.jpg',
 };
 
+/** @param {string|null|undefined} url */
+export function resolveProductImageUrl(url) {
+  if (!url) return null;
+  if (url.startsWith('/products/')) {
+    return `${import.meta.env.BASE_URL}${url.slice(1)}`;
+  }
+  return url;
+}
+
 /** @param {string} name */
 export function getItemImageUrl(name) {
-  return ITEM_IMAGE_BY_NAME[name] ?? null;
+  return resolveProductImageUrl(ITEM_IMAGE_BY_NAME[name] ?? null);
 }

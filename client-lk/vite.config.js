@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { devServer, productsStaticPlugin } from '../vite.shared.js';
+import { devServer, pagesBase, productsStaticPlugin } from '../vite.shared.js';
 
 export default defineConfig({
+  base: pagesBase('client-lk'),
   plugins: [productsStaticPlugin()],
   server: {
     ...devServer,

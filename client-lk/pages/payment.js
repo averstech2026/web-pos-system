@@ -3,11 +3,11 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { COL } from '../../shared/schema.js';
 import { processOrderPayment } from '../../shared/payment.js';
 import { cancelUnpaidOrder, canCancelOrder } from '../../shared/orders.js';
-import { getItemImageUrl } from '../../shared/item-images.js';
+import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-images.js';
 import { cart } from '../store.js';
 
 function resolveItemImage(item) {
-  return item.imageUrl || getItemImageUrl(item.name);
+  return resolveProductImageUrl(item.imageUrl) || getItemImageUrl(item.name);
 }
 
 const TIME_SLOTS = ['11:30', '12:00', '12:30', '13:00', '13:30'];

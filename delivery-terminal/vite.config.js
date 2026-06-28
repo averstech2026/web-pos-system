@@ -1,7 +1,8 @@
 import { defineConfig } from 'vite';
-import { devServer } from '../vite.shared.js';
+import { devServer, pagesBase } from '../vite.shared.js';
 
 export default defineConfig({
+  base: pagesBase('delivery-terminal'),
   cacheDir: '../node_modules/.vite/delivery-terminal',
   server: devServer,
 });
