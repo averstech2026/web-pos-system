@@ -10,7 +10,7 @@
     "dev:delivery": "vite delivery-terminal --config delivery-terminal/vite.config.js --port 3004",
     "dev:queue": "vite queue-screen --config queue-screen/vite.config.js --port 3005",
     "build:lk": "vite build client-lk --outDir ../dist/client-lk && cp -r products dist/client-lk/products",
-    "build:admin": "vite build admin --outDir ../dist/admin",
+    "build:admin": "vite build admin --outDir ../dist/admin && cp -r products dist/admin/products",
     "build:kitchen": "vite build kitchen-terminal --outDir ../dist/kitchen-terminal",
     "build:delivery": "vite build delivery-terminal --outDir ../dist/delivery-terminal",
     "build:queue": "vite build queue-screen --outDir ../dist/queue-screen",

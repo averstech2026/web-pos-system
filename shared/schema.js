@@ -15,6 +15,7 @@ export const COL = {
   CHECKS: 'checks',
   TRANSACTIONS: 'transactions',
   NOTIFICATIONS: 'notifications',
+  SETTINGS: 'settings',
 };
 
 // ─── Allowed enum values ─────────────────────────────────────────────────────
@@ -98,13 +99,15 @@ export function createUserDoc({
  * @param {boolean} [p.isAvailable=true]
  * @param {string|null} [p.imageUrl=null] - local path, e.g. '/products/caesar.jpg'
  * @param {{ protein?: number, fat?: number, carbs?: number, kcal?: number }|null} [p.nutrition=null]
+ * @param {string[]} [p.allergens=[]] - allergen ids from settings/menu
  */
 export function createItemDoc({
-  name, description, price, category, isAvailable = true, imageUrl = null, nutrition = null,
+  name, description, price, category, isAvailable = true, imageUrl = null, nutrition = null, allergens = [],
 }) {
   const doc = { name, description, price, category, isAvailable };
   if (imageUrl) doc.imageUrl = imageUrl;
   if (nutrition) doc.nutrition = nutrition;
+  if (allergens?.length) doc.allergens = allergens;
   return doc;
 }
 

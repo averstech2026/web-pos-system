@@ -50,6 +50,12 @@ service cloud.firestore {
       );
     }
 
+    // ── settings (menu categories, allergens) ───────────────
+    match /settings/{docId} {
+      allow read: if isAuth();
+      allow write: if isRole('admin') || isRole('manager');
+    }
+
     function isOrderOwner() {
       return isAuth() && resource.data.userId == request.auth.uid;
     }
