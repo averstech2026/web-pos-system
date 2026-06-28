@@ -13,7 +13,8 @@
     "build:admin": "vite build admin --outDir ../dist/admin",
     "build:kitchen": "vite build kitchen-terminal --outDir ../dist/kitchen-terminal",
     "build:delivery": "vite build delivery-terminal --outDir ../dist/delivery-terminal",
-    "build:queue": "vite build queue-screen --outDir ../dist/queue-screen"
+    "build:queue": "vite build queue-screen --outDir ../dist/queue-screen",
+    "build": "npm run build:lk && npm run build:admin && npm run build:kitchen && npm run build:delivery && npm run build:queue"
   },
   "dependencies": {
     "firebase": "^11.0.0",
