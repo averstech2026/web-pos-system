@@ -1,5 +1,4 @@
-/* ── Reset & base (tokens live in styles.css) ─────────────── */
-@import './styles.css';
+/* ── Reset & base (import ../shared/styles.css before this file) ── */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

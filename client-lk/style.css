@@ -998,7 +998,7 @@ button.order-status-pill {
   line-height: 1.25;
 }
 
-.pay-cancel-btn {
+.pay-header .btn.pay-cancel-btn {
   flex-shrink: 0;
   width: auto;
   min-height: 32px;
@@ -1035,7 +1035,7 @@ button.order-status-pill {
     grid-template-columns: 1fr;
   }
 
-  .pay-cancel-btn {
+  .pay-header .btn.pay-cancel-btn {
     font-size: 9px;
     padding: 6px 8px;
   }

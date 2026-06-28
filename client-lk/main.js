@@ -1,3 +1,4 @@
+import '../shared/styles.css';
 import '../shared/global.css';
 import './style.css';
 
