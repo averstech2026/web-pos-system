@@ -60,7 +60,7 @@ export class HomePage {
   renderShell() {
     const u = this.userData;
     const shortCode = this.user.uid.slice(0, 12).toUpperCase();
-    const balanceFmt = fmtMoney(u.balance ?? 0);
+    const balanceDisplay = (u.balance ?? 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽';
 
     this.container.innerHTML = `
       <div class="lk-shell">
@@ -84,23 +84,24 @@ export class HomePage {
 
         <main class="lk-main">
           <div class="lk-id-card">
-            <div class="id-card-body">
-              <div class="id-card-left">
-                <div class="id-card-block" id="btn-show-qr" role="button" tabindex="0" aria-label="Показать QR-карту">
-                  <div class="id-card-label">Карта питания:</div>
-                  <div class="id-card-row">
-                    <span class="id-card-number">${shortCode}</span>
-                    <span class="id-card-balance">${balanceFmt}</span>
+            <div class="id-card-surface">
+              <div class="id-card-pattern" aria-hidden="true"></div>
+              <div class="id-card-content">
+                <div class="id-card-info">
+                  <div class="id-card-details" id="btn-show-qr" role="button" tabindex="0" aria-label="Показать QR-карту">
+                    <div class="id-card-label">Карта питания:</div>
+                    <div class="id-card-number">${shortCode}</div>
+                    <div class="id-card-balance-row">
+                      <span class="id-card-balance-label">Баланс:</span>
+                      <span class="id-card-balance">${balanceDisplay}</span>
+                    </div>
                   </div>
+                  <button class="id-card-history-link btn-press" id="btn-history" type="button">Смотреть историю заказов &gt;</button>
                 </div>
-                <div class="id-card-block id-card-block--history" id="btn-history" role="button" tabindex="0" aria-label="История заказов">
-                  <div class="id-card-label">История заказов</div>
-                  <div class="id-card-history-link">Смотреть →</div>
-                </div>
+                <button class="id-card-qr btn-press" id="btn-show-qr-icon" type="button" aria-label="Показать QR-код">
+                  <img src="${this.qrSmall}" alt="QR-код" loading="lazy" />
+                </button>
               </div>
-              <button class="id-card-qr btn-press" id="btn-show-qr-icon" type="button" aria-label="Показать QR-код">
-                <img src="${this.qrSmall}" alt="QR-код" loading="lazy" />
-              </button>
             </div>
           </div>
 
