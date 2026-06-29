@@ -402,6 +402,7 @@ export function createOrderDoc({ orderNumber, userId, dateSlot, timeSlot, items 
     dateSlot,
     timeSlot,
     createdAt: serverTimestamp(),
+    // paidAt is set in processOrderPayment when status becomes COOKING
   };
 }
 

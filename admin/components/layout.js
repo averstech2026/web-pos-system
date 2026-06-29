@@ -2,7 +2,7 @@ import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
-/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'allergens' | 'schedules' | 'marketing' | 'payments' | 'users' | 'crm-groups' | 'crm-loyalty' | 'crm-wallets' | 'reports'} AdminSection */
+/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'allergens' | 'schedules' | 'calendar' | 'marketing' | 'payments' | 'users' | 'crm-groups' | 'crm-loyalty' | 'crm-wallets' | 'reports'} AdminSection */
 
 /** @type {Record<string, string>} */
 const NAV_ICONS = {
@@ -61,6 +61,7 @@ const NAV_GROUPS = [
     icon: 'settings',
     items: [
       { id: 'schedules', path: '/schedules', label: 'Расписания' },
+      { id: 'calendar', path: '/calendar', label: 'Календарь дней' },
       { id: 'reports', path: '/reports', label: 'Отчёты' },
     ],
   },

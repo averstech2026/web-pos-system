@@ -132,7 +132,7 @@ service cloud.firestore {
         && request.resource.data.checkId.size() > 0
         && request.resource.data.items == resource.data.items
         && request.resource.data.userId == resource.data.userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkId', 'paymentStatus', 'status']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkId', 'paymentStatus', 'status', 'paidAt']);
     }
 
     // ── orders ───────────────────────────────────────────────

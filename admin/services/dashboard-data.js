@@ -68,11 +68,11 @@ function tsToMs(ts) {
   return typeof ts.toMillis === 'function' ? ts.toMillis() : null;
 }
 
-/** @param {Array<{ createdAt?: object, readyAt?: object }>} orders */
+/** @param {Array<{ createdAt?: object, paidAt?: object, readyAt?: object }>} orders */
 function avgPrepTimeMinutes(orders) {
   const mins = [];
   for (const o of orders) {
-    const start = tsToMs(o.createdAt);
+    const start = tsToMs(o.paidAt) || tsToMs(o.createdAt);
     const end = tsToMs(o.readyAt);
     if (start == null || end == null) continue;
     const m = (end - start) / 60_000;

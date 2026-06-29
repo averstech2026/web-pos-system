@@ -9,7 +9,7 @@
  *     a. Decrement users.balance (if balance was used).
  *     b. Create checks document.
  *     c. Create 1–2 transactions documents.
- *     d. Update orders: set checkId, paymentStatus → 'paid', status → 'cooking'.
+ *     d. Update orders: set checkId, paymentStatus → 'paid', status → 'cooking', paidAt.
  */
 
 import {
@@ -146,6 +146,7 @@ export async function processOrderPayment(orderId, useBalance = false) {
       checkId,
       paymentStatus: PAYMENT_STATUS.PAID,
       status: ORDER_STATUS.COOKING,
+      paidAt: serverTimestamp(),
     });
 
     return { checkId, check: checkData };

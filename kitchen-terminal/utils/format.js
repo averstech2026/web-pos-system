@@ -49,9 +49,14 @@ export function elapsedSince(ts) {
   return formatElapsed((Date.now() - ms) / 1000);
 }
 
-/** Fixed prep time: createdAt → readyAt (or now while cooking). */
+/** Kitchen prep start: paidAt (when order hits the monitor) or createdAt for legacy orders. */
+function orderPrepStartMs(order) {
+  return tsToMs(order?.paidAt) || tsToMs(order?.createdAt);
+}
+
+/** Fixed prep time: paidAt → readyAt (or now while cooking). */
 export function orderPrepSeconds(order) {
-  const start = tsToMs(order?.createdAt);
+  const start = orderPrepStartMs(order);
   if (!start) return 0;
   const end = order?.status === 'ready' && order?.readyAt
     ? tsToMs(order.readyAt)

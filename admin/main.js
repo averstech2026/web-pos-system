@@ -73,6 +73,7 @@ async function renderRoute(path) {
     '/groups': () => import('./pages/category-groups.js').then(m => m.CategoryGroupsPage),
     '/allergens': () => import('./pages/allergens.js').then(m => m.AllergensPage),
     '/schedules': () => import('./pages/availability-schedules.js').then(m => m.AvailabilitySchedulesPage),
+    '/calendar': () => import('./pages/calendar-days.js').then(m => m.CalendarDaysPage),
     '/marketing': () => import('./pages/marketing.js').then(m => m.MarketingPage),
     '/users': () => import('./pages/users.js').then(m => m.UsersPage),
     '/crm-groups': () => import('./pages/crm-user-groups.js').then(m => m.CrmUserGroupsPage),
