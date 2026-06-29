@@ -188,7 +188,7 @@ export class PaymentPage {
           ` : ''}
         </header>
 
-        <main class="pay-main">
+        <main class="pay-main" id="pay-main">
 
           <!-- Items -->
           <div class="card pay-cart-card">
@@ -228,6 +228,8 @@ export class PaymentPage {
           ${this.renderSlotFields()}
 
         </main>
+
+        <div class="pay-scroll-fade" id="pay-scroll-fade" hidden aria-hidden="true"></div>
 
         <!-- Pay footer -->
         <div class="pay-footer">
@@ -357,6 +359,47 @@ export class PaymentPage {
     };
     document.getElementById('pay-date')?.addEventListener('change', onSlotChange);
     document.getElementById('pay-time')?.addEventListener('change', onSlotChange);
+
+    this.bindPayScrollFade();
+  }
+
+  bindPayScrollFade() {
+    this._scrollFadeCleanup?.();
+
+    const shell = document.querySelector('.pay-shell');
+    const main = document.getElementById('pay-main');
+    const fade = document.getElementById('pay-scroll-fade');
+    const footer = document.querySelector('.pay-footer');
+    if (!main || !fade) return;
+
+    const update = () => {
+      const hasOverflow = main.scrollHeight > main.clientHeight + 8;
+      const atBottom = main.scrollTop + main.clientHeight >= main.scrollHeight - 12;
+      const showHint = hasOverflow && !atBottom;
+
+      fade.hidden = !showHint;
+      shell?.classList.toggle('pay-shell--scroll-hint', showHint);
+      shell?.classList.toggle('pay-shell--has-overflow', hasOverflow);
+
+      if (footer) {
+        fade.style.bottom = `${footer.offsetHeight}px`;
+      }
+    };
+
+    main.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    const ro = new ResizeObserver(update);
+    ro.observe(main);
+    if (footer) ro.observe(footer);
+    requestAnimationFrame(update);
+    setTimeout(update, 120);
+
+    this._scrollFadeCleanup = () => {
+      main.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+      ro.disconnect();
+      shell?.classList.remove('pay-shell--scroll-hint', 'pay-shell--has-overflow');
+    };
   }
 
   async cancelOrder() {

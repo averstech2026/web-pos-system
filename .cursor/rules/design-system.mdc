@@ -66,3 +66,73 @@ HTML: include Montserrat from Google Fonts (see `client-lk/index.html`).
 .auth-fields .btn { margin-top: var(--space-sm); } /* +8px → 24px before CTA */
 .form-group { gap: var(--space-sm); }
 ```
+
+## Premium Wallet Card (ID card)
+
+Unified digital wallet card for client LK: food card number, balance, history link, and QR on one tactile surface. **Reference:** `client-lk/pages/home.js`, `client-lk/style.css` (`.lk-id-card` … `.id-card-qr`).
+
+### When to use
+
+- User identity / food card / balance summary in client LK
+- Any “show QR at checkout” block that must feel premium and match primary CTAs
+
+### Structure
+
+```html
+<div class="lk-id-card">
+  <div class="id-card-surface">
+    <div class="id-card-pattern" aria-hidden="true"></div>
+    <div class="id-card-content">
+      <div class="id-card-info">
+        <div class="id-card-details" role="button" tabindex="0">
+          <div class="id-card-label">Карта питания:</div>
+          <div class="id-card-number">BD4PSTZYSKC4</div>
+          <div class="id-card-balance-row">
+            <span class="id-card-balance-label">Баланс:</span>
+            <span class="id-card-balance">330,00 ₽</span>
+          </div>
+        </div>
+        <button class="id-card-history-link btn-press" type="button">Смотреть историю заказов &gt;</button>
+      </div>
+      <button class="id-card-qr btn-press" type="button" aria-label="Показать QR-код">
+        <img src="…" alt="QR-код" />
+      </button>
+    </div>
+  </div>
+</div>
+```
+
+### Surface & color (strict)
+
+- **Background:** rich navy gradient — same family as `btn-primary`, never gray or violet/purple tints
+  - `#35317f → #28256a → var(--color-navy) → var(--color-primary-dark)`
+- **Gloss:** `::before` white sheen + navy radial highlights; `::after` subtle corner bloom — all `rgba(30, 27, 75, …)` or navy-tinted
+- **Shadow:** layered floating shadow `rgba(30, 27, 75, 0.18–0.52)` — stronger than `--shadow-card`
+- **Pattern:** `.id-card-pattern` — white SVG food icons, `opacity: 0.07`, `background-size: 120px`
+- **Shape:** `border-radius: 20px`, `padding: 22px 20px`, `overflow: hidden`
+
+### Typography (on card)
+
+| Element | Size | Weight | Color |
+|---------|------|--------|-------|
+| Label («Карта питания:») | `--font-size-xs` | 400 | `rgba(255,255,255,0.72)` |
+| Card number | `--font-size-sm` | 400 | `#fff`, `letter-spacing: 0.02em` |
+| «Баланс:» | `--font-size-xs` | 400 | `rgba(255,255,255,0.72)` |
+| Amount | `--font-size-xs` | 600 | `#fff`, tabular-nums |
+| History link | `--font-size-sm` | 500 | `rgba(255,255,255,0.62)` → `#fff` on hover |
+
+No balance pill/bubble — amount is plain text on the card surface.
+
+### QR chip
+
+- White container on the right: `92×92px`, `border-radius: 14px`, `padding: 8px`
+- `box-shadow: 0 6px 16px rgba(0,0,0,0.18)` + subtle navy inset border
+- Flex row: `.id-card-content` with `gap: var(--space-lg)`, `align-items: center`
+
+### Do / Don't
+
+- ✅ Reuse existing class names; copy styles from `client-lk/style.css`
+- ✅ Keep history link inline under balance, not a separate gray block
+- ❌ Gray or slate backgrounds on the card surface
+- ❌ Purple/violet accent colors (`#5b4fd6`, indigo-500, etc.) — stay in navy token family
+- ❌ Large bold card number — keep compact and light (400 weight)

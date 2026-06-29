@@ -1113,6 +1113,11 @@ button.order-status-pill {
 }
 
 /* ── Payment page ────────────────────────────────────────── */
+#app:has(.pay-shell) {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 .pay-shell {
   width: 100%;
   max-width: 430px;
@@ -1120,6 +1125,12 @@ button.order-status-pill {
   background: var(--color-bg);
   display: flex;
   flex-direction: column;
+}
+
+.pay-shell:has(.pay-footer) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
 }
 
 .pay-header {
@@ -1181,12 +1192,34 @@ button.order-status-pill {
 
 .pay-main {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: var(--space-md);
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
   padding-bottom: 120px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pay-scroll-fade {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  height: 56px;
+  background: linear-gradient(to bottom, transparent 0%, var(--color-bg) 80%);
+  pointer-events: none;
+  z-index: 19;
+  transition: opacity 0.25s ease;
+}
+
+.pay-shell--scroll-hint .pay-footer,
+.pay-shell--has-overflow .pay-footer {
+  box-shadow:
+    0 -10px 32px -4px rgba(30, 27, 75, 0.16),
+    0 -2px 8px rgba(30, 27, 75, 0.08);
 }
 
 .pay-items-list {
