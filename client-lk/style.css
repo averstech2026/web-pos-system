@@ -470,14 +470,21 @@ button.order-status-pill {
     0 -2px 8px rgba(30, 27, 75, 0.08);
 }
 
-/* ── New order button (kiosk pay CTA) ───────────────────── */
-.new-order-btn {
+/* ── Footer primary CTA (home + menu) ───────────────────── */
+.new-order-btn,
+.cart-bar-btn {
   width: 100%;
   padding: var(--space-md);
   font-size: var(--font-size-lg);
   border-radius: var(--radius-pill);
   min-height: 52px;
   letter-spacing: 0.03em;
+}
+
+.cart-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── Modals (kiosk modal-panel style) ────────────────────── */
@@ -1106,24 +1113,12 @@ button.order-status-pill {
   display: none !important;
 }
 
-.cart-bar-btn {
-  width: 100%;
-  padding: 10px var(--space-lg);
-  font-size: var(--font-size-md);
-  border-radius: var(--radius-pill);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 52px;
-  letter-spacing: 0.03em;
-}
-
 .cart-bar-inner {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-md);
-  max-width: 100%;
+  width: 100%;
+  column-gap: var(--space-sm);
 }
 
 .cart-bar-badge {
@@ -1132,9 +1127,10 @@ button.order-status-pill {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  margin-right: var(--space-xs);
+  width: 24px;
+  height: 24px;
+  margin-left: var(--space-sm);
+  justify-self: start;
 }
 
 .cart-bar-icon {
@@ -1147,8 +1143,8 @@ button.order-status-pill {
 
 .cart-bar-icon svg {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
   fill: currentColor;
 }
 
@@ -1173,29 +1169,30 @@ button.order-status-pill {
 }
 
 .cart-bar-btn-text {
-  flex: 0 1 auto;
   min-width: 0;
-  text-align: left;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 700;
-  margin: 0 var(--space-sm);
+  padding: 0 var(--space-xs);
 }
 
 .cart-bar-amount {
   flex-shrink: 0;
-  padding: 0;
+  margin-right: var(--space-sm);
+  padding-left: var(--space-md);
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
   background: none;
   border-radius: 0;
-  font-size: var(--font-size-md);
+  font-size: inherit;
   font-weight: 700;
   color: #fff;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   white-space: nowrap;
   line-height: 1;
-  margin-left: var(--space-xs);
+  justify-self: end;
 }
 
 /* ── Payment page ────────────────────────────────────────── */
