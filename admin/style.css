@@ -1897,179 +1897,44 @@ body:has(.admin-shell) {
   min-width: 0;
 }
 
-/* Category groups page (master-detail) */
-.cgr-page {
-  padding: 0;
-  min-height: min(72vh, 640px);
-  background: transparent;
-  border: none;
-  box-shadow: none;
-}
-
-.cgr-layout {
-  display: grid;
-  grid-template-columns: 2fr 3fr;
-  gap: var(--space-md);
-  min-height: min(72vh, 640px);
-}
-
-.cgr-master {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  min-width: 0;
-  min-height: 0;
-}
-
-.cgr-master-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  flex-shrink: 0;
-  padding: 0 2px;
-}
-
-.cgr-master-title {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-  color: var(--color-navy);
-  letter-spacing: 0.02em;
-}
-
-.cgr-master-head .products-create-btn {
-  flex-shrink: 0;
-}
-
-.cgr-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
-  max-height: none;
-}
-
-.cgr-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-  min-height: 56px;
-  padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-}
-
-.cgr-row--active {
-  border-color: var(--color-navy);
-  background: var(--color-indigo-soft);
-  box-shadow: 0 0 0 1px var(--color-indigo-soft);
-}
-
-.cgr-row-main {
-  flex: 1;
-  width: 100%;
+/* Allergens editor */
+.alr-layout .avr-row-main {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  min-width: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
 }
 
-.cgr-row-thumb .products-thumb-wrap {
+.alr-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 40px;
   height: 40px;
   flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+  font-size: 1.1rem;
 }
 
-.cgr-row-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.cgr-row-name {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-navy);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cgr-row-meta {
-  font-size: 10px;
-  color: var(--color-text-muted);
-}
-
-
-.cgr-detail {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-muted);
-  overflow: hidden;
-}
-
-.cgr-detail-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-sm);
-  padding: var(--space-xl) var(--space-lg);
-  text-align: center;
-  height: 100%;
-  min-height: 320px;
-}
-
-.cgr-detail-empty-icon {
-  font-size: 2rem;
-  opacity: 0.5;
-}
-
-.cgr-detail-empty-title {
-  margin: 0;
-  font-size: var(--font-size-md);
-  font-weight: 600;
-  color: var(--color-navy);
-}
-
-.cgr-detail-empty-hint {
-  margin: 0;
-  max-width: 260px;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
-.cgr-detail-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-.cgr-detail-scroll {
-  flex: 1;
-  overflow-y: auto;
+.alr-detail-scroll {
   padding: var(--space-sm);
-  display: flex;
-  flex-direction: column;
+}
+
+.alr-detail-id {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.alr-detail-id code {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+/* Category groups editor */
+.cgr-layout .avr-detail-scroll {
+  padding: var(--space-sm);
   gap: var(--space-sm);
 }
 
@@ -2420,17 +2285,6 @@ body:has(.admin-shell) {
   color: var(--color-text-muted);
 }
 
-
-.cgr-detail-foot {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  padding: var(--space-md);
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
 .cgr-product-row {
   display: flex;
   align-items: center;
@@ -2534,17 +2388,6 @@ body:has(.admin-shell) {
 .cgr-detail-delete--active:hover,
 .cgr-detail-delete:not(:disabled):hover {
   filter: brightness(0.95);
-}
-
-.cgr-detail-save {
-  width: 100%;
-  min-height: 40px;
-  padding: 8px 16px;
-  font-size: 12px;
-  text-transform: none;
-  letter-spacing: normal;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
 }
 
 .catm-photo-btn {
@@ -3226,19 +3069,6 @@ body:has(.admin-shell) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .cgr-layout {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-
-  .cgr-list {
-    max-height: 280px;
-  }
-
-  .cgr-detail {
-    min-height: 360px;
-  }
-
   .catm-schedule-fields {
     max-width: none;
   }
@@ -3524,6 +3354,14 @@ body:has(.admin-shell) {
 
 /* ── Availability rules (schedules) editor ─────────────────── */
 
+.avr-page.card,
+.prm-page.card {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
 .avr-layout,
 .avr-page {
   min-height: 520px;
@@ -3533,7 +3371,7 @@ body:has(.admin-shell) {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
   gap: var(--space-lg);
-  min-height: inherit;
+  align-items: start;
 }
 
 .avr-master,
@@ -3545,6 +3383,15 @@ body:has(.admin-shell) {
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
+}
+
+.avr-master {
+  align-self: start;
+  width: 100%;
+}
+
+.avr-detail {
+  min-height: min(72vh, 640px);
 }
 
 .avr-master-head {
@@ -3579,8 +3426,6 @@ body:has(.admin-shell) {
   list-style: none;
   margin: 0;
   padding: var(--space-sm);
-  overflow-y: auto;
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
@@ -3629,6 +3474,25 @@ body:has(.admin-shell) {
   line-height: 1.45;
 }
 
+.avr-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.avr-row--thumb .avr-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.avr-row-thumb .products-thumb-wrap {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
 .avr-detail-empty {
   display: flex;
   flex-direction: column;
@@ -3644,6 +3508,21 @@ body:has(.admin-shell) {
 .avr-detail-empty-icon {
   font-size: 2rem;
   opacity: 0.45;
+}
+
+.avr-detail-empty-title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--color-navy);
+}
+
+.avr-detail-empty-hint {
+  margin: 0;
+  max-width: 280px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
 
 .avr-detail-panel {
@@ -4115,6 +3994,10 @@ body:has(.admin-shell) {
     grid-template-columns: 1fr;
   }
 
+  .avr-detail {
+    min-height: 360px;
+  }
+
   .avr-condition-head {
     flex-direction: column;
     align-items: stretch;
@@ -4126,10 +4009,6 @@ body:has(.admin-shell) {
 }
 
 /* ── Promo rules (marketing) editor ──────────────────────── */
-
-.prm-page {
-  min-height: 520px;
-}
 
 .prm-layout .avr-detail-scroll {
   display: flex;

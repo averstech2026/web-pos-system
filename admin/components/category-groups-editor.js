@@ -182,12 +182,12 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   function renderListRow(group) {
     const active = group.id === selectedId;
     return `
-      <li class="cgr-row ${active ? 'cgr-row--active' : ''}" data-id="${escAttr(group.id)}">
-        <button type="button" class="cgr-row-main btn-press" data-action="select" aria-pressed="${active}">
-          <span class="cgr-row-thumb">${productThumbHtml({ name: group.name, imageUrl: group.imageUrl })}</span>
-          <span class="cgr-row-info">
-            <span class="cgr-row-name">${esc(group.name)}</span>
-            <span class="cgr-row-meta">${memberCount(group.id)} шт. · ${esc(scheduleSummaryForGroup(group))}</span>
+      <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''}" data-id="${escAttr(group.id)}">
+        <button type="button" class="avr-row-main btn-press" data-action="select" aria-pressed="${active}">
+          <span class="avr-row-thumb">${productThumbHtml({ name: group.name, imageUrl: group.imageUrl })}</span>
+          <span class="avr-row-info">
+            <span class="avr-row-name">${esc(group.name)}</span>
+            <span class="avr-row-meta">${memberCount(group.id)} шт. · ${esc(scheduleSummaryForGroup(group))}</span>
           </span>
         </button>
       </li>
@@ -196,10 +196,10 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
 
   function renderDetailEmpty() {
     return `
-      <div class="cgr-detail-empty">
-        <span class="cgr-detail-empty-icon" aria-hidden="true">📂</span>
-        <p class="cgr-detail-empty-title">Выберите группу</p>
-        <p class="cgr-detail-empty-hint">Нажмите «+ Добавить группу» слева или выберите группу из списка, чтобы настроить состав, время и фото.</p>
+      <div class="avr-detail-empty">
+        <span class="avr-detail-empty-icon" aria-hidden="true">📂</span>
+        <p class="avr-detail-empty-title">Выберите группу</p>
+        <p class="avr-detail-empty-hint">Нажмите «+ Добавить группу» слева или выберите группу из списка, чтобы настроить состав, время и фото.</p>
       </div>
     `;
   }
@@ -209,8 +209,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     const imagePath = group.imageUrl || '';
 
     return `
-      <div class="cgr-detail-panel" id="cgr-detail-panel">
-        <div class="cgr-detail-scroll">
+      <div class="avr-detail-panel" id="cgr-detail-panel">
+        <div class="avr-detail-scroll cgr-detail-scroll">
           <section class="cgr-detail-card">
             <label class="cgr-detail-name-field cgr-detail-name-field--solo">
               <span class="cgr-detail-label">Название группы</span>
@@ -262,8 +262,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
           <p class="ifm-error" id="cgr-error" hidden></p>
         </div>
 
-        <div class="cgr-detail-foot">
-          <button type="button" class="btn btn-primary btn-press cgr-detail-save" id="cgr-detail-save">Сохранить изменения</button>
+        <div class="avr-detail-foot">
+          <button type="button" class="btn btn-primary btn-press avr-save-btn" id="cgr-detail-save">Сохранить изменения</button>
           <div class="cgr-detail-danger">
             <label class="cgr-delete-confirm">
               <input type="checkbox" id="cgr-delete-confirm" />
@@ -285,18 +285,19 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   function render() {
     const group = selectedGroup();
     host.innerHTML = `
-      <div class="cgr-layout">
-        <div class="cgr-master">
-          <div class="cgr-master-head">
-            <h2 class="cgr-master-title">${groupsHeaderText()}</h2>
+      <div class="avr-layout cgr-layout">
+        <div class="avr-master">
+          <div class="avr-master-head">
+            <h2 class="avr-master-title">${groupsHeaderText()}</h2>
             <button type="button" class="btn btn-primary btn-press products-create-btn" id="cgr-create-btn">
               + Добавить группу
             </button>
           </div>
-          <ul class="cgr-list" id="cgr-list">${groups.map(g => renderListRow(g)).join('')}</ul>
+          <ul class="avr-list" id="cgr-list">${groups.map(g => renderListRow(g)).join('')}</ul>
+          ${!groups.length ? '<p class="avr-list-empty">Нет групп. Создайте первую.</p>' : ''}
           <p class="ifm-error" id="cgr-list-error" hidden></p>
         </div>
-        <aside class="cgr-detail" aria-label="Настройки группы">
+        <aside class="avr-detail" aria-label="Настройки группы">
           ${group ? renderDetailPanel(group) : renderDetailEmpty()}
         </aside>
       </div>
@@ -305,15 +306,15 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   }
 
   function updateListRowMeta(id) {
-    const row = host.querySelector(`.cgr-row[data-id="${id}"]`);
+    const row = host.querySelector(`.avr-row[data-id="${id}"]`);
     const group = groups.find(g => g.id === id);
     if (!row || !group) return;
-    row.querySelector('.cgr-row-name')?.replaceChildren(document.createTextNode(group.name));
-    row.querySelector('.cgr-row-meta')?.replaceChildren(
+    row.querySelector('.avr-row-name')?.replaceChildren(document.createTextNode(group.name));
+    row.querySelector('.avr-row-meta')?.replaceChildren(
       document.createTextNode(`${memberCount(id)} шт. · ${scheduleSummaryForGroup(group)}`),
     );
-    row.querySelector('.cgr-row-thumb')?.replaceChildren();
-    row.querySelector('.cgr-row-thumb')?.insertAdjacentHTML(
+    row.querySelector('.avr-row-thumb')?.replaceChildren();
+    row.querySelector('.avr-row-thumb')?.insertAdjacentHTML(
       'afterbegin',
       productThumbHtml({ name: group.name, imageUrl: group.imageUrl }),
     );
@@ -337,7 +338,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     host.querySelector('#cgr-list')?.addEventListener('click', e => {
       const selectBtn = e.target.closest('[data-action="select"]');
       if (!selectBtn) return;
-      const id = selectBtn.closest('.cgr-row')?.dataset.id;
+      const id = selectBtn.closest('.avr-row')?.dataset.id;
       if (!id || id === selectedId) return;
       syncSidebarToState();
       selectedId = id;

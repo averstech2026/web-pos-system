@@ -195,7 +195,7 @@ export function openItemFormModal({
                 </div>
               </fieldset>
             ` : `
-              <p class="ifm-hint">Справочник аллергенов пуст — добавьте записи через кнопку «Аллергены» на странице товаров.</p>
+              <p class="ifm-hint">Справочник аллергенов пуст — добавьте записи в разделе «Аллергены» в меню.</p>
             `}
 
             <fieldset class="ifm-fieldset ifm-availability">

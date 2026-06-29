@@ -51,7 +51,7 @@ export class MarketingPage {
       ? '<div class="admin-loading">Загрузка акций…</div>'
       : this.error
         ? `<div class="admin-error card">${this.error}</div>`
-        : '<div class="prm-page card" id="prm-editor-host"></div>';
+        : '<div class="avr-page prm-page card" id="prm-editor-host"></div>';
 
     this.container.innerHTML = renderAdminShell({
       active: 'marketing',

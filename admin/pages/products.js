@@ -1,5 +1,4 @@
 import { bindAdminShell, renderAdminShell } from '../components/layout.js';
-import { openAllergensModal } from '../components/allergens-modal.js';
 import {
   openBulkAllergensModal,
   openBulkAvailabilityModal,
@@ -172,7 +171,6 @@ export class ProductsPage {
 
   handleFilterDropdownOutside(e) {
     if (document.getElementById('item-form-modal')?.contains(e.target)) return;
-    if (document.getElementById('allergens-modal')?.contains(e.target)) return;
     if (document.getElementById('bulk-ops-modal')?.contains(e.target)) return;
 
     const categoryDropdown = this.container.querySelector('#products-category-dropdown');
@@ -265,7 +263,7 @@ export class ProductsPage {
     this.container.innerHTML = renderAdminShell({
       active: 'products',
       title: 'Товары',
-      subtitle: 'Справочник блюд и аллергенов',
+      subtitle: 'Справочник блюд',
       bodyHtml,
     });
 
@@ -442,9 +440,6 @@ export class ProductsPage {
             <span class="products-count">${this.itemsCountText()}</span>
           </div>
 
-          <div class="products-filters-actions">
-            <button type="button" class="btn btn-outline btn-press products-meta-btn" id="products-manage-allergens">Аллергены</button>
-          </div>
         </div>
       </section>
     `;
@@ -624,15 +619,6 @@ export class ProductsPage {
     if (e.target.closest('#products-create-btn')) {
       this.openItemModal({
         categories: this.categories,
-        allergens: this.allergens,
-        onSaved: () => this.loadData(),
-      });
-      return;
-    }
-
-    if (e.target.closest('#products-manage-allergens')) {
-      this.closeFilterDropdowns();
-      openAllergensModal({
         allergens: this.allergens,
         onSaved: () => this.loadData(),
       });
@@ -892,7 +878,6 @@ export class ProductsPage {
     this.container.removeEventListener('input', this._onContainerInput);
     this.container.removeEventListener('change', this._onContainerChange);
     document.getElementById('item-form-modal')?.remove();
-    document.getElementById('allergens-modal')?.remove();
     document.getElementById('bulk-ops-modal')?.remove();
   }
 }
