@@ -1,6 +1,6 @@
 import { auth, db } from '../../shared/firebase.js';
 import {
-  collection, getDoc, getDocs, addDoc, query, where,
+  collection, doc, getDoc, getDocs, addDoc, query, where,
   serverTimestamp,
 } from 'firebase/firestore';
 import { COL, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
