@@ -22,6 +22,7 @@ import { showToast } from '../utils/toast.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { formatAvailabilityRuleShort, buildGroupsByName, matchesScheduleFilter } from '../../shared/availability-rules.js';
 import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
+import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
 
 const AVAILABILITY_OPTIONS = [
   { id: 'all', label: 'Все' },
@@ -107,6 +108,30 @@ export class ProductsPage {
     }
 
     return result;
+  }
+
+  hasActiveFilters() {
+    return Boolean(
+      this.search.trim()
+      || this.categoryFilters.length
+      || this.allergenFilters.length
+      || this.scheduleFilter !== 'all'
+      || this.availabilityFilter !== 'all',
+    );
+  }
+
+  resetFilters() {
+    this.search = '';
+    this.categoryFilters = [];
+    this.allergenFilters = [];
+    this.scheduleFilter = 'all';
+    this.availabilityFilter = 'all';
+    this.closeFilterDropdowns();
+    const searchInput = this.container.querySelector('#products-search');
+    if (searchInput) searchInput.value = '';
+    const scheduleSelect = this.container.querySelector('#products-schedule-filter');
+    if (scheduleSelect) scheduleSelect.value = 'all';
+    this.renderShell();
   }
 
   filterCategories() {
@@ -417,29 +442,29 @@ export class ProductsPage {
               `).join('')}
             </select>
           </div>
+
+          ${renderFiltersResetBtn(this.hasActiveFilters())}
         </div>
 
         <div class="products-filters-toolbar">
-          <button type="button" class="btn btn-primary btn-press products-create-btn" id="products-create-btn">
-            + Добавить
-          </button>
+          <div class="admin-filters-toolbar-left">
+            <button type="button" class="btn btn-primary btn-press products-create-btn" id="products-create-btn">
+              + Добавить
+            </button>
 
-          <div class="products-filter-inline">
-            <span class="products-filter-label">Доступность</span>
-            <div class="products-chip-group">
-              ${AVAILABILITY_OPTIONS.map(o => `
-                <button type="button" class="products-chip btn-press ${this.availabilityFilter === o.id ? 'products-chip--active' : ''}" data-availability="${o.id}">${o.label}</button>
-              `).join('')}
+            <div class="products-filter-inline">
+              <span class="products-filter-label">Доступность</span>
+              <div class="products-chip-group">
+                ${AVAILABILITY_OPTIONS.map(o => `
+                  <button type="button" class="products-chip btn-press ${this.availabilityFilter === o.id ? 'products-chip--active' : ''}" data-availability="${o.id}">${o.label}</button>
+                `).join('')}
+              </div>
             </div>
           </div>
 
-          <div class="products-filters-sep" aria-hidden="true"></div>
-
-          <div class="products-filter-inline products-filter-summary">
-            <span class="products-filter-label">Найдено</span>
-            <span class="products-count">${this.itemsCountText()}</span>
+          <div class="admin-filters-toolbar-right">
+            <span class="admin-filters-count">Найдено <span class="products-count">${this.itemsCountText()}</span></span>
           </div>
-
         </div>
       </section>
     `;
@@ -497,8 +522,8 @@ export class ProductsPage {
     const scheduleText = rule ? formatAvailabilityRuleShort(rule) : '';
 
     return `
-      <tr class="products-row ${this.selectedIds.has(item.id) ? 'products-row--selected' : ''}" data-item-id="${item.id}">
-        <td class="products-td-check">
+      <tr class="orders-row products-row ${this.selectedIds.has(item.id) ? 'products-row--selected' : ''}" data-item-id="${item.id}" tabindex="0">
+        <td class="products-td-check" data-stop-row="1">
           <input
             type="checkbox"
             class="products-check products-row-check"
@@ -509,7 +534,7 @@ export class ProductsPage {
         </td>
         <td class="products-td-photo">${productThumbHtml(item)}</td>
         <td class="products-td-name">
-          <button type="button" class="products-name-link btn-press" data-action="edit" data-item-id="${item.id}">${esc(item.name || '—')}</button>
+          <span class="orders-client">${esc(item.name || '—')}</span>
           ${item.description ? `<span class="products-desc">${esc(item.description)}</span>` : ''}
           ${scheduleText ? `<span class="products-avail-schedule">🕐 ${esc(scheduleText)}</span>` : ''}
           ${allergenText ? `<span class="products-allergens">⚠ ${esc(allergenText)}</span>` : ''}
@@ -517,7 +542,7 @@ export class ProductsPage {
         <td><span class="products-category">${esc(item.category || '—')}</span></td>
         <td class="products-td-num">${fmtMoney(item.price)}</td>
         <td class="products-td-num">${nutrition?.kcal ?? '—'}</td>
-        <td class="products-td-avail">
+        <td class="products-td-avail" data-stop-row="1">
           <button
             type="button"
             class="products-avail-toggle btn-press ${available ? 'products-avail-toggle--on' : ''}"
@@ -530,7 +555,7 @@ export class ProductsPage {
             <span class="products-avail-label">${available ? 'В продаже' : 'Скрыт'}</span>
           </button>
         </td>
-        <td class="products-td-actions">
+        <td class="products-td-actions" data-stop-row="1">
           <div class="products-actions-inner">
             <button type="button" class="products-action btn-press" data-action="edit" data-item-id="${item.id}">Изменить</button>
             <button type="button" class="products-action products-action--danger btn-press" data-action="archive" data-item-id="${item.id}">В архив</button>
@@ -616,6 +641,11 @@ export class ProductsPage {
   _onContainerClick(e) {
     if (!this.container.querySelector('.products-page')) return;
 
+    if (e.target.closest('[data-action="reset-filters"]')) {
+      this.resetFilters();
+      return;
+    }
+
     if (e.target.closest('#products-create-btn')) {
       this.openItemModal({
         categories: this.categories,
@@ -686,6 +716,21 @@ export class ProductsPage {
       return;
     }
 
+    const row = e.target.closest('.products-table [data-item-id]');
+    if (row) {
+      if (e.target.closest('[data-stop-row]')) return;
+      const item = this.items.find(i => i.id === row.dataset.itemId);
+      if (item) {
+        this.openItemModal({
+          item,
+          categories: this.categories,
+          allergens: this.allergens,
+          onSaved: () => this.loadData(),
+        });
+      }
+      return;
+    }
+
     const actionBtn = e.target.closest('[data-action]');
     if (!actionBtn) return;
 
@@ -729,6 +774,7 @@ export class ProductsPage {
     this.syncBulkUi();
     this.syncCategoryDropdown();
     this.syncAllergenDropdown();
+    syncFiltersResetBtn(page, this.hasActiveFilters());
   }
 
   syncBulkUi() {

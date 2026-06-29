@@ -43,6 +43,22 @@ export function fmtOrderDateTime(ts) {
   });
 }
 
+/** @param {import('firebase/firestore').Timestamp | null | undefined} ts */
+export function fmtOrderDateCell(ts) {
+  if (!ts?.toDate) return '—';
+  const d = ts.toDate();
+  const date = d.toLocaleDateString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  });
+  const time = d.toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `<time class="ufm-date-cell"><span class="ufm-date-part">${date}</span><span class="ufm-time-part">${time}</span></time>`;
+}
+
 /** @param {string} iso YYYY-MM-DD */
 export function fmtPickupDate(iso) {
   if (!iso) return '—';

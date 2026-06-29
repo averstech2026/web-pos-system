@@ -102,8 +102,8 @@ export function openGroupProductsPickerModal({ groupName, items, onApplied }) {
         <div class="admin-modal-foot gpp-modal-foot">
           <p class="gpp-hint">Отметьте товары, которые должны входить в группу. Снятая галочка у текущих товаров группы перенесёт их в «Прочее».</p>
           <div class="gpp-modal-actions">
-            <button type="button" class="btn btn-outline btn-press" id="gpp-cancel">Отмена</button>
-            <button type="button" class="btn btn-primary btn-press" id="gpp-apply">${applyCountLabel(selectedIds.size)}</button>
+            <button type="button" class="action-btn action-btn-secondary btn-press" id="gpp-cancel">Отмена</button>
+            <button type="button" class="action-btn action-btn-primary btn-press" id="gpp-apply">${applyCountLabel(selectedIds.size)}</button>
           </div>
         </div>
       </div>

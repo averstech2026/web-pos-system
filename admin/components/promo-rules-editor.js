@@ -398,18 +398,22 @@ export function createPromoRulesEditor(host, {
         </div>
 
         <div class="avr-detail-foot">
-          <button type="button" class="btn btn-primary btn-press avr-save-btn" id="prm-save-btn">Сохранить акцию</button>
-          ${!isNew ? `
-            <div class="cgr-detail-danger avr-detail-danger">
-              <label class="cgr-delete-confirm">
-                <input type="checkbox" id="prm-delete-confirm" />
-                <span>Я подтверждаю удаление этой акции</span>
-              </label>
-              <button type="button" class="cgr-detail-delete btn-press" id="prm-detail-delete" disabled>
-                Удалить акцию
-              </button>
+          <div class="avr-detail-foot-row${isNew ? ' avr-detail-foot-row--actions-only' : ''}">
+            ${!isNew ? `
+              <div class="cgr-detail-danger avr-detail-danger">
+                <label class="cgr-delete-confirm">
+                  <input type="checkbox" id="prm-delete-confirm" />
+                  <span>Я подтверждаю удаление этой акции</span>
+                </label>
+                <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="prm-detail-delete" disabled>
+                  Удалить акцию
+                </button>
+              </div>
+            ` : ''}
+            <div class="footer-action-bar">
+              <button type="button" class="action-btn action-btn-primary btn-press" id="prm-save-btn">Сохранить акцию</button>
             </div>
-          ` : ''}
+          </div>
         </div>
       </div>
     `;

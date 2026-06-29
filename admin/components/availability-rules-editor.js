@@ -226,19 +226,23 @@ export function createAvailabilityRulesEditor(host, {
         </div>
 
         <div class="avr-detail-foot">
-          <button type="button" class="btn btn-primary btn-press avr-save-btn" id="avr-save-btn">Сохранить шаблон</button>
-          ${!isNew ? `
-            <button type="button" class="btn btn-outline btn-press avr-archive-btn" id="avr-archive-btn">В архив</button>
-            <div class="cgr-detail-danger avr-detail-danger">
-              <label class="cgr-delete-confirm">
-                <input type="checkbox" id="avr-delete-confirm" />
-                <span>Я подтверждаю, что хочу безвозвратно удалить этот шаблон расписания</span>
-              </label>
-              <button type="button" class="cgr-detail-delete btn-press" id="avr-detail-delete" disabled>
-                Удалить шаблон
-              </button>
+          <div class="avr-detail-foot-row${isNew ? ' avr-detail-foot-row--actions-only' : ''}">
+            ${!isNew ? `
+              <div class="cgr-detail-danger avr-detail-danger cgr-detail-danger--wide">
+                <label class="cgr-delete-confirm">
+                  <input type="checkbox" id="avr-delete-confirm" />
+                  <span>Я подтверждаю, что хочу безвозвратно удалить этот шаблон расписания</span>
+                </label>
+                <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="avr-detail-delete" disabled>
+                  Удалить шаблон
+                </button>
+              </div>
+            ` : ''}
+            <div class="footer-action-bar">
+              ${!isNew ? `<button type="button" class="action-btn action-btn-secondary btn-press" id="avr-archive-btn">В архив</button>` : ''}
+              <button type="button" class="action-btn action-btn-primary btn-press" id="avr-save-btn">Сохранить шаблон</button>
             </div>
-          ` : ''}
+          </div>
         </div>
       </div>
     `;

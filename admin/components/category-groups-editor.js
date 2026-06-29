@@ -263,15 +263,19 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
         </div>
 
         <div class="avr-detail-foot">
-          <button type="button" class="btn btn-primary btn-press avr-save-btn" id="cgr-detail-save">Сохранить изменения</button>
-          <div class="cgr-detail-danger">
-            <label class="cgr-delete-confirm">
-              <input type="checkbox" id="cgr-delete-confirm" />
-              <span>Я понимаю, что товары группы перейдут в «Прочее», и подтверждаю удаление</span>
-            </label>
-            <button type="button" class="cgr-detail-delete btn-press" id="cgr-detail-delete" disabled>
-              Удалить группу
-            </button>
+          <div class="avr-detail-foot-row">
+            <div class="cgr-detail-danger cgr-detail-danger--wide">
+              <label class="cgr-delete-confirm">
+                <input type="checkbox" id="cgr-delete-confirm" />
+                <span>Я понимаю, что товары группы перейдут в «Прочее», и подтверждаю удаление</span>
+              </label>
+              <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="cgr-detail-delete" disabled>
+                Удалить группу
+              </button>
+            </div>
+            <div class="footer-action-bar">
+              <button type="button" class="action-btn action-btn-primary btn-press" id="cgr-detail-save">Сохранить изменения</button>
+            </div>
           </div>
         </div>
       </div>

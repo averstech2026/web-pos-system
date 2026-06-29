@@ -69,6 +69,46 @@ export function filterByStatus(orders, statuses) {
 
 /**
  * @param {Array<object>} orders
+ * @param {Map<string, object>} usersById
+ * @param {object} filters
+ */
+export function filterOrders(orders, usersById, {
+  statuses = [],
+  search = '',
+  groupIds = [],
+  loyaltyCategoryIds = [],
+} = {}) {
+  let result = filterByStatus(orders, statuses);
+
+  const q = search.trim().toLowerCase();
+  const groupSet = groupIds.length ? new Set(groupIds) : null;
+  const loyaltySet = loyaltyCategoryIds.length ? new Set(loyaltyCategoryIds) : null;
+
+  return result.filter(order => {
+    const user = usersById.get(order.userId);
+
+    if (groupSet && !groupSet.has(user?.userGroupId || '')) return false;
+
+    if (loyaltySet) {
+      const catKey = user?.loyaltyCategoryId || '__none__';
+      if (!loyaltySet.has(catKey)) return false;
+    }
+
+    if (!q) return true;
+
+    const hay = [
+      order.orderNumber,
+      user?.name,
+      user?.email,
+      user?.phone,
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    return hay.includes(q);
+  });
+}
+
+/**
+ * @param {Array<object>} orders
  * @param {Map<string, object>} itemsById
  * @returns {Map<string, Map<string, { category: string, name: string, qty: number }>>}
  */

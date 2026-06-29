@@ -111,15 +111,19 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
         </div>
 
         <div class="avr-detail-foot">
-          <button type="button" class="btn btn-primary btn-press avr-save-btn" id="alr-detail-save">Сохранить изменения</button>
-          <div class="cgr-detail-danger">
-            <label class="cgr-delete-confirm">
-              <input type="checkbox" id="alr-delete-confirm" />
-              <span>Я понимаю, что аллерген исчезнет из справочника, и подтверждаю удаление</span>
-            </label>
-            <button type="button" class="cgr-detail-delete btn-press" id="alr-detail-delete" disabled>
-              Удалить аллерген
-            </button>
+          <div class="avr-detail-foot-row">
+            <div class="cgr-detail-danger cgr-detail-danger--wide">
+              <label class="cgr-delete-confirm">
+                <input type="checkbox" id="alr-delete-confirm" />
+                <span>Я понимаю, что аллерген исчезнет из справочника, и подтверждаю удаление</span>
+              </label>
+              <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="alr-detail-delete" disabled>
+                Удалить аллерген
+              </button>
+            </div>
+            <div class="footer-action-bar">
+              <button type="button" class="action-btn action-btn-primary btn-press" id="alr-detail-save">Сохранить изменения</button>
+            </div>
           </div>
         </div>
       </div>

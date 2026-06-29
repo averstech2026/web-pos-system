@@ -215,8 +215,8 @@ export function openItemFormModal({
       </div>
 
       <div class="admin-modal-foot">
-        <button type="button" class="btn btn-outline btn-press" id="ifm-cancel">Отмена</button>
-        <button type="button" class="btn btn-primary btn-press" id="ifm-submit">
+        <button type="button" class="action-btn action-btn-secondary btn-press" id="ifm-cancel">Отмена</button>
+        <button type="button" class="action-btn action-btn-primary btn-press" id="ifm-submit">
           ${isEdit ? 'Сохранить' : 'Создать'}
         </button>
       </div>

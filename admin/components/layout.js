@@ -2,18 +2,68 @@ import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
-/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'allergens' | 'schedules' | 'marketing' | 'users' | 'reports'} AdminSection */
+/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'allergens' | 'schedules' | 'marketing' | 'payments' | 'users' | 'crm-groups' | 'crm-loyalty' | 'crm-wallets' | 'reports'} AdminSection */
 
-const NAV = [
-  { id: 'dashboard', path: '/dashboard', label: 'Дашборд', icon: '📊' },
-  { id: 'orders', path: '/orders', label: 'Заказы', icon: '🧾' },
-  { id: 'products', path: '/products', label: 'Товары', icon: '🍽️' },
-  { id: 'groups', path: '/groups', label: 'Группы', icon: '📂' },
-  { id: 'allergens', path: '/allergens', label: 'Аллергены', icon: '⚠' },
-  { id: 'schedules', path: '/schedules', label: 'Расписания', icon: '🕐' },
-  { id: 'marketing', path: '/marketing', label: 'Маркетинг', icon: '🎁' },
-  { id: 'users', path: '/users', label: 'Пользователи', icon: '👥' },
-  { id: 'reports', path: '/reports', label: 'Отчёты', icon: '📈' },
+/** @type {Record<string, string>} */
+const NAV_ICONS = {
+  'layout-dashboard': `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>`,
+  'shopping-bag': `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`,
+  users: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+  wallet: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-2a2 2 0 0 0 0 4h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>`,
+  'bar-chart-3': `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>`,
+  settings: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
+};
+
+/** @type {{ id: string; label: string; icon: keyof typeof NAV_ICONS; items: { id: AdminSection; path: string; label: string }[] }[]} */
+const NAV_GROUPS = [
+  {
+    id: 'main',
+    label: 'Главное',
+    icon: 'layout-dashboard',
+    items: [
+      { id: 'dashboard', path: '/dashboard', label: 'Дашборд' },
+      { id: 'orders', path: '/orders', label: 'Заказы' },
+    ],
+  },
+  {
+    id: 'menu',
+    label: 'Меню и товары',
+    icon: 'shopping-bag',
+    items: [
+      { id: 'products', path: '/products', label: 'Товары' },
+      { id: 'groups', path: '/groups', label: 'Группы товаров' },
+      { id: 'allergens', path: '/allergens', label: 'Аллергены' },
+    ],
+  },
+  {
+    id: 'crm',
+    label: 'Клиенты и CRM',
+    icon: 'users',
+    items: [
+      { id: 'users', path: '/users', label: 'Клиенты' },
+      { id: 'crm-groups', path: '/crm-groups', label: 'Группы клиентов' },
+      { id: 'crm-loyalty', path: '/crm-loyalty', label: 'Категории лояльности' },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Финансы и маркетинг',
+    icon: 'wallet',
+    items: [
+      { id: 'crm-wallets', path: '/crm-wallets', label: 'Кошельки' },
+      { id: 'payments', path: '/payments', label: 'Платежи' },
+      { id: 'marketing', path: '/marketing', label: 'Маркетинг' },
+    ],
+  },
+  {
+    id: 'settings-analytics',
+    label: 'Настройки и аналитика',
+    icon: 'settings',
+    items: [
+      { id: 'schedules', path: '/schedules', label: 'Расписания' },
+      { id: 'reports', path: '/reports', label: 'Отчёты' },
+    ],
+  },
 ];
 
 let sidebarCollapsed = false;
@@ -29,17 +79,26 @@ let sidebarCollapsed = false;
 export function renderAdminShell({ active, title, subtitle = '', bodyHtml, toolbarHtml = '' }) {
   const userEmail = auth.currentUser?.email || '';
 
-  const navHtml = NAV.map(item => `
-    <button
-      type="button"
-      class="admin-nav-item btn-press ${item.id === active ? 'admin-nav-item--active' : ''}"
-      data-path="${item.path}"
-      aria-current="${item.id === active ? 'page' : 'false'}"
-      title="${item.label}"
-    >
-      <span class="admin-nav-icon" aria-hidden="true">${item.icon}</span>
-      <span class="admin-nav-label">${item.label}</span>
-    </button>
+  const navHtml = NAV_GROUPS.map((group, groupIndex) => `
+    <div class="admin-nav-group${groupIndex > 0 ? ' admin-nav-group--spaced' : ''}">
+      <div class="admin-nav-group-head" aria-hidden="true">
+        <span class="admin-nav-group-icon">${NAV_ICONS[group.icon]}</span>
+        <span class="admin-nav-group-label">${group.label}</span>
+      </div>
+      <div class="admin-nav-group-items">
+        ${group.items.map(item => `
+          <button
+            type="button"
+            class="admin-nav-item btn-press ${item.id === active ? 'admin-nav-item--active' : ''}"
+            data-path="${item.path}"
+            aria-current="${item.id === active ? 'page' : 'false'}"
+            title="${item.label}"
+          >
+            <span class="admin-nav-label">${item.label}</span>
+          </button>
+        `).join('')}
+      </div>
+    </div>
   `).join('');
 
   return `

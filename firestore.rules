@@ -35,6 +35,36 @@ service cloud.firestore {
       allow create: if isAuth();
       allow update: if isOwner(userId) || isRole('admin') || isRole('manager');
       allow delete: if isRole('admin');
+
+      match /wallet_history/{entryId} {
+        allow read: if isOwner(userId) || isStaff();
+        allow create: if isRole('admin') || isRole('manager');
+        allow update, delete: if isRole('admin');
+      }
+    }
+
+    // ── user_groups (CRM counterparty groups) ───────────────
+    match /user_groups/{groupId} {
+      allow read: if isStaff();
+      allow write: if isRole('admin') || isRole('manager');
+    }
+
+    // ── loyalty_categories (CRM loyalty tiers) ─────────────
+    match /loyalty_categories/{categoryId} {
+      allow read: if isStaff();
+      allow write: if isRole('admin') || isRole('manager');
+    }
+
+    // ── wallets (CRM wallet catalog) ───────────────────────
+    match /wallets/{walletId} {
+      allow read: if isStaff();
+      allow write: if isRole('admin') || isRole('manager');
+    }
+
+    // ── payment_methods (payment types catalog) ───────────
+    match /payment_methods/{methodId} {
+      allow read: if isStaff();
+      allow write: if isRole('admin') || isRole('manager');
     }
 
     // ── items (menu) ─────────────────────────────────────────

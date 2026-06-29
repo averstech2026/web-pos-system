@@ -31,8 +31,8 @@ function openBulkModal({ title, bodyHtml, submitLabel, onSubmit }) {
         <p class="ifm-error bulk-modal-error" hidden></p>
       </div>
       <div class="admin-modal-foot">
-        <button type="button" class="btn btn-outline btn-press" data-bulk-close>Отмена</button>
-        <button type="button" class="btn btn-primary btn-press" data-bulk-submit>${esc(submitLabel)}</button>
+        <button type="button" class="action-btn action-btn-secondary btn-press" data-bulk-close>Отмена</button>
+        <button type="button" class="action-btn action-btn-primary btn-press" data-bulk-submit>${esc(submitLabel)}</button>
       </div>
     </div>
   `;

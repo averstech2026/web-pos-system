@@ -75,6 +75,10 @@ async function renderRoute(path) {
     '/schedules': () => import('./pages/availability-schedules.js').then(m => m.AvailabilitySchedulesPage),
     '/marketing': () => import('./pages/marketing.js').then(m => m.MarketingPage),
     '/users': () => import('./pages/users.js').then(m => m.UsersPage),
+    '/crm-groups': () => import('./pages/crm-user-groups.js').then(m => m.CrmUserGroupsPage),
+    '/crm-loyalty': () => import('./pages/crm-loyalty-categories.js').then(m => m.CrmLoyaltyCategoriesPage),
+    '/crm-wallets': () => import('./pages/crm-wallets.js').then(m => m.CrmWalletsPage),
+    '/payments': () => import('./pages/payments.js').then(m => m.PaymentsPage),
     '/reports': () => import('./pages/reports.js').then(m => m.ReportsPage),
   };
 

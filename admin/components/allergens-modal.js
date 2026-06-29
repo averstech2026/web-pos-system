@@ -51,8 +51,8 @@ export function openAllergensModal({ allergens, onSaved }) {
           <p class="ifm-error" id="alm-error" hidden></p>
         </div>
         <div class="admin-modal-foot">
-          <button type="button" class="btn btn-outline btn-press" id="alm-cancel">Отмена</button>
-          <button type="button" class="btn btn-primary btn-press" id="alm-save">Сохранить</button>
+          <button type="button" class="action-btn action-btn-secondary btn-press" id="alm-cancel">Отмена</button>
+          <button type="button" class="action-btn action-btn-primary btn-press" id="alm-save">Сохранить</button>
         </div>
       </div>
     `;

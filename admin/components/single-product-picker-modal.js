@@ -109,8 +109,8 @@ export function openSingleProductPickerModal({
         <div class="admin-modal-foot gpp-modal-foot">
           <p class="gpp-hint">Выберите один товар из списка. Отметьте строку или нажмите на чекбокс.</p>
           <div class="gpp-modal-actions">
-            <button type="button" class="btn btn-outline btn-press" id="spp-cancel">Отмена</button>
-            <button type="button" class="btn btn-primary btn-press" id="spp-apply" ${selectedId ? '' : 'disabled'}>
+            <button type="button" class="action-btn action-btn-secondary btn-press" id="spp-cancel">Отмена</button>
+            <button type="button" class="action-btn action-btn-primary btn-press" id="spp-apply" ${selectedId ? '' : 'disabled'}>
               ${applyLabel()}
             </button>
           </div>

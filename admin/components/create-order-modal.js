@@ -132,8 +132,8 @@ export function openCreateOrderModal({ clients, items, groupsByName = new Map(),
         </div>
 
         <div class="admin-modal-foot">
-          <button type="button" class="btn btn-outline btn-press" id="com-cancel">Отмена</button>
-          <button type="button" class="btn btn-primary btn-pill btn-press" id="com-submit" ${lines.length ? '' : 'disabled'}>
+          <button type="button" class="action-btn action-btn-secondary btn-press" id="com-cancel">Отмена</button>
+          <button type="button" class="action-btn action-btn-primary btn-press" id="com-submit" ${lines.length ? '' : 'disabled'}>
             Оформить и оплатить
           </button>
         </div>

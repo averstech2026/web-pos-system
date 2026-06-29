@@ -20,7 +20,7 @@ import {
   signOut,
 } from 'firebase/auth';
 import { auth, db } from './firebase.js';
-import { COL, ROLES, createItemDoc } from './schema.js';
+import { COL, ROLES, createItemDoc, createUserDoc, USER_STATUS } from './schema.js';
 import { getItemImageUrl } from './item-images.js';
 import { DEMO_NUTRITION_BY_NAME } from './demo-nutrition.js';
 
@@ -56,8 +56,40 @@ const DEMO_USERS = [
   { id: 'demo-manager-001', name: 'Менеджер',      email: 'manager@ifcm.demo', role: ROLES.MANAGER, balance: 0 },
   { id: 'demo-cook-001',    name: 'Повар',         email: 'cook@ifcm.demo',    role: ROLES.COOK,    balance: 0 },
   { id: 'demo-cashier-001', name: 'Кассир',        email: 'cashier@ifcm.demo', role: ROLES.CASHIER, balance: 0 },
-  { id: 'demo-client-001',  name: 'Иванов И.',     email: 'ivanov@ifcm.demo',  role: ROLES.CLIENT,  balance: 1686.86 },
-  { id: 'demo-client-002',  name: 'Петрова А.',    email: 'petrova@ifcm.demo', role: ROLES.CLIENT,  balance: 500 },
+  createUserDoc({
+    id: 'demo-client-001',
+    name: 'Иванов Иван Иванович',
+    email: 'ivanov@ifcm.demo',
+    role: ROLES.CLIENT,
+    balance: 1686,
+    phone: '+7 900 111-22-33',
+    birthDate: '1985-03-15',
+    status: USER_STATUS.ACTIVE,
+    userGroupId: 'office_romashka',
+    loyaltyCategoryId: 'gold',
+    qrCode: 'MEAL-100000001',
+    allergens: ['gluten'],
+    allowsWebAccess: true,
+    wallets: {
+      personal: { balance: 686, name: 'Личные средства', restrictions: [] },
+      dotation: { balance: 1000, name: 'Дотация', restrictions: ['bakery_id'] },
+    },
+  }),
+  createUserDoc({
+    id: 'demo-client-002',
+    name: 'Петрова Анна Сергеевна',
+    email: 'petrova@ifcm.demo',
+    role: ROLES.CLIENT,
+    balance: 500,
+    phone: '+7 900 444-55-66',
+    birthDate: '1992-07-22',
+    status: USER_STATUS.ACTIVE,
+    userGroupId: 'production',
+    loyaltyCategoryId: 'silver',
+    qrCode: 'MEAL-100000002',
+    allergens: [],
+    allowsWebAccess: true,
+  }),
 ];
 
 export async function seedDatabase() {
@@ -80,6 +112,30 @@ export async function seedDatabase() {
   console.log('[seed] Seeding demo users...');
   for (const user of DEMO_USERS) {
     await setDoc(doc(db, COL.USERS, user.id), user);
+  }
+
+  console.log('[seed] Seeding user groups...');
+  const DEMO_USER_GROUPS = [
+    { id: 'office_romashka', name: 'Офис Ромашка', description: 'Офисные сотрудники' },
+    { id: 'production', name: 'Производство', description: 'Производственный персонал' },
+    { id: 'askona', name: 'Завод Аскона', description: 'Корпоративное питание' },
+  ];
+  for (const group of DEMO_USER_GROUPS) {
+    await setDoc(doc(db, COL.USER_GROUPS, group.id), { name: group.name, description: group.description || '' });
+  }
+
+  console.log('[seed] Seeding loyalty categories...');
+  const DEMO_LOYALTY = [
+    { id: 'bronze', name: 'Бронза', discountPercent: 0, cashbackPercent: 3 },
+    { id: 'silver', name: 'Серебро', discountPercent: 5, cashbackPercent: 5 },
+    { id: 'gold', name: 'Золото', discountPercent: 10, cashbackPercent: 7 },
+  ];
+  for (const cat of DEMO_LOYALTY) {
+    await setDoc(doc(db, COL.LOYALTY_CATEGORIES, cat.id), {
+      name: cat.name,
+      discountPercent: cat.discountPercent,
+      cashbackPercent: cat.cashbackPercent,
+    });
   }
 
   console.log('[seed] Done! 🎉');
