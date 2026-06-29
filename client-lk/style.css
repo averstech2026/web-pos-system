@@ -6,6 +6,12 @@
   background: var(--color-bg);
 }
 
+#app:has(.lk-shell),
+#app:has(.pay-shell) {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 .lk-shell {
   width: 100%;
   max-width: 430px;
@@ -93,7 +99,7 @@
 .id-card-surface {
   position: relative;
   border-radius: 20px;
-  padding: 22px 20px;
+  padding: 20px 20px;
   overflow: hidden;
   background: linear-gradient(
     145deg,
@@ -145,8 +151,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-lg);
-  min-height: 108px;
+  gap: var(--space-md);
+  min-height: 0;
 }
 
 .id-card-info {
@@ -154,13 +160,13 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .id-card-details {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
   text-align: left;
   border-radius: 8px;
@@ -184,7 +190,7 @@
   color: #fff;
   letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
-  line-height: 1.35;
+  line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -195,7 +201,7 @@
   align-items: baseline;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 .id-card-balance-label {
@@ -235,8 +241,8 @@
 
 .id-card-qr {
   flex-shrink: 0;
-  width: 92px;
-  height: 92px;
+  width: 80px;
+  height: 80px;
   padding: 8px;
   background: #fff;
   border: none;
@@ -439,6 +445,29 @@ button.order-status-pill {
   border-top: 1px solid rgba(229, 231, 235, 0.65);
   box-shadow: var(--shadow-footer);
   z-index: 20;
+}
+
+.lk-scroll-fade,
+.pay-scroll-fade {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  height: 56px;
+  background: linear-gradient(to bottom, transparent 0%, var(--color-bg) 80%);
+  pointer-events: none;
+  z-index: 19;
+  transition: opacity 0.25s ease;
+}
+
+.lk-shell--scroll-hint .lk-bottom-bar,
+.lk-shell--has-overflow .lk-bottom-bar,
+.pay-shell--scroll-hint .pay-footer,
+.pay-shell--has-overflow .pay-footer {
+  box-shadow:
+    0 -10px 32px -4px rgba(30, 27, 75, 0.16),
+    0 -2px 8px rgba(30, 27, 75, 0.08);
 }
 
 /* ── New order button (kiosk pay CTA) ───────────────────── */
@@ -1079,45 +1108,97 @@ button.order-status-pill {
 
 .cart-bar-btn {
   width: 100%;
-  padding: 6px 6px 6px var(--space-lg);
+  padding: 10px var(--space-lg);
   font-size: var(--font-size-md);
   border-radius: var(--radius-pill);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
+  justify-content: center;
   min-height: 52px;
   letter-spacing: 0.03em;
 }
 
+.cart-bar-inner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  max-width: 100%;
+}
+
+.cart-bar-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-right: var(--space-xs);
+}
+
+.cart-bar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  line-height: 0;
+}
+
+.cart-bar-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.cart-bar-qty {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
 .cart-bar-btn-text {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 700;
+  margin: 0 var(--space-sm);
 }
 
 .cart-bar-amount {
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.22);
-  border-radius: var(--radius-pill);
-  padding: 10px 16px;
+  padding: 0;
+  background: none;
+  border-radius: 0;
   font-size: var(--font-size-md);
-  font-weight: 800;
+  font-weight: 700;
+  color: #fff;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   white-space: nowrap;
   line-height: 1;
+  margin-left: var(--space-xs);
 }
 
 /* ── Payment page ────────────────────────────────────────── */
-#app:has(.pay-shell) {
-  height: 100dvh;
-  overflow: hidden;
-}
-
 .pay-shell {
   width: 100%;
   max-width: 430px;
@@ -1200,26 +1281,6 @@ button.order-status-pill {
   gap: var(--space-md);
   padding-bottom: 120px;
   -webkit-overflow-scrolling: touch;
-}
-
-.pay-scroll-fade {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 430px;
-  height: 56px;
-  background: linear-gradient(to bottom, transparent 0%, var(--color-bg) 80%);
-  pointer-events: none;
-  z-index: 19;
-  transition: opacity 0.25s ease;
-}
-
-.pay-shell--scroll-hint .pay-footer,
-.pay-shell--has-overflow .pay-footer {
-  box-shadow:
-    0 -10px 32px -4px rgba(30, 27, 75, 0.16),
-    0 -2px 8px rgba(30, 27, 75, 0.08);
 }
 
 .pay-items-list {

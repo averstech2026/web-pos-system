@@ -31,7 +31,7 @@ Never use `#1A3B6E`, orange accent, or ad-hoc colors.
 - **Primary CTA**: navy pill (`border-radius: 9999px`), `box-shadow: var(--shadow-btn-navy)`, class `btn btn-primary btn-pill btn-press`
 - **Cancel**: white + rose border (`btn-outline-danger`)
 - **Tabs/switchers**: pill container, active segment = navy fill (see `.auth-tabs`, `.cat-tab`)
-- **Footers**: sticky bottom bar with `box-shadow: var(--shadow-footer)`
+- **Footers**: sticky/fixed bottom bar with `box-shadow: var(--shadow-footer)`; on long screens add **Scroll edge hint** (below)
 - **Touch feedback**: always add `btn-press` on interactive elements
 
 ## Imports
@@ -109,7 +109,7 @@ Unified digital wallet card for client LK: food card number, balance, history li
 - **Gloss:** `::before` white sheen + navy radial highlights; `::after` subtle corner bloom — all `rgba(30, 27, 75, …)` or navy-tinted
 - **Shadow:** layered floating shadow `rgba(30, 27, 75, 0.18–0.52)` — stronger than `--shadow-card`
 - **Pattern:** `.id-card-pattern` — white SVG food icons, `opacity: 0.07`, `background-size: 120px`
-- **Shape:** `border-radius: 20px`, `padding: 22px 20px`, `overflow: hidden`
+- **Shape:** `border-radius: 20px`, `padding: 20px 20px`, `overflow: hidden`
 
 ### Typography (on card)
 
@@ -125,7 +125,7 @@ No balance pill/bubble — amount is plain text on the card surface.
 
 ### QR chip
 
-- White container on the right: `92×92px`, `border-radius: 14px`, `padding: 8px`
+- White container on the right: `80×80px`, `border-radius: 14px`, `padding: 8px` (keep ~10% padding ratio vs original `92×8`)
 - `box-shadow: 0 6px 16px rgba(0,0,0,0.18)` + subtle navy inset border
 - Flex row: `.id-card-content` with `gap: var(--space-lg)`, `align-items: center`
 
@@ -136,3 +136,89 @@ No balance pill/bubble — amount is plain text on the card surface.
 - ❌ Gray or slate backgrounds on the card surface
 - ❌ Purple/violet accent colors (`#5b4fd6`, indigo-500, etc.) — stay in navy token family
 - ❌ Large bold card number — keep compact and light (400 weight)
+
+## Scroll edge hint (fixed footer + long content)
+
+Screens with a **fixed bottom bar** and scrollable body must show a soft shadow at the content/footer boundary when content overflows. **References:** `client-lk/utils/scroll-fade.js`, `client-lk/pages/home.js`, `client-lk/pages/payment.js`, `admin/components/layout.js`.
+
+### When to use
+
+- Client LK / kiosk pages: header + scrollable main + fixed CTA footer (оплата, меню, формы)
+- Any time the user can scroll while a bottom action bar stays pinned
+
+### Shell layout (required)
+
+The scroll container must be **inside** a height-locked shell — never let `body`/`#app` scroll instead of `main`:
+
+```css
+.shell:has(.shell-footer) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+.shell-main {
+  flex: 1;
+  min-height: 0;          /* critical for flex scroll */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: /* footer height + safe-area */;
+}
+```
+
+### Structure
+
+```html
+<div class="shell shell--pay">
+  <header>…</header>
+  <main class="shell-main" id="shell-main">…</main>
+  <div class="scroll-fade" id="scroll-fade" hidden aria-hidden="true"></div>
+  <footer class="shell-footer">…</footer>
+</div>
+```
+
+### Visual (two layers)
+
+1. **Footer shadow** — when `scrollHeight > clientHeight`: stronger upward shadow on the fixed footer (replaces subtle `--shadow-footer`):
+   - `0 -10px 32px -4px rgba(30, 27, 75, 0.16), 0 -2px 8px rgba(30, 27, 75, 0.08)`
+2. **Scroll fade** — when overflow **and** user has **not** reached the bottom: gradient above footer:
+   - `height: 56px`, `background: linear-gradient(to bottom, transparent 0%, var(--color-bg) 80%)`
+   - `position: fixed`, `bottom: {footer.offsetHeight}px`, `z-index: 19` (footer `z-index: 20`)
+   - `pointer-events: none`
+
+### JS toggle
+
+Use `bindScrollFade()` from `client-lk/utils/scroll-fade.js`:
+
+```js
+import { bindScrollFade } from '../utils/scroll-fade.js';
+
+this._scrollFadeCleanup = bindScrollFade({
+  shell: document.querySelector('.lk-shell'),
+  main: document.getElementById('lk-main'),
+  fade: document.getElementById('lk-scroll-fade'),
+  footer: document.querySelector('.lk-bottom-bar'),
+  classScrollHint: 'lk-shell--scroll-hint',
+  classHasOverflow: 'lk-shell--has-overflow',
+});
+```
+
+Logic inside util:
+
+```js
+const hasOverflow = main.scrollHeight > main.clientHeight + 8;
+const atBottom = main.scrollTop + main.clientHeight >= main.scrollHeight - 12;
+shell.classList.toggle('shell--has-overflow', hasOverflow);
+shell.classList.toggle('shell--scroll-hint', hasOverflow && !atBottom);
+fade.hidden = !(hasOverflow && !atBottom);
+fade.style.bottom = `${footer.offsetHeight}px`;
+```
+
+Re-bind on page render; util watches `scroll`, `resize`, `ResizeObserver`, and `MutationObserver` on `main`. Call returned cleanup on `destroy()`.
+
+### Do / Don't
+
+- ✅ Lock shell to `100dvh`; scroll only `.shell-main`
+- ✅ Measure footer height dynamically (safe-area changes height)
+- ✅ Hide fade at scroll bottom; keep footer shadow while overflow exists
+- ❌ Rely on page/body scroll — fade logic will never fire
+- ❌ Hard-code fade `bottom` in px without measuring footer

@@ -9,6 +9,7 @@ import { cart } from '../store.js';
 import { fmtDate, fmtDateTime, fmtMoney, orderStatusIcon, orderStatusLabel, orderTotal } from '../utils/format.js';
 import { qrDataUrl } from '../utils/qr.js';
 import { openOrderDetailModal } from '../components/order-detail.js';
+import { bindScrollFade } from '../utils/scroll-fade.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
 /** Next N working dates (Mon–Fri), starting from tomorrow */
@@ -48,7 +49,7 @@ export class HomePage {
 
     const qrData = `LK:${this.user.uid}`;
     [this.qrSmall, this.qrLarge] = await Promise.all([
-      qrDataUrl(qrData, 72),
+      qrDataUrl(qrData, 64),
       qrDataUrl(qrData, 220),
     ]);
 
@@ -82,7 +83,7 @@ export class HomePage {
           </div>
         </header>
 
-        <main class="lk-main">
+        <main class="lk-main" id="lk-main">
           <div class="lk-id-card">
             <div class="id-card-surface">
               <div class="id-card-pattern" aria-hidden="true"></div>
@@ -110,6 +111,8 @@ export class HomePage {
             <div class="loading-text">Загрузка…</div>
           </div>
         </main>
+
+        <div class="lk-scroll-fade" id="lk-scroll-fade" hidden aria-hidden="true"></div>
 
         <div class="lk-bottom-bar">
           <button class="btn btn-primary btn-pill btn-press new-order-btn" id="btn-new-order">Новый заказ</button>
@@ -264,6 +267,20 @@ export class HomePage {
         this.navigate('/auth');
       }
     });
+
+    this.bindScrollFade();
+  }
+
+  bindScrollFade() {
+    this._scrollFadeCleanup?.();
+    this._scrollFadeCleanup = bindScrollFade({
+      shell: document.querySelector('.lk-shell'),
+      main: document.getElementById('lk-main'),
+      fade: document.getElementById('lk-scroll-fade'),
+      footer: document.querySelector('.lk-bottom-bar'),
+      classScrollHint: 'lk-shell--scroll-hint',
+      classHasOverflow: 'lk-shell--has-overflow',
+    });
   }
 
   subscribeOrders() {
@@ -371,6 +388,7 @@ export class HomePage {
   }
 
   destroy() {
+    this._scrollFadeCleanup?.();
     this._unsubOrders?.();
     this._unsubNotif?.();
     document.getElementById('order-detail-modal')?.remove();

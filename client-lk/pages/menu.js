@@ -135,8 +135,18 @@ export class MenuPage {
 
         <div class="cart-bar" id="cart-bar" style="display:none">
           <button class="btn btn-primary btn-pill btn-press cart-bar-btn" id="btn-checkout">
-            <span class="cart-bar-btn-text" id="cart-bar-label">Оформить заказ</span>
-            <span class="cart-bar-amount" id="cart-bar-total">0 р.</span>
+            <span class="cart-bar-inner">
+              <span class="cart-bar-badge" id="cart-bar-badge" aria-hidden="true">
+                <span class="cart-bar-icon">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
+                    <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2zM7.16 14l.84-2h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20.01 4H5.21l-.94-2H1v2h2l3.6 7.59-1.35 2.44C4.52 15.37 5.48 17 7 17h12v-2H7.42c-.14 0-.25-.11-.26-.25z"/>
+                  </svg>
+                </span>
+                <span class="cart-bar-qty" id="cart-bar-qty">0</span>
+              </span>
+              <span class="cart-bar-btn-text" id="cart-bar-label">Оформить заказ</span>
+              <span class="cart-bar-amount" id="cart-bar-total">0 р.</span>
+            </span>
           </button>
         </div>
 
@@ -260,6 +270,7 @@ export class MenuPage {
   updateCartBar() {
     const bar = document.getElementById('cart-bar');
     const label = document.getElementById('cart-bar-label');
+    const qty = document.getElementById('cart-bar-qty');
     const total = document.getElementById('cart-bar-total');
     if (!bar) return;
 
@@ -268,9 +279,13 @@ export class MenuPage {
       bar.style.display = 'none';
     } else {
       bar.style.display = 'block';
-      label.textContent = `Оформить заказ ${count} ${pluralItem(count)}`;
+      if (qty) qty.textContent = String(count);
+      label.textContent = 'Оформить заказ';
       total.textContent = `${cart.total().toLocaleString('ru-RU')} р.`;
       total.style.display = '';
+      const badge = document.getElementById('cart-bar-badge');
+      if (badge) badge.style.display = '';
+      if (qty) qty.style.display = '';
     }
   }
 
@@ -282,6 +297,8 @@ export class MenuPage {
     btn.disabled = true;
     btn.querySelector('#cart-bar-label').textContent = 'Создаём заказ…';
     btn.querySelector('#cart-bar-total').style.display = 'none';
+    const badge = btn.querySelector('#cart-bar-badge');
+    if (badge) badge.style.display = 'none';
 
     try {
       const user = auth.currentUser;
@@ -312,11 +329,4 @@ export class MenuPage {
     this._cartUnsub?.();
     document.getElementById('item-detail-modal')?.remove();
   }
-}
-
-function pluralItem(n) {
-  const mod = n % 10;
-  if (mod === 1 && n !== 11) return 'блюдо';
-  if (mod >= 2 && mod <= 4 && (n < 10 || n > 20)) return 'блюда';
-  return 'блюд';
 }

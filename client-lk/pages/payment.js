@@ -7,6 +7,7 @@ import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-image
 import { hasNutrition, renderNutritionGrid, sumNutrition } from '../../shared/nutrition.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { cart } from '../store.js';
+import { bindScrollFade } from '../utils/scroll-fade.js';
 
 function resolveItemImage(item) {
   return resolveProductImageUrl(item.imageUrl) || getItemImageUrl(item.name);
@@ -365,41 +366,14 @@ export class PaymentPage {
 
   bindPayScrollFade() {
     this._scrollFadeCleanup?.();
-
-    const shell = document.querySelector('.pay-shell');
-    const main = document.getElementById('pay-main');
-    const fade = document.getElementById('pay-scroll-fade');
-    const footer = document.querySelector('.pay-footer');
-    if (!main || !fade) return;
-
-    const update = () => {
-      const hasOverflow = main.scrollHeight > main.clientHeight + 8;
-      const atBottom = main.scrollTop + main.clientHeight >= main.scrollHeight - 12;
-      const showHint = hasOverflow && !atBottom;
-
-      fade.hidden = !showHint;
-      shell?.classList.toggle('pay-shell--scroll-hint', showHint);
-      shell?.classList.toggle('pay-shell--has-overflow', hasOverflow);
-
-      if (footer) {
-        fade.style.bottom = `${footer.offsetHeight}px`;
-      }
-    };
-
-    main.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    const ro = new ResizeObserver(update);
-    ro.observe(main);
-    if (footer) ro.observe(footer);
-    requestAnimationFrame(update);
-    setTimeout(update, 120);
-
-    this._scrollFadeCleanup = () => {
-      main.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-      ro.disconnect();
-      shell?.classList.remove('pay-shell--scroll-hint', 'pay-shell--has-overflow');
-    };
+    this._scrollFadeCleanup = bindScrollFade({
+      shell: document.querySelector('.pay-shell'),
+      main: document.getElementById('pay-main'),
+      fade: document.getElementById('pay-scroll-fade'),
+      footer: document.querySelector('.pay-footer'),
+      classScrollHint: 'pay-shell--scroll-hint',
+      classHasOverflow: 'pay-shell--has-overflow',
+    });
   }
 
   async cancelOrder() {
