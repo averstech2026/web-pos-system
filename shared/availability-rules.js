@@ -30,9 +30,22 @@ export const AVAIL_DAY_VALUES = [0, 1, 2, 3, 4, 5, 6];
 export const AVAIL_DAY_UI_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 export const CONDITION_TYPE_OPTIONS = [
-  { id: 'allow', label: 'Разрешить доступ' },
-  { id: 'deny', label: 'Запретить / Скрыть' },
+  {
+    id: 'allow',
+    label: 'Доступно только в указанное время',
+    hint: 'Товар, группа или акция видны в меню только в выбранные дни и часы. Вне этого окна — скрыты.',
+  },
+  {
+    id: 'deny',
+    label: 'Скрыть в указанное время',
+    hint: 'Исключение: скрывает объект в выбранные интервалы. Часто добавляют к условию «Доступно только…» — например, обеденный перерыв.',
+  },
 ];
+
+/** @param {'allow'|'deny'} type */
+export function getConditionTypeHint(type) {
+  return CONDITION_TYPE_OPTIONS.find(o => o.id === type)?.hint || '';
+}
 
 /** @returns {AvailabilityCondition} */
 export function createDefaultCondition(type = 'allow') {
@@ -354,7 +367,7 @@ function fmtShortDate(iso) {
 /** @param {ReturnType<typeof normalizeCondition>} cond */
 function formatConditionLine(cond) {
   const parts = [];
-  const prefix = cond.type === 'deny' ? 'Исключение' : 'Применено';
+  const prefix = cond.type === 'deny' ? 'Скрыто' : 'Доступно';
 
   if (cond.timeStart && cond.timeEnd) {
     parts.push(`${formatDaysRange(cond.days)} с ${cond.timeStart} до ${cond.timeEnd}`);
@@ -367,7 +380,7 @@ function formatConditionLine(cond) {
   }
 
   if (!parts.length) {
-    return cond.type === 'deny' ? `${prefix}: всегда запрещено` : `${prefix}: всегда разрешено`;
+    return `${prefix}: всегда`;
   }
 
   return `${prefix}: ${parts.join('; ')}`;

@@ -1,10 +1,12 @@
 import {
   AVAIL_DAY_UI_ORDER,
   AVAIL_DAY_LABELS,
+  CONDITION_TYPE_OPTIONS,
   createDefaultAvailabilityRuleDoc,
   createDefaultCondition,
   filterActiveRules,
   formatAvailabilityRuleShort,
+  getConditionTypeHint,
   getRuleDirectUsage,
   isRuleArchived,
   isRuleInUse,
@@ -88,9 +90,11 @@ export function createAvailabilityRulesEditor(host, {
           <label class="avr-condition-type">
             <span class="avr-field-label">Действие</span>
             <select data-field="type" class="avr-select" ${isActive ? '' : 'disabled'}>
-              <option value="allow" ${cond.type === 'allow' ? 'selected' : ''}>Разрешить доступ</option>
-              <option value="deny" ${cond.type === 'deny' ? 'selected' : ''}>Запретить / Скрыть</option>
+              ${CONDITION_TYPE_OPTIONS.map(opt => `
+                <option value="${opt.id}" ${cond.type === opt.id ? 'selected' : ''}>${esc(opt.label)}</option>
+              `).join('')}
             </select>
+            <p class="avr-condition-type-hint" data-field="type-hint">${esc(getConditionTypeHint(cond.type))}</p>
           </label>
           <label class="avr-active-toggle" title="${isActive ? 'Приостановить условие' : 'Активировать условие'}">
             <input type="checkbox" data-field="is-active" ${isActive ? 'checked' : ''} />
@@ -200,7 +204,13 @@ export function createAvailabilityRulesEditor(host, {
 
           <div class="avr-conditions-section">
             <div class="avr-section-head">
-              <h3 class="avr-section-title">Условия</h3>
+              <div class="avr-section-head-text">
+                <h3 class="avr-section-title">Условия</h3>
+                <p class="avr-section-hint">
+                  Шаблон назначается группам, товарам и акциям. Задайте, когда объект доступен в меню,
+                  и при необходимости добавьте исключения для скрытия.
+                </p>
+              </div>
               <button type="button" class="btn btn-outline btn-press avr-add-condition" data-action="add-condition">
                 + Добавить условие
               </button>

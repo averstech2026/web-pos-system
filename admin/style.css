@@ -3703,9 +3703,31 @@ body:has(.admin-shell) {
 
 .avr-section-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-md);
+}
+
+.avr-section-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+
+.avr-section-hint {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  max-width: 42rem;
+}
+
+.avr-condition-type-hint {
+  margin: 0;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
 }
 
 .avr-section-title {
@@ -4100,5 +4122,257 @@ body:has(.admin-shell) {
 
   .avr-active-toggle {
     justify-content: flex-end;
+  }
+}
+
+/* ── Promo rules (marketing) editor ──────────────────────── */
+
+.prm-page {
+  min-height: 520px;
+}
+
+.prm-layout .avr-detail-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.prm-block {
+  margin: 0;
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-bg) 40%, var(--color-surface));
+  box-shadow: none;
+}
+
+.prm-block-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.prm-block-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 24px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: var(--color-navy);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.prm-block-badge--action {
+  background: color-mix(in srgb, var(--color-navy) 75%, #3b82f6);
+}
+
+.prm-block-badge--basic {
+  background: color-mix(in srgb, var(--color-navy) 85%, var(--color-text-muted));
+}
+
+.prm-block-title {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-navy);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.prm-block-body.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.prm-active-row {
+  display: flex;
+  align-items: center;
+}
+
+.prm-hint {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-navy) 5%, transparent);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.prm-row-status {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--space-xs);
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.prm-row-status--on {
+  background: #16a34a;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #16a34a 25%, transparent);
+}
+
+.prm-row-status--off {
+  background: var(--color-text-muted);
+  opacity: 0.5;
+}
+
+.prm-conditional-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Animated reveal for dependent fields */
+.prm-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin: 0;
+  pointer-events: none;
+  transition:
+    grid-template-rows 0.24s ease,
+    opacity 0.2s ease,
+    margin 0.24s ease;
+}
+
+.prm-reveal--visible {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.prm-reveal-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.prm-reveal--visible .prm-reveal-inner.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-top: 0;
+}
+
+.prm-reveal--visible + .prm-reveal--visible {
+  margin-top: 0;
+}
+
+/* Client segment chips */
+.prm-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.prm-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.prm-chip:hover {
+  border-color: color-mix(in srgb, var(--color-navy) 25%, var(--color-border));
+  color: var(--color-navy);
+}
+
+.prm-chip--active {
+  background: var(--color-navy);
+  border-color: var(--color-navy);
+  color: #fff;
+  box-shadow: var(--shadow-btn-navy);
+}
+
+/* Product picker field (promo editor) */
+.ppf-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.ppf-pick-btn {
+  align-self: flex-start;
+  min-height: 40px;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+
+.ppf-selected {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid color-mix(in srgb, var(--color-navy) 18%, var(--color-border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-navy) 4%, var(--color-surface));
+}
+
+.ppf-selected-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.ppf-selected-name {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-navy);
+}
+
+.ppf-selected-cat {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  padding: 2px var(--space-sm);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-navy) 6%, transparent);
+}
+
+.ppf-clear {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ppf-clear:hover {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+}
+
+@media (max-width: 900px) {
+  .prm-layout .avr-detail {
+    min-height: 480px;
   }
 }

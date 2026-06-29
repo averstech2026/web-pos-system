@@ -9,6 +9,7 @@ import { cart } from '../store.js';
 import { openItemDetailModal } from '../components/item-detail.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { filterActiveRules, isMenuItemAvailableAt, normalizeAvailabilityRuleDoc } from '../../shared/availability-rules.js';
+import { normalizePromoRuleDoc } from '../../shared/promo-rules.js';
 import { mergeCategoryGroups } from '../../shared/menu-catalog.js';
 
 function resolveImageUrl(item) {
@@ -44,7 +45,8 @@ export class MenuPage {
     this.categories = [];
     this.activeCategory = null;
     this.allRules = [];
-    this.groupsByName = new Map();
+    this.promoRules = [];
+    this.categoryGroups = [];
     this._cartUnsub = null;
     this.init();
   }
@@ -73,9 +75,10 @@ export class MenuPage {
   }
 
   async fetchItems() {
-    const [itemsSnap, rulesSnap, menuSnap] = await Promise.all([
+    const [itemsSnap, rulesSnap, promosSnap, menuSnap] = await Promise.all([
       getDocs(query(collection(db, COL.ITEMS), where('isAvailable', '==', true))),
       getDocs(collection(db, COL.AVAILABILITY_RULES)),
+      getDocs(collection(db, COL.PROMO_RULES)),
       getDoc(doc(db, COL.SETTINGS, 'menu')),
     ]);
 
@@ -83,20 +86,34 @@ export class MenuPage {
       rulesSnap.docs.map(d => normalizeAvailabilityRuleDoc({ id: d.id, ...d.data() }, d.id)),
     );
 
+    this.promoRules = promosSnap.docs
+      .map(d => normalizePromoRuleDoc({ id: d.id, ...d.data() }, d.id))
+      .filter(p => p.isActive);
+
     const menuData = menuSnap.exists() ? menuSnap.data() : {};
     const groups = mergeCategoryGroups(menuData.categoryGroups || []);
+    this.categoryGroups = groups;
     this.groupsByName = new Map(groups.map(g => [g.name, g]));
 
     const slot = { date: cart.dateSlot, time: cart.timeSlot };
 
-    this.items = itemsSnap.docs.map(d => {
+    const allItems = itemsSnap.docs.map(d => {
       const data = d.data();
       return {
         id: d.id,
         ...data,
         nutrition: resolveItemNutrition(data),
       };
-    }).filter(item => isMenuItemAvailableAt(item, this.groupsByName, this.allRules, slot));
+    });
+
+    this.items = allItems.filter(item => isMenuItemAvailableAt(item, this.groupsByName, this.allRules, slot));
+
+    cart.setPromoContext({
+      activePromos: this.promoRules,
+      allAvailabilityRules: this.allRules,
+      catalogItems: allItems,
+      categoryGroups: this.categoryGroups,
+    });
 
     const order = ['Первые блюда', 'Вторые блюда', 'Салаты', 'Напитки', 'Выпечка'];
     const found = [...new Set(this.items.map(i => i.category))];

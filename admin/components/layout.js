@@ -2,7 +2,7 @@ import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
-/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'schedules' | 'users' | 'reports'} AdminSection */
+/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'schedules' | 'marketing' | 'users' | 'reports'} AdminSection */
 
 const NAV = [
   { id: 'dashboard', path: '/dashboard', label: 'Дашборд', icon: '📊' },
@@ -10,6 +10,7 @@ const NAV = [
   { id: 'products', path: '/products', label: 'Товары', icon: '🍽️' },
   { id: 'groups', path: '/groups', label: 'Группы', icon: '📂' },
   { id: 'schedules', path: '/schedules', label: 'Расписания', icon: '🕐' },
+  { id: 'marketing', path: '/marketing', label: 'Маркетинг', icon: '🎁' },
   { id: 'users', path: '/users', label: 'Пользователи', icon: '👥' },
   { id: 'reports', path: '/reports', label: 'Отчёты', icon: '📈' },
 ];

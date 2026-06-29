@@ -17,6 +17,7 @@ export const COL = {
   NOTIFICATIONS: 'notifications',
   SETTINGS: 'settings',
   AVAILABILITY_RULES: 'availability_rules',
+  PROMO_RULES: 'promo_rules',
 };
 
 // ─── Allowed enum values ─────────────────────────────────────────────────────
