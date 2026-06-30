@@ -60,6 +60,42 @@ export function resolvePeriod(preset, customFrom, customTo) {
   return { start: from, end: to > from ? to : endOfDay(from), preset: 'custom' };
 }
 
+/** @param {Date} [base] @param {number} [offsetDays] */
+export function addDays(base = new Date(), offsetDays = 0) {
+  const d = new Date(base);
+  d.setDate(d.getDate() + offsetDays);
+  return d;
+}
+
+/** @returns {string} YYYY-MM-DD — завтра (локальная дата) */
+export function tomorrowDateInputValue() {
+  return toDateInputValue(addDays(new Date(), 1));
+}
+
+/** @param {string} iso YYYY-MM-DD */
+export function fmtPlanDateLong(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+/** @param {string} a YYYY-MM-DD @param {string} b YYYY-MM-DD */
+export function isSameDateKey(a, b) {
+  return a === b;
+}
+
+/** @param {string} iso YYYY-MM-DD */
+export function fmtReportDateShort(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
+}
+
 /** @param {Date} start @param {Date} end */
 export function eachDayKey(start, end) {
   const keys = [];

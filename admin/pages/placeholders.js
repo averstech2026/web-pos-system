@@ -33,9 +33,3 @@ export const UsersPage = placeholderPage(
   'Пользователи',
   'CRM клиентов, баланс, доступ в ЛК и история заказов',
 );
-
-export const ReportsPage = placeholderPage(
-  'reports',
-  'Отчёты',
-  'Заказ-наряд для кухни и финансовый отчёт по transactions',
-);

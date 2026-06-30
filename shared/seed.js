@@ -222,6 +222,27 @@ export async function updateItemNutrition() {
   if (failed) console.warn(`[seed] ${failed} update(s) failed.`);
 }
 
+/**
+ * Синхронизирует category у существующих блюд с эталоном DEMO_ITEMS.
+ * Вызов из консоли: await patchDemoItemCategories()
+ */
+export async function patchDemoItemCategories() {
+  const snap = await getDocs(collection(db, COL.ITEMS));
+  let updated = 0;
+
+  for (const docSnap of snap.docs) {
+    const name = docSnap.data().name;
+    const expected = DEMO_ITEMS.find(i => i.name === name)?.category;
+    if (!expected || docSnap.data().category === expected) continue;
+
+    await updateDoc(doc(db, COL.ITEMS, docSnap.id), { category: expected });
+    updated += 1;
+    console.log(`[seed] ${name}: → ${expected}`);
+  }
+
+  console.log(`[seed] Categories patched for ${updated} item(s).`);
+}
+
 /** Demo password for all staff seed accounts */
 export const STAFF_DEMO_PASSWORD = 'demo1234';
 

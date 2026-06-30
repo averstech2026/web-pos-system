@@ -30,7 +30,7 @@ Never use `#1A3B6E`, orange accent, or ad-hoc colors.
 - **Cards**: `border-radius: 16px`, `box-shadow: var(--shadow-card)`
 - **Primary CTA**: navy pill (`border-radius: 9999px`), `box-shadow: var(--shadow-btn-navy)`, class `btn btn-primary btn-pill btn-press`
 - **Cancel**: white + rose border (`btn-outline-danger`)
-- **Tabs/switchers**: pill container, active segment = navy fill (see `.auth-tabs`, `.cat-tab`)
+- **Tabs/switchers**: pill container, active segment = navy fill (see `.auth-tabs`, `.cat-tab`, **Period tab selector** below)
 - **Footers**: sticky/fixed bottom bar with `box-shadow: var(--shadow-footer)`; on long screens add **Scroll edge hint** (below)
 - **Touch feedback**: always add `btn-press` on interactive elements
 
@@ -66,6 +66,54 @@ HTML: include Montserrat from Google Fonts (see `client-lk/index.html`).
 .auth-fields .btn { margin-top: var(--space-sm); } /* +8px → 24px before CTA */
 .form-group { gap: var(--space-sm); }
 ```
+
+## Period tab selector (B2B segmented control)
+
+Canonical pill switcher for **period presets** and **short mutually exclusive choices** (e.g. День / Неделя / Месяц, Сегодня / Завтра). **Source of truth:** `admin/style.css` (`.period-tabs`, `.period-tab`, `.period-tab--active`). **References:** `admin/pages/reports.js`, `admin/pages/dashboard.js`.
+
+### When to use
+
+- Quick date-range presets in admin filters and dashboards
+- Any 2–4 option toggle where one choice is active (not multi-select)
+- Pair with a filter label above (`reports-filter-label` / `period-bar-label`), never inline text beside the control
+
+### Do not
+
+- ❌ Invent a separate gray track (`#e2e8f0`) or custom active colors for the same pattern
+- ❌ Duplicate styles under new class names (e.g. `reports-kitchen-tab`) — reuse `.period-tabs` / `.period-tab`
+- ❌ Use for main app navigation or more than ~4 segments — use nav tabs instead
+
+### Structure
+
+```html
+<div class="reports-filter-field">
+  <span class="reports-filter-label">Период</span>
+  <div class="period-tabs" role="tablist" aria-label="Период отчёта">
+    <button type="button" class="period-tab btn-press period-tab--active" data-period="week" role="tab" aria-selected="true">Неделя</button>
+    <button type="button" class="period-tab btn-press" data-period="month" role="tab" aria-selected="false">Месяц</button>
+  </div>
+</div>
+```
+
+- Always add `btn-press` on each segment button
+- Active segment: class `period-tab--active` + `aria-selected="true"`
+- Optional wrapper modifier for layout only (e.g. `reports-kitchen-day-tabs`) — **no color/size overrides**
+
+### Visual (strict)
+
+| Part | Classes | Tokens / values |
+|------|---------|-----------------|
+| Track | `.period-tabs` | `background: var(--color-surface-muted)`, `border: 1px solid var(--color-border)`, `border-radius: var(--radius-pill)`, `padding: var(--space-xs)`, `gap: var(--space-xs)`, `width: fit-content` |
+| Segment (default) | `.period-tab` | `color: var(--color-text-muted)`, `font-size: var(--font-size-sm)`, `font-weight: 500`, `min-height: 32px`, `padding: 6px var(--space-md)`, pill radius |
+| Segment (active) | `.period-tab--active` | `background: var(--color-navy)`, `color: #fff`, `box-shadow: var(--shadow-btn-navy)` |
+
+Typography: **sentence case**, no uppercase on segment labels (`text-transform: none`).
+
+### Layout with filters
+
+- Place label **above** the track (same as other filter fields: `gap: 6px`)
+- In a filter row, align control baseline with dropdown triggers (`min-height: 40px` row); the track itself stays `fit-content` height (~32px inner + padding)
+- On narrow screens, track may grow to `width: 100%` via a layout modifier only
 
 ## Premium Wallet Card (ID card)
 

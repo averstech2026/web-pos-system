@@ -8,10 +8,11 @@ import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../shared/schema.js';
 
 if (import.meta.env.DEV) {
-  import('../shared/seed.js').then(({ seedStaffAuth }) => {
+  import('../shared/seed.js').then(({ seedStaffAuth, patchDemoItemCategories }) => {
     window.seedStaffAuth = seedStaffAuth;
+    window.patchDemoItemCategories = patchDemoItemCategories;
     console.info(
-      '%c[DEV] Staff setup helper loaded.\nRun: await seedStaffAuth()',
+      '%c[DEV] Staff setup helper loaded.\nRun: await seedStaffAuth()\nRun: await patchDemoItemCategories()',
       'color:#1E1B4B;font-weight:bold',
     );
   });
