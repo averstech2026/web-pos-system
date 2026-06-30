@@ -1,4 +1,11 @@
-import { createItem, updateItem } from '../services/products-data.js';
+import {
+  archiveItem,
+  channelFlagsFromMode,
+  createItem,
+  ITEM_CHANNEL_MODES,
+  resolveChannelMode,
+  updateItem,
+} from '../services/products-data.js';
 import { productThumbHtml } from '../utils/product-image.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
@@ -12,6 +19,7 @@ import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.j
  * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} [p.availabilityRules]
  * @param {string|null} [p.lockedCategory]
  * @param {(saved: object) => void|Promise<void>} [p.onSaved]
+ * @param {(id: string) => void|Promise<void>} [p.onArchived]
  */
 export function openItemFormModal({
   item = null,
@@ -20,6 +28,7 @@ export function openItemFormModal({
   availabilityRules = [],
   lockedCategory = null,
   onSaved,
+  onArchived,
 }) {
   document.getElementById('item-form-modal')?.remove();
 
@@ -39,7 +48,6 @@ export function openItemFormModal({
     description: item?.description || '',
     category: lockedCategory || item?.category || categories[0] || '',
     price: item?.price ?? '',
-    isAvailable: item?.isAvailable !== false,
     protein: nutrition?.protein ?? '',
     fat: nutrition?.fat ?? '',
     carbs: nutrition?.carbs ?? '',
@@ -48,6 +56,7 @@ export function openItemFormModal({
     imageUrl: item?.imageUrl || getItemImageUrl(item?.name || '') || '',
     previewObjectUrl: null,
     availabilityRuleId: selectedRuleId,
+    channelMode: resolveChannelMode(item?.visibleInWeb, item?.visibleInKiosk),
   };
 
   const categoryOptions = [...new Set([...categories, state.category].filter(Boolean))];
@@ -83,6 +92,14 @@ export function openItemFormModal({
     el.innerHTML = productThumbHtml(previewItem());
   }
 
+  function syncChannelTabs() {
+    overlay.querySelectorAll('[data-channel-mode]').forEach(btn => {
+      const active = btn.dataset.channelMode === state.channelMode;
+      btn.classList.toggle('period-tab--active', active);
+      btn.setAttribute('aria-checked', String(active));
+    });
+  }
+
   overlay.innerHTML = `
     <div class="admin-modal card admin-modal--lg" role="document">
       <div class="admin-modal-head">
@@ -92,133 +109,147 @@ export function openItemFormModal({
 
       <div class="admin-modal-body">
         <div class="ifm-form">
-            <label class="ifm-check ifm-check--top">
-              <input type="checkbox" id="ifm-available" ${state.isAvailable ? 'checked' : ''} />
-              <span>Доступен в меню</span>
-            </label>
+          <div class="ifm-field ifm-field--wide">
+            <span>Доступность</span>
+            <div class="period-tabs ifm-channel-tabs" role="radiogroup" aria-label="Доступность">
+              ${ITEM_CHANNEL_MODES.map(o => `
+                <button
+                  type="button"
+                  class="period-tab btn-press ${state.channelMode === o.id ? 'period-tab--active' : ''}"
+                  data-channel-mode="${o.id}"
+                  role="radio"
+                  aria-checked="${state.channelMode === o.id}"
+                >${o.label}</button>
+              `).join('')}
+            </div>
+          </div>
 
-            <div class="ifm-photo-row">
-              <div class="ifm-preview" id="ifm-preview">
-                ${productThumbHtml({ name: state.name, imageUrl: state.imageUrl })}
-              </div>
-              <div class="ifm-photo-controls">
-                <div class="ifm-photo-actions">
-                  <label class="btn btn-outline btn-press ifm-photo-btn">
-                    Выбрать файл
-                    <input type="file" id="ifm-photo-file" accept="image/jpeg,image/png,image/webp" hidden />
-                  </label>
-                  <button type="button" class="btn btn-outline btn-press ifm-photo-btn" id="ifm-photo-by-name">
-                    По названию
-                  </button>
-                </div>
-                <label class="ifm-field ifm-field--wide ifm-field--compact">
-                  <span>Путь к фото</span>
-                  <input type="text" id="ifm-image-url" value="${escAttr(state.imageUrl)}" placeholder="/products/dish.jpg" />
-                </label>
-                <p class="ifm-hint ifm-hint--inline">Файлы в папке <code>products/</code></p>
-              </div>
+          <div class="ifm-main-grid">
+            <div class="ifm-preview" id="ifm-preview">
+              ${productThumbHtml({ name: state.name, imageUrl: state.imageUrl })}
             </div>
 
-            <label class="ifm-field ifm-field--wide">
+            <label class="ifm-field ifm-field--name">
               <span>Название</span>
               <input type="text" id="ifm-name" value="${escAttr(state.name)}" placeholder="Борщ с мясом" maxlength="120" />
             </label>
 
-            <label class="ifm-field ifm-field--wide">
-              <span>Описание</span>
-              <textarea id="ifm-description" rows="3" placeholder="Состав, особенности…">${esc(state.description)}</textarea>
+            <label class="ifm-field ifm-field--price">
+              <span>Цена, ₽</span>
+              <input type="number" id="ifm-price" min="0" step="1" value="${state.price}" />
             </label>
 
-            <div class="ifm-form-row ifm-form-row--2">
-              <label class="ifm-field">
-                <span>Группа (категория)</span>
-                ${lockedCategory ? `
-                  <input
-                    type="text"
-                    class="ifm-category-locked"
-                    value="${escAttr(lockedCategory)}"
-                    disabled
-                    aria-readonly="true"
-                  />
-                  <input type="hidden" id="ifm-category" value="${escAttr(lockedCategory)}" />
-                ` : `
-                  <select id="ifm-category">
-                    ${categoryOptions.map(c => `
-                      <option value="${escAttr(c)}" ${c === state.category ? 'selected' : ''}>${esc(c)}</option>
-                    `).join('')}
-                  </select>
-                `}
+            <div class="ifm-photo-controls ifm-photo-controls--grid">
+              <div class="ifm-photo-actions">
+                <label class="btn btn-outline btn-press ifm-photo-btn">
+                  Выбрать файл
+                  <input type="file" id="ifm-photo-file" accept="image/jpeg,image/png,image/webp" hidden />
+                </label>
+                <button type="button" class="btn btn-outline btn-press ifm-photo-btn" id="ifm-photo-by-name">
+                  По названию
+                </button>
+              </div>
+              <label class="ifm-field ifm-field--wide ifm-field--compact">
+                <span>Путь к фото</span>
+                <input type="text" id="ifm-image-url" value="${escAttr(state.imageUrl)}" placeholder="/products/dish.jpg" />
               </label>
+              <p class="ifm-hint ifm-hint--inline">Файлы в папке <code>products/</code></p>
+            </div>
+          </div>
 
+          <label class="ifm-field ifm-field--wide">
+            <span>Описание</span>
+            <textarea id="ifm-description" rows="3" placeholder="Состав, особенности…">${esc(state.description)}</textarea>
+          </label>
+
+          <label class="ifm-field ifm-field--wide">
+            <span>Группа (категория)</span>
+            ${lockedCategory ? `
+              <input
+                type="text"
+                class="ifm-category-locked"
+                value="${escAttr(lockedCategory)}"
+                disabled
+                aria-readonly="true"
+              />
+              <input type="hidden" id="ifm-category" value="${escAttr(lockedCategory)}" />
+            ` : `
+              <select id="ifm-category">
+                ${categoryOptions.map(c => `
+                  <option value="${escAttr(c)}" ${c === state.category ? 'selected' : ''}>${esc(c)}</option>
+                `).join('')}
+              </select>
+            `}
+          </label>
+
+          <fieldset class="ifm-fieldset">
+            <legend>КБЖУ на порцию</legend>
+            <div class="ifm-nutrition-grid">
               <label class="ifm-field">
-                <span>Цена, ₽</span>
-                <input type="number" id="ifm-price" min="0" step="1" value="${state.price}" />
+                <span>Белки, г</span>
+                <input type="number" id="ifm-protein" min="0" step="1" value="${state.protein}" placeholder="—" />
+              </label>
+              <label class="ifm-field">
+                <span>Жиры, г</span>
+                <input type="number" id="ifm-fat" min="0" step="1" value="${state.fat}" placeholder="—" />
+              </label>
+              <label class="ifm-field">
+                <span>Углеводы, г</span>
+                <input type="number" id="ifm-carbs" min="0" step="1" value="${state.carbs}" placeholder="—" />
+              </label>
+              <label class="ifm-field">
+                <span>Ккал</span>
+                <input type="number" id="ifm-kcal" min="0" step="1" value="${state.kcal}" placeholder="—" />
               </label>
             </div>
+          </fieldset>
 
+          ${allergens.length ? `
             <fieldset class="ifm-fieldset">
-              <legend>КБЖУ на порцию</legend>
-              <div class="ifm-nutrition-grid">
-                <label class="ifm-field">
-                  <span>Белки, г</span>
-                  <input type="number" id="ifm-protein" min="0" step="1" value="${state.protein}" placeholder="—" />
-                </label>
-                <label class="ifm-field">
-                  <span>Жиры, г</span>
-                  <input type="number" id="ifm-fat" min="0" step="1" value="${state.fat}" placeholder="—" />
-                </label>
-                <label class="ifm-field">
-                  <span>Углеводы, г</span>
-                  <input type="number" id="ifm-carbs" min="0" step="1" value="${state.carbs}" placeholder="—" />
-                </label>
-                <label class="ifm-field">
-                  <span>Ккал</span>
-                  <input type="number" id="ifm-kcal" min="0" step="1" value="${state.kcal}" placeholder="—" />
-                </label>
+              <legend>Аллергены</legend>
+              <div class="ifm-allergens">
+                ${allergens.map(a => `
+                  <label class="ifm-allergen">
+                    <input
+                      type="checkbox"
+                      value="${escAttr(a.id)}"
+                      ${state.allergens.includes(a.id) ? 'checked' : ''}
+                    />
+                    <span>${esc(a.name)}</span>
+                  </label>
+                `).join('')}
               </div>
             </fieldset>
+          ` : `
+            <p class="ifm-hint">Справочник аллергенов пуст — добавьте записи в разделе «Аллергены» в меню.</p>
+          `}
 
-            ${allergens.length ? `
-              <fieldset class="ifm-fieldset">
-                <legend>Аллергены</legend>
-                <div class="ifm-allergens">
-                  ${allergens.map(a => `
-                    <label class="ifm-allergen">
-                      <input
-                        type="checkbox"
-                        value="${escAttr(a.id)}"
-                        ${state.allergens.includes(a.id) ? 'checked' : ''}
-                      />
-                      <span>${esc(a.name)}</span>
-                    </label>
-                  `).join('')}
-                </div>
-              </fieldset>
-            ` : `
-              <p class="ifm-hint">Справочник аллергенов пуст — добавьте записи в разделе «Аллергены» в меню.</p>
-            `}
+          <fieldset class="ifm-fieldset ifm-availability">
+            <legend>Время доступности</legend>
+            <label class="ifm-field">
+              <span>Шаблон расписания</span>
+              <select id="ifm-availability-rule-id" class="ifm-select">
+                <option value="" ${!selectedRuleId ? 'selected' : ''}>Доступно всегда (Без ограничений)</option>
+                ${ruleOptions}
+              </select>
+            </label>
+            <p class="ifm-hint ifm-avail-rule-summary" id="ifm-avail-rule-summary" ${initialSummary ? '' : 'hidden'}>${esc(initialSummary)}</p>
+          </fieldset>
 
-            <fieldset class="ifm-fieldset ifm-availability">
-              <legend>Время доступности</legend>
-              <label class="ifm-field">
-                <span>Шаблон расписания</span>
-                <select id="ifm-availability-rule-id" class="ifm-select">
-                  <option value="" ${!selectedRuleId ? 'selected' : ''}>Доступно всегда (Без ограничений)</option>
-                  ${ruleOptions}
-                </select>
-              </label>
-              <p class="ifm-hint ifm-avail-rule-summary" id="ifm-avail-rule-summary" ${initialSummary ? '' : 'hidden'}>${esc(initialSummary)}</p>
-            </fieldset>
-
-            <p class="ifm-error" id="ifm-error" hidden></p>
-          </div>
+          <p class="ifm-error" id="ifm-error" hidden></p>
+        </div>
       </div>
 
-      <div class="admin-modal-foot">
-        <button type="button" class="action-btn action-btn-secondary btn-press" id="ifm-cancel">Отмена</button>
-        <button type="button" class="action-btn action-btn-primary btn-press" id="ifm-submit">
-          ${isEdit ? 'Сохранить' : 'Создать'}
-        </button>
+      <div class="admin-modal-foot ifm-foot">
+        ${isEdit ? `
+          <button type="button" class="ifm-archive-btn btn-press" id="ifm-archive">В архив</button>
+        ` : '<span class="ifm-foot-spacer"></span>'}
+        <div class="ifm-foot-actions">
+          <button type="button" class="action-btn action-btn-secondary btn-press" id="ifm-cancel">Отмена</button>
+          <button type="button" class="action-btn action-btn-primary btn-press" id="ifm-submit">
+            ${isEdit ? 'Сохранить' : 'Создать'}
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -228,6 +259,32 @@ export function openItemFormModal({
   overlay.querySelector('#ifm-close')?.addEventListener('click', close);
   overlay.querySelector('#ifm-cancel')?.addEventListener('click', close);
   overlay.querySelector('#ifm-submit')?.addEventListener('click', submit);
+
+  overlay.querySelector('#ifm-archive')?.addEventListener('click', async () => {
+    if (!isEdit || !item?.id) return;
+    const name = overlay.querySelector('#ifm-name')?.value.trim() || item.name || 'товар';
+    if (!confirm(`Переместить «${name}» в архив? Товар исчезнет из меню, но останется в истории заказов.`)) return;
+
+    const btn = overlay.querySelector('#ifm-archive');
+    btn.disabled = true;
+
+    try {
+      await archiveItem(item.id);
+      close();
+      await onArchived?.(item.id);
+    } catch (err) {
+      console.error('[item-form] archive', err);
+      showError(err.message || 'Не удалось переместить товар в архив');
+      btn.disabled = false;
+    }
+  });
+
+  overlay.querySelectorAll('[data-channel-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.channelMode = btn.dataset.channelMode || 'web';
+      syncChannelTabs();
+    });
+  });
 
   overlay.querySelector('#ifm-name')?.addEventListener('input', updatePreview);
   overlay.querySelector('#ifm-image-url')?.addEventListener('input', () => {
@@ -283,6 +340,7 @@ export function openItemFormModal({
   async function submit() {
     const errEl = overlay.querySelector('#ifm-error');
     const btn = overlay.querySelector('#ifm-submit');
+    const channelFlags = channelFlagsFromMode(state.channelMode);
 
     const data = {
       name: overlay.querySelector('#ifm-name')?.value || '',
@@ -293,7 +351,9 @@ export function openItemFormModal({
       fat: overlay.querySelector('#ifm-fat')?.value,
       carbs: overlay.querySelector('#ifm-carbs')?.value,
       kcal: overlay.querySelector('#ifm-kcal')?.value,
-      isAvailable: overlay.querySelector('#ifm-available')?.checked,
+      isAvailable: channelFlags.isAvailable,
+      visibleInWeb: channelFlags.visibleInWeb,
+      visibleInKiosk: channelFlags.visibleInKiosk,
       allergens: [...overlay.querySelectorAll('.ifm-allergens input:checked')].map(el => el.value),
       imageUrl: overlay.querySelector('#ifm-image-url')?.value.trim() || getItemImageUrl(overlay.querySelector('#ifm-name')?.value.trim()),
       availabilityRuleId: overlay.querySelector('#ifm-availability-rule-id')?.value || null,

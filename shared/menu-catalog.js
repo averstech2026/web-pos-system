@@ -9,13 +9,39 @@ export const DEFAULT_CATEGORIES = [
   'Выпечка',
 ];
 
+/** Default visibility for new/existing groups without explicit flags. */
+export const DEFAULT_GROUP_VISIBLE_IN_WEB = true;
+export const DEFAULT_GROUP_VISIBLE_IN_KIOSK = false;
+
 /**
  * @typedef {object} CategoryGroup
  * @property {string} id
  * @property {string} name
  * @property {string|null} [imageUrl]
  * @property {string|null} [availabilityRuleId] - ref to availability_rules/{id}; null = always available
+ * @property {boolean} [visibleInWeb] - show in personal account (web portal)
+ * @property {boolean} [visibleInKiosk] - show on self-service kiosk
+ * @property {number} [webOrder] - sort index in web menu
+ * @property {number} [kioskOrder] - sort index on kiosk menu
  */
+
+/** @param {unknown} value @param {number} [fallback] */
+export function normalizeGroupOrderIndex(value, fallback = 0) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.floor(n);
+}
+
+/** @param {CategoryGroup[]} groups @param {'web'|'kiosk'} channel */
+export function sortCategoryGroupsByChannel(groups, channel = 'web') {
+  const key = channel === 'kiosk' ? 'kioskOrder' : 'webOrder';
+  return [...groups].sort((a, b) => {
+    const ao = normalizeGroupOrderIndex(a[key], 0);
+    const bo = normalizeGroupOrderIndex(b[key], 0);
+    if (ao !== bo) return ao - bo;
+    return a.name.localeCompare(b.name, 'ru');
+  });
+}
 
 /** @param {string} name */
 export function slugFromCategoryName(name) {
@@ -56,7 +82,21 @@ export function normalizeCategoryGroup(raw, fallbackName = '') {
     name,
     imageUrl: raw?.imageUrl || null,
     availabilityRuleId: ruleId,
+    visibleInWeb: raw?.visibleInWeb !== false,
+    visibleInKiosk: raw?.visibleInKiosk === true,
+    webOrder: normalizeGroupOrderIndex(raw?.webOrder, 0),
+    kioskOrder: normalizeGroupOrderIndex(raw?.kioskOrder, 0),
   };
+}
+
+/** @param {CategoryGroup[]} groups */
+export function filterWebVisibleCategoryGroups(groups) {
+  return groups.filter(g => g.visibleInWeb !== false);
+}
+
+/** @param {CategoryGroup[]} groups */
+export function filterKioskVisibleCategoryGroups(groups) {
+  return groups.filter(g => g.visibleInKiosk === true);
 }
 
 /** @param {CategoryGroup[]} groups */

@@ -1,5 +1,6 @@
 import { saveAllergens } from '../services/menu-settings-data.js';
 import { showToast } from '../utils/toast.js';
+import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -13,6 +14,34 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
   let allergens = initialAllergens.map(a => ({ ...a }));
   /** @type {string|null} */
   let selectedId = allergens[0]?.id || null;
+
+  /** @type {string} */
+  let baselineJson = '';
+
+  function snapshot() {
+    return JSON.stringify(
+      allergens.map(a => ({ id: a.id, name: a.name.trim() })).sort((a, b) => a.id.localeCompare(b.id)),
+    );
+  }
+
+  function commitBaseline() {
+    syncPanelToState();
+    baselineJson = snapshot();
+  }
+
+  function isDirty() {
+    syncPanelToState();
+    return snapshot() !== baselineJson;
+  }
+
+  function discardChanges() {
+    allergens = JSON.parse(baselineJson);
+    if (selectedId && !allergens.some(a => a.id === selectedId)) {
+      selectedId = allergens[0]?.id || null;
+    }
+  }
+
+  commitBaseline();
 
   function selectedAllergen() {
     return allergens.find(a => a.id === selectedId) || null;
@@ -122,6 +151,7 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
               </button>
             </div>
             <div class="footer-action-bar">
+              ${renderAvrCancelButton('alr-detail-cancel')}
               <button type="button" class="action-btn action-btn-primary btn-press" id="alr-detail-save">Сохранить изменения</button>
             </div>
           </div>
@@ -191,6 +221,7 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
     try {
       await saveAllergens(next);
       allergens = next;
+      commitBaseline();
       showToast('Справочник аллергенов сохранён');
       await onSaved?.();
       return true;
@@ -205,25 +236,44 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
 
   function bindEvents() {
     host.querySelector('#alr-create-btn')?.addEventListener('click', () => {
-      hideErrors();
-      const id = uniqueId('новый_аллерген');
-      const draft = { id, name: 'Новый аллерген' };
-      allergens = [...allergens, draft];
-      selectedId = id;
-      render();
-      host.querySelector('[data-field="name"]')?.focus();
-      host.querySelector('[data-field="name"]')?.select();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: () => persistAll(allergens.map(a => ({ id: a.id, name: a.name.trim() })).filter(a => a.id && a.name)),
+        proceed: () => {
+          hideErrors();
+          const id = uniqueId('новый_аллерген');
+          const draft = { id, name: 'Новый аллерген' };
+          allergens = [...allergens, draft];
+          selectedId = id;
+          render();
+          host.querySelector('[data-field="name"]')?.focus();
+          host.querySelector('[data-field="name"]')?.select();
+        },
+      });
     });
 
     host.querySelector('#alr-list')?.addEventListener('click', e => {
       const btn = e.target.closest('[data-action="select"]');
       if (!btn) return;
-      syncPanelToState();
       const row = btn.closest('.avr-row');
       const id = row?.dataset.id;
       if (!id || id === selectedId) return;
-      selectedId = id;
-      render();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: async () => {
+          syncPanelToState();
+          const next = allergens
+            .map(a => ({ id: a.id, name: a.name.trim() }))
+            .filter(a => a.id && a.name);
+          return persistAll(next);
+        },
+        proceed: () => {
+          selectedId = id;
+          render();
+        },
+      });
     });
 
     host.querySelector('[data-field="name"]')?.addEventListener('input', () => {
@@ -265,6 +315,12 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
       const ok = await persistAll(next);
       if (ok) render();
     });
+
+    host.querySelector('#alr-detail-cancel')?.addEventListener('click', () => {
+      if (!isDirty()) return;
+      discardChanges();
+      render();
+    });
   }
 
   render();
@@ -273,6 +329,7 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
     destroy() {
       host.innerHTML = '';
     },
+    isDirty,
   };
 }
 

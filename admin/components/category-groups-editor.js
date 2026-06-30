@@ -3,7 +3,13 @@ import {
   renameCategoryOnItems,
   saveCategoryGroups,
 } from '../services/menu-settings-data.js';
-import { batchSetItemCategories, setItemAvailability } from '../services/products-data.js';
+import {
+  batchSetItemCategories,
+  setItemAvailability,
+  channelFlagsFromMode,
+  ITEM_CHANNEL_MODES,
+  resolveChannelMode,
+} from '../services/products-data.js';
 import { openItemFormModal } from './item-form-modal.js';
 import { openGroupProductsPickerModal } from './group-products-picker-modal.js';
 import { productThumbHtml } from '../utils/product-image.js';
@@ -11,8 +17,19 @@ import {
   normalizeCategoryGroup,
   slugFromCategoryName,
   formatGroupScheduleSummary,
+  sortCategoryGroupsByChannel,
 } from '../../shared/menu-catalog.js';
 import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.js';
+import {
+  renderAvrCancelButton,
+  runWithUnsavedGuard,
+} from '../utils/avr-unsaved-changes.js';
+
+const CGR_PLUS_ICON = `
+  <svg class="cgr-btn-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+    <path fill="currentColor" d="M8 3a1 1 0 0 1 1 1v3h3a1 1 0 1 1 0 2H9v3a1 1 0 1 1-2 0V9H4a1 1 0 1 1 0-2h3V4a1 1 0 0 1 1-1z"/>
+  </svg>
+`;
 
 /**
  * @param {HTMLElement} host
@@ -40,6 +57,66 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   /** @type {Record<string, string>} */
   let previewObjectUrls = {};
 
+  /** @type {string} */
+  let baselineGroupsJson = '';
+  /** @type {string} */
+  let baselineItemsJson = '';
+  /** @type {'web'|'kiosk'} */
+  let listSortChannel = 'kiosk';
+
+  function groupsSnapshot(gs) {
+    return JSON.stringify(
+      gs.map(g => normalizeCategoryGroup(g)).sort((a, b) => a.id.localeCompare(b.id)),
+    );
+  }
+
+  function itemsSnapshot(its) {
+    return JSON.stringify(
+      its.map(i => ({
+        id: i.id,
+        category: i.category || '',
+        isAvailable: i.isAvailable !== false,
+      })).sort((a, b) => a.id.localeCompare(b.id)),
+    );
+  }
+
+  function commitBaseline() {
+    syncSidebarToState();
+    baselineGroupsJson = groupsSnapshot(groups);
+    baselineItemsJson = itemsSnapshot(items);
+    originalNames.clear();
+    for (const g of groups) originalNames.add(g.name);
+    originalNameById.clear();
+    for (const g of groups) originalNameById.set(g.id, g.name);
+  }
+
+  function isDirty() {
+    syncSidebarToState();
+    return groupsSnapshot(groups) !== baselineGroupsJson
+      || itemsSnapshot(items) !== baselineItemsJson;
+  }
+
+  function discardChanges() {
+    groups = JSON.parse(baselineGroupsJson);
+    const baselineItems = JSON.parse(baselineItemsJson);
+    const baselineMap = new Map(baselineItems.map(i => [i.id, i]));
+    for (const item of items) {
+      const base = baselineMap.get(item.id);
+      if (!base) continue;
+      item.category = base.category;
+      item.isAvailable = base.isAvailable;
+    }
+    for (const url of Object.values(previewObjectUrls)) {
+      if (url) URL.revokeObjectURL(url);
+    }
+    previewObjectUrls = {};
+    if (selectedId && !groups.some(g => g.id === selectedId)) {
+      selectedId = groups[0]?.id || null;
+    }
+  }
+
+  commitBaseline();
+
   function groupItems(group) {
     return items.filter(i => i.category === group.name);
   }
@@ -65,12 +142,40 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     return groups.find(g => g.id === selectedId) || null;
   }
 
+  function sortedGroupsForList() {
+    return sortCategoryGroupsByChannel(groups, listSortChannel);
+  }
+
+  function orderIndicatorsHtml(group) {
+    const w = Number(group.webOrder) || 0;
+    const k = Number(group.kioskOrder) || 0;
+    const wClass = listSortChannel === 'web' ? 'cgr-row-order cgr-row-order--active' : 'cgr-row-order';
+    const kClass = listSortChannel === 'kiosk' ? 'cgr-row-order cgr-row-order--active' : 'cgr-row-order';
+    return `<span class="${wClass}">W: ${w}</span> | <span class="${kClass}">K: ${k}</span>`;
+  }
+
+  function listRowMetaHtml(group) {
+    return `${memberCount(group.id)} шт. · ${esc(scheduleSummaryForGroup(group))} · ${orderIndicatorsHtml(group)}`;
+  }
+
+  function readOrderField(panel, field) {
+    const raw = panel.querySelector(`[data-field="${field}"]`)?.value;
+    const n = Number.parseInt(String(raw ?? ''), 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }
+
+  function readChannelModeFromPanel(panel) {
+    const active = panel.querySelector('[data-group-channel-mode].period-tab--active');
+    return active?.dataset.groupChannelMode || 'everywhere';
+  }
+
   function syncSidebarToState() {
     const panel = host.querySelector('#cgr-detail-panel');
     if (!selectedId || !panel) return;
 
     const ruleSelect = panel.querySelector('[data-field="availability-rule-id"]');
     const ruleId = ruleSelect?.value || null;
+    const { visibleInWeb, visibleInKiosk } = channelFlagsFromMode(readChannelModeFromPanel(panel));
 
     const updated = normalizeCategoryGroup({
       ...groups.find(g => g.id === selectedId),
@@ -78,9 +183,69 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
       name: panel.querySelector('[data-field="name"]')?.value.trim() || '',
       imageUrl: panel.querySelector('[data-field="image-url"]')?.value.trim() || null,
       availabilityRuleId: ruleId || null,
+      visibleInWeb,
+      visibleInKiosk,
+      webOrder: readOrderField(panel, 'web-order'),
+      kioskOrder: readOrderField(panel, 'kiosk-order'),
     });
 
     groups = groups.map(g => (g.id === selectedId ? updated : g));
+  }
+
+  function renderVisibilitySection(group) {
+    const mode = resolveChannelMode(group.visibleInWeb, group.visibleInKiosk);
+    return `
+      <div class="cgr-detail-subsection" id="cgr-visibility-section">
+        <h4 class="cgr-detail-section-title">Видимость</h4>
+        <div class="period-tabs cgr-channel-tabs" role="radiogroup" aria-label="Видимость группы">
+          ${ITEM_CHANNEL_MODES.map(o => `
+            <button
+              type="button"
+              class="period-tab btn-press ${mode === o.id ? 'period-tab--active' : ''}"
+              data-group-channel-mode="${o.id}"
+              role="radio"
+              aria-checked="${mode === o.id}"
+            >${esc(o.label)}</button>
+          `).join('')}
+        </div>
+        <div class="cgr-order-fields">
+          <label class="cgr-order-field">
+            <span class="cgr-detail-label">Порядок в Вебе (index)</span>
+            <input
+              type="number"
+              class="avr-name-input cgr-order-input"
+              data-field="web-order"
+              min="0"
+              step="1"
+              value="${escAttr(String(group.webOrder ?? 0))}"
+            />
+          </label>
+          <label class="cgr-order-field">
+            <span class="cgr-detail-label">Порядок на Киоске (index)</span>
+            <input
+              type="number"
+              class="avr-name-input cgr-order-input"
+              data-field="kiosk-order"
+              min="0"
+              step="1"
+              value="${escAttr(String(group.kioskOrder ?? 0))}"
+            />
+          </label>
+        </div>
+      </div>
+    `;
+  }
+
+  function syncGroupChannelTabs() {
+    const group = selectedGroup();
+    const panel = host.querySelector('#cgr-detail-panel');
+    if (!group || !panel) return;
+    const mode = resolveChannelMode(group.visibleInWeb, group.visibleInKiosk);
+    panel.querySelectorAll('[data-group-channel-mode]').forEach(btn => {
+      const active = btn.dataset.groupChannelMode === mode;
+      btn.classList.toggle('period-tab--active', active);
+      btn.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
   }
 
   function renderAvailabilitySection(group) {
@@ -187,7 +352,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
           <span class="avr-row-thumb">${productThumbHtml({ name: group.name, imageUrl: group.imageUrl })}</span>
           <span class="avr-row-info">
             <span class="avr-row-name">${esc(group.name)}</span>
-            <span class="avr-row-meta">${memberCount(group.id)} шт. · ${esc(scheduleSummaryForGroup(group))}</span>
+            <span class="avr-row-meta">${listRowMetaHtml(group)}</span>
           </span>
         </button>
       </li>
@@ -223,11 +388,11 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
                 <span class="cgr-detail-count" id="cgr-detail-count">${productCountLabel(group)}</span>
               </div>
               <div class="cgr-group-products-toolbar">
-                <button type="button" class="btn btn-outline btn-press cgr-add-product-btn" id="cgr-add-product-btn">
-                  + Создать и добавить товар
+                <button type="button" class="btn btn-outline btn-press cgr-toolbar-btn" id="cgr-add-product-btn">
+                  <span class="cgr-btn-inner">${CGR_PLUS_ICON}<span>Создать и добавить товар</span></span>
                 </button>
-                <button type="button" class="btn btn-outline btn-press cgr-pick-products-btn" id="cgr-pick-products-btn">
-                  ➕ Добавить из базы
+                <button type="button" class="btn btn-outline btn-press cgr-toolbar-btn" id="cgr-pick-products-btn">
+                  <span class="cgr-btn-inner">${CGR_PLUS_ICON}<span>Добавить из базы</span></span>
                 </button>
               </div>
               <div class="catm-products-list cgr-products-list" id="cgr-products-list">
@@ -238,6 +403,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
 
           <section class="cgr-detail-card cgr-detail-card--muted">
             <h3 class="cgr-detail-card-title">Дополнительные настройки</h3>
+
+            ${renderVisibilitySection(group)}
 
             ${renderAvailabilitySection(group)}
 
@@ -274,6 +441,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
               </button>
             </div>
             <div class="footer-action-bar">
+              ${renderAvrCancelButton('cgr-detail-cancel')}
               <button type="button" class="action-btn action-btn-primary btn-press" id="cgr-detail-save">Сохранить изменения</button>
             </div>
           </div>
@@ -284,6 +452,44 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
 
   function groupsHeaderText() {
     return `Группы (${groups.length})`;
+  }
+
+  function renderListSortBar() {
+    return `
+      <div class="cgr-list-sort-bar">
+        <span class="cgr-list-sort-label">Список по</span>
+        <div class="period-tabs cgr-list-sort-tabs" role="radiogroup" aria-label="Сортировка списка групп">
+          <button
+            type="button"
+            class="period-tab btn-press ${listSortChannel === 'web' ? 'period-tab--active' : ''}"
+            data-cgr-list-sort="web"
+            role="radio"
+            aria-checked="${listSortChannel === 'web'}"
+          >Веб</button>
+          <button
+            type="button"
+            class="period-tab btn-press ${listSortChannel === 'kiosk' ? 'period-tab--active' : ''}"
+            data-cgr-list-sort="kiosk"
+            role="radio"
+            aria-checked="${listSortChannel === 'kiosk'}"
+          >Киоск</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function refreshListOrder() {
+    const list = host.querySelector('#cgr-list');
+    if (!list) return;
+    list.innerHTML = sortedGroupsForList().map(g => renderListRow(g)).join('');
+  }
+
+  function syncListSortTabs() {
+    host.querySelectorAll('[data-cgr-list-sort]').forEach(btn => {
+      const active = btn.dataset.cgrListSort === listSortChannel;
+      btn.classList.toggle('period-tab--active', active);
+      btn.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
   }
 
   function render() {
@@ -297,7 +503,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
               + Добавить группу
             </button>
           </div>
-          <ul class="avr-list" id="cgr-list">${groups.map(g => renderListRow(g)).join('')}</ul>
+          ${renderListSortBar()}
+          <ul class="avr-list" id="cgr-list">${sortedGroupsForList().map(g => renderListRow(g)).join('')}</ul>
           ${!groups.length ? '<p class="avr-list-empty">Нет групп. Создайте первую.</p>' : ''}
           <p class="ifm-error" id="cgr-list-error" hidden></p>
         </div>
@@ -314,9 +521,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     const group = groups.find(g => g.id === id);
     if (!row || !group) return;
     row.querySelector('.avr-row-name')?.replaceChildren(document.createTextNode(group.name));
-    row.querySelector('.avr-row-meta')?.replaceChildren(
-      document.createTextNode(`${memberCount(id)} шт. · ${scheduleSummaryForGroup(group)}`),
-    );
+    const metaEl = row.querySelector('.avr-row-meta');
+    if (metaEl) metaEl.innerHTML = listRowMetaHtml(group);
     row.querySelector('.avr-row-thumb')?.replaceChildren();
     row.querySelector('.avr-row-thumb')?.insertAdjacentHTML(
       'afterbegin',
@@ -339,17 +545,39 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   function bindEvents() {
     host.querySelector('#cgr-create-btn')?.addEventListener('click', addCategory);
 
+    host.querySelector('.cgr-list-sort-tabs')?.addEventListener('click', e => {
+      const btn = e.target.closest('[data-cgr-list-sort]');
+      if (!btn) return;
+      const channel = btn.dataset.cgrListSort;
+      if (channel !== 'web' && channel !== 'kiosk') return;
+      if (channel === listSortChannel) return;
+      listSortChannel = channel;
+      syncListSortTabs();
+      refreshListOrder();
+    });
+
     host.querySelector('#cgr-list')?.addEventListener('click', e => {
       const selectBtn = e.target.closest('[data-action="select"]');
       if (!selectBtn) return;
       const id = selectBtn.closest('.avr-row')?.dataset.id;
       if (!id || id === selectedId) return;
-      syncSidebarToState();
-      selectedId = id;
-      render();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save,
+        proceed: () => {
+          selectedId = id;
+          render();
+        },
+      });
     });
 
     host.querySelector('#cgr-detail-save')?.addEventListener('click', () => save());
+    host.querySelector('#cgr-detail-cancel')?.addEventListener('click', () => {
+      if (!isDirty()) return;
+      discardChanges();
+      render();
+    });
     host.querySelector('#cgr-delete-confirm')?.addEventListener('change', e => {
       const btn = host.querySelector('#cgr-detail-delete');
       if (!btn) return;
@@ -360,24 +588,27 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     host.querySelector('#cgr-add-product-btn')?.addEventListener('click', openCreateProductModal);
     host.querySelector('#cgr-pick-products-btn')?.addEventListener('click', openPickProductsModal);
 
-    host.querySelector('#cgr-detail-panel')?.addEventListener('click', async e => {
+    host.querySelector('#cgr-detail-panel')?.addEventListener('click', e => {
+      const modeBtn = e.target.closest('[data-group-channel-mode]');
+      if (modeBtn && selectedId) {
+        e.preventDefault();
+        const { visibleInWeb, visibleInKiosk } = channelFlagsFromMode(modeBtn.dataset.groupChannelMode);
+        groups = groups.map(g => (
+          g.id === selectedId ? { ...g, visibleInWeb, visibleInKiosk } : g
+        ));
+        syncGroupChannelTabs();
+        updateListRowMeta(selectedId);
+        return;
+      }
+
       const removeBtn = e.target.closest('[data-action="remove-from-group"]');
       if (removeBtn && selectedId) {
         e.preventDefault();
         const itemId = removeBtn.dataset.productId;
         const item = items.find(i => i.id === itemId);
         if (!item) return;
-
-        removeBtn.disabled = true;
-        try {
-          await batchSetItemCategories([{ id: itemId, category: 'Прочее' }]);
-          item.category = 'Прочее';
-          refreshProductList();
-        } catch (err) {
-          console.error('[category-groups] remove product', err);
-          removeBtn.disabled = false;
-          showError(err.message || 'Не удалось исключить товар из группы');
-        }
+        item.category = 'Прочее';
+        refreshProductList();
         return;
       }
     });
@@ -392,9 +623,15 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
         updateListRowMeta(selectedId);
         return;
       }
+
+      if (e.target.matches('[data-field="web-order"], [data-field="kiosk-order"]')) {
+        syncSidebarToState();
+        updateListRowMeta(selectedId);
+        refreshListOrder();
+      }
     });
 
-    host.querySelector('#cgr-detail-panel')?.addEventListener('change', async e => {
+    host.querySelector('#cgr-detail-panel')?.addEventListener('change', e => {
       if (!selectedId) return;
 
       if (e.target.matches('[data-photo-file]')) {
@@ -413,20 +650,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
       const itemId = e.target.dataset.productId;
       const item = items.find(i => i.id === itemId);
       if (!item) return;
-
-      const next = e.target.checked;
-      const prev = item.isAvailable !== false;
-      item.isAvailable = next;
-
-      try {
-        await setItemAvailability(itemId, next);
-        refreshProductList();
-      } catch (err) {
-        console.error('[category-groups] availability', err);
-        item.isAvailable = prev;
-        e.target.checked = prev;
-        showError(err.message || 'Не удалось изменить статус продажи');
-      }
+      item.isAvailable = e.target.checked;
+      refreshProductList();
     });
   }
 
@@ -441,6 +666,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     openGroupProductsPickerModal({
       groupName: group.name,
       items,
+      deferPersistence: true,
       onApplied: updates => {
         for (const { id, category } of updates) {
           const item = items.find(i => i.id === id);
@@ -496,6 +722,15 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   }
 
   function addCategory() {
+    runWithUnsavedGuard({
+      isDirty,
+      discard: discardChanges,
+      save,
+      proceed: () => addCategoryDraft(),
+    });
+  }
+
+  function addCategoryDraft() {
     syncSidebarToState();
 
     let name = 'Новая группа';
@@ -517,6 +752,34 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     });
   }
 
+  async function applyItemChangesFromBaseline() {
+    const baselineItems = JSON.parse(baselineItemsJson);
+    const baselineMap = new Map(baselineItems.map(i => [i.id, i]));
+    /** @type {Array<{ id: string, category: string }>} */
+    const categoryUpdates = [];
+
+    for (const item of items) {
+      const base = baselineMap.get(item.id);
+      if (!base) continue;
+      if (item.category !== base.category) {
+        categoryUpdates.push({ id: item.id, category: item.category || 'Прочее' });
+      }
+    }
+
+    if (categoryUpdates.length) {
+      await batchSetItemCategories(categoryUpdates);
+    }
+
+    for (const item of items) {
+      const base = baselineMap.get(item.id);
+      if (!base) continue;
+      const avail = item.isAvailable !== false;
+      if (avail !== base.isAvailable) {
+        await setItemAvailability(item.id, avail);
+      }
+    }
+  }
+
   async function save() {
     syncSidebarToState();
     const errEl = host.querySelector('#cgr-error');
@@ -526,6 +789,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     if (btn) btn.disabled = true;
 
     try {
+      await applyItemChangesFromBaseline();
+
       const next = [];
       const names = new Set();
 
@@ -552,6 +817,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
       }
 
       await saveCategoryGroups(next);
+      groups = next.map(g => ({ ...g }));
+      commitBaseline();
       await onSaved?.();
       return true;
     } catch (err) {
@@ -579,7 +846,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
 
   render();
 
-  return { save, destroy };
+  return { save, destroy, isDirty };
 }
 
 function esc(s) {

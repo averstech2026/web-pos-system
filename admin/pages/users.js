@@ -12,15 +12,8 @@ import {
   userStatusBadgeClass,
   userStatusLabel,
 } from '../utils/user-format.js';
-import { USER_STATUS } from '../../shared/schema.js';
 import { showToast } from '../utils/toast.js';
 import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
-
-const STATUS_OPTIONS = [
-  { id: USER_STATUS.ACTIVE, label: 'Активен' },
-  { id: USER_STATUS.BLOCKED, label: 'Заблокирован' },
-  { id: USER_STATUS.FIRED, label: 'Уволен' },
-];
 
 export class UsersPage {
   constructor(container, navigate) {
@@ -33,10 +26,9 @@ export class UsersPage {
     this.allergens = [];
     this.search = '';
     this.groupFilters = [];
-    this.statusFilters = [];
     this.loyaltyFilters = [];
+    this.activeOnly = true;
     this.groupDropdownOpen = false;
-    this.statusDropdownOpen = false;
     this.loyaltyDropdownOpen = false;
     this.bulkGroupOpen = false;
     this.bulkLoyaltyOpen = false;
@@ -92,8 +84,8 @@ export class UsersPage {
     return filterCrmUsers(this.users, {
       search: this.search,
       groupIds: this.groupFilters,
-      statuses: this.statusFilters,
       loyaltyCategoryIds: this.loyaltyFilters,
+      activeOnly: this.activeOnly,
     });
   }
 
@@ -101,21 +93,23 @@ export class UsersPage {
     return Boolean(
       this.search.trim()
       || this.groupFilters.length
-      || this.statusFilters.length
-      || this.loyaltyFilters.length,
+      || this.loyaltyFilters.length
+      || !this.activeOnly,
     );
   }
 
   resetFilters() {
     this.search = '';
     this.groupFilters = [];
-    this.statusFilters = [];
     this.loyaltyFilters = [];
+    this.activeOnly = true;
     this.groupDropdownOpen = false;
-    this.statusDropdownOpen = false;
     this.loyaltyDropdownOpen = false;
     const searchInput = this.container.querySelector('#users-search');
     if (searchInput) searchInput.value = '';
+    const activeToggle = this.container.querySelector('#users-active-only');
+    if (activeToggle) activeToggle.checked = true;
+    this.syncActiveOnlyToggle();
     this.refreshTable();
   }
 
@@ -138,10 +132,23 @@ export class UsersPage {
     return `${this.groupFilters.length} группы`;
   }
 
-  statusFilterSummary() {
-    if (!this.statusFilters.length) return 'Все статусы';
-    if (this.statusFilters.length === 1) return userStatusLabel(this.statusFilters[0]);
-    return `${this.statusFilters.length} статуса`;
+  renderActiveOnlyToggle() {
+    return `
+      <label class="avr-active-toggle products-archived-toggle mkb-status-toggle users-active-toggle" title="${this.activeOnly ? 'Показать всех клиентов' : 'Только активные клиенты'}">
+        <input type="checkbox" id="users-active-only" ${this.activeOnly ? 'checked' : ''} />
+        <span class="avr-switch" aria-hidden="true"></span>
+        <span class="avr-active-label products-archived-label users-active-label">Только активные</span>
+      </label>
+    `;
+  }
+
+  syncActiveOnlyToggle() {
+    const toggle = this.container.querySelector('.users-active-toggle');
+    const label = this.container.querySelector('.users-active-label');
+    if (toggle) {
+      toggle.title = this.activeOnly ? 'Показать всех клиентов' : 'Только активные клиенты';
+    }
+    if (label) label.textContent = 'Только активные';
   }
 
   loyaltyFilterSummary() {
@@ -156,12 +163,10 @@ export class UsersPage {
   syncDropdown(idPrefix) {
     const openMap = {
       group: this.groupDropdownOpen,
-      status: this.statusDropdownOpen,
       loyalty: this.loyaltyDropdownOpen,
     };
     const summaryMap = {
       group: () => this.groupFilterSummary(),
-      status: () => this.statusFilterSummary(),
       loyalty: () => this.loyaltyFilterSummary(),
     };
     const open = openMap[idPrefix];
@@ -193,7 +198,6 @@ export class UsersPage {
 
   syncAllDropdowns() {
     this.syncDropdown('group');
-    this.syncDropdown('status');
     this.syncDropdown('loyalty');
   }
 
@@ -434,13 +438,13 @@ export class UsersPage {
 
   renderFilters() {
     return `
-      <section class="orders-filters card users-filters ${this.selectedIds.size ? 'users-filters--dimmed' : ''}">
-        <div class="orders-filters-primary">
-          <div class="orders-filter-inline orders-filter-search">
-            <span class="orders-filter-label">Поиск</span>
+      <section class="products-filters card users-filters ${this.selectedIds.size ? 'users-filters--dimmed' : ''}">
+        <div class="products-filters-row products-filters-row--data">
+          <div class="products-filter-field products-filter-field--search">
+            <span class="products-filter-label">Поиск</span>
             <input
               type="search"
-              class="orders-search-input users-search-input"
+              class="products-search-input products-filter-control"
               id="users-search"
               placeholder="ФИО, email, телефон…"
               value="${escAttr(this.search)}"
@@ -448,32 +452,29 @@ export class UsersPage {
             />
           </div>
 
-          <div class="orders-filter-inline">
-            <span class="orders-filter-label">Группа</span>
+          <div class="products-filter-field products-filter-field--group">
+            <span class="products-filter-label">Группа</span>
             ${this.renderGroupDropdown()}
           </div>
 
-          <div class="orders-filter-inline">
-            <span class="orders-filter-label">Статус</span>
-            ${this.renderStatusDropdown()}
-          </div>
-
-          <div class="orders-filter-inline">
-            <span class="orders-filter-label">Категория</span>
+          <div class="products-filter-field products-filter-field--schedule">
+            <span class="products-filter-label">Категория</span>
             ${this.renderLoyaltyDropdown()}
           </div>
 
-          ${renderFiltersResetBtn(this.hasActiveFilters())}
+          <div class="products-filters-reset-wrap">
+            ${renderFiltersResetBtn(this.hasActiveFilters())}
+          </div>
         </div>
 
-        <div class="orders-filters-toolbar">
-          <div class="admin-filters-toolbar-left">
-            <button type="button" class="btn btn-primary btn-press orders-create-btn" id="users-create-btn">+ Новый пользователь</button>
+        <div class="products-filters-row products-filters-row--controls">
+          <button type="button" class="btn btn-primary btn-press orders-create-btn products-create-btn" id="users-create-btn">+ Добавить клиента</button>
+
+          <div class="products-filters-controls-group">
+            ${this.renderActiveOnlyToggle()}
           </div>
 
-          <div class="admin-filters-toolbar-right">
-            <span class="admin-filters-count">Найдено <span class="users-count">${this.usersCountText()}</span></span>
-          </div>
+          <span class="admin-filters-count products-filters-count">Найдено <span class="users-count">${this.usersCountText()}</span></span>
         </div>
       </section>
     `;
@@ -495,28 +496,6 @@ export class UsersPage {
           `).join('')}
           <div class="orders-status-menu-foot">
             <button type="button" class="orders-status-reset btn-press" data-group-action="clear">Сбросить</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  renderStatusDropdown() {
-    return `
-      <div class="orders-status-dropdown ${this.statusDropdownOpen ? 'orders-status-dropdown--open' : ''}" id="users-status-dropdown">
-        <button type="button" class="orders-status-trigger btn-press" id="users-status-trigger" aria-expanded="${this.statusDropdownOpen}">
-          <span class="orders-status-trigger-label">${esc(this.statusFilterSummary())}</span>
-          <span class="orders-status-trigger-caret">▾</span>
-        </button>
-        <div class="orders-status-menu" id="users-status-menu" ${this.statusDropdownOpen ? '' : 'hidden'}>
-          ${STATUS_OPTIONS.map(s => `
-            <label class="orders-status-option">
-              <input type="checkbox" data-status-filter="${s.id}" ${this.statusFilters.includes(s.id) ? 'checked' : ''} />
-              <span>${s.label}</span>
-            </label>
-          `).join('')}
-          <div class="orders-status-menu-foot">
-            <button type="button" class="orders-status-reset btn-press" data-status-action="clear">Сбросить</button>
           </div>
         </div>
       </div>
@@ -599,10 +578,8 @@ export class UsersPage {
 
   handleDropdownOutside(e) {
     if (this.container.querySelector('#users-group-dropdown')?.contains(e.target)) return;
-    if (this.container.querySelector('#users-status-dropdown')?.contains(e.target)) return;
     if (this.container.querySelector('#users-loyalty-dropdown')?.contains(e.target)) return;
     if (this.container.querySelector('#users-group-menu')?.contains(e.target)) return;
-    if (this.container.querySelector('#users-status-menu')?.contains(e.target)) return;
     if (this.container.querySelector('#users-loyalty-menu')?.contains(e.target)) return;
     if (this.container.querySelector('#users-bulk-group-dropdown')?.contains(e.target)) return;
     if (this.container.querySelector('#users-bulk-loyalty-dropdown')?.contains(e.target)) return;
@@ -610,9 +587,8 @@ export class UsersPage {
     if (this.container.querySelector('#users-bulk-loyalty-menu')?.contains(e.target)) return;
 
     let changed = false;
-    if (this.groupDropdownOpen || this.statusDropdownOpen || this.loyaltyDropdownOpen) {
+    if (this.groupDropdownOpen || this.loyaltyDropdownOpen) {
       this.groupDropdownOpen = false;
-      this.statusDropdownOpen = false;
       this.loyaltyDropdownOpen = false;
       changed = true;
     }
@@ -684,16 +660,6 @@ export class UsersPage {
     if (e.target.closest('#users-group-trigger')) {
       e.stopPropagation();
       this.groupDropdownOpen = !this.groupDropdownOpen;
-      this.statusDropdownOpen = false;
-      this.loyaltyDropdownOpen = false;
-      this.syncAllDropdowns();
-      return;
-    }
-
-    if (e.target.closest('#users-status-trigger')) {
-      e.stopPropagation();
-      this.statusDropdownOpen = !this.statusDropdownOpen;
-      this.groupDropdownOpen = false;
       this.loyaltyDropdownOpen = false;
       this.syncAllDropdowns();
       return;
@@ -703,19 +669,12 @@ export class UsersPage {
       e.stopPropagation();
       this.loyaltyDropdownOpen = !this.loyaltyDropdownOpen;
       this.groupDropdownOpen = false;
-      this.statusDropdownOpen = false;
       this.syncAllDropdowns();
       return;
     }
 
     if (e.target.closest('[data-group-action="clear"]')) {
       this.groupFilters = [];
-      this.refreshTable();
-      return;
-    }
-
-    if (e.target.closest('[data-status-action="clear"]')) {
-      this.statusFilters = [];
       this.refreshTable();
       return;
     }
@@ -776,14 +735,9 @@ export class UsersPage {
       return;
     }
 
-    const statusCb = e.target.closest('[data-status-filter]');
-    if (statusCb) {
-      const id = statusCb.dataset.statusFilter;
-      if (statusCb.checked) {
-        if (!this.statusFilters.includes(id)) this.statusFilters.push(id);
-      } else {
-        this.statusFilters = this.statusFilters.filter(x => x !== id);
-      }
+    if (e.target.id === 'users-active-only') {
+      this.activeOnly = e.target.checked;
+      this.syncActiveOnlyToggle();
       this.refreshTable();
       return;
     }
@@ -801,7 +755,7 @@ export class UsersPage {
   }
 
   _onWindowResize() {
-    if (this.groupDropdownOpen || this.statusDropdownOpen || this.loyaltyDropdownOpen) this.syncAllDropdowns();
+    if (this.groupDropdownOpen || this.loyaltyDropdownOpen) this.syncAllDropdowns();
     if (this.bulkGroupOpen) this.syncBulkDropdown('group');
     if (this.bulkLoyaltyOpen) this.syncBulkDropdown('loyalty');
   }

@@ -5,6 +5,7 @@ import {
 } from '../services/payments-data.js';
 import { RECEIPT_TYPE, PAYMENT_CURRENCY } from '../../shared/schema.js';
 import { showToast } from '../utils/toast.js';
+import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
 
 const CURRENCY_OPTIONS = [
   { value: PAYMENT_CURRENCY.RUB, label: 'Рубль (₽)' },
@@ -29,6 +30,36 @@ export function createPaymentsEditor(host, {
   /** @type {string|null} */
   let selectedId = methods[0]?.id || null;
   let saving = false;
+
+  /** @type {string} */
+  let baselineJson = '';
+
+  function snapshot() {
+    return JSON.stringify(methods.map(m => ({
+      ...m,
+      allowedCategories: [...(m.allowedCategories || [])],
+      allowedUserGroups: [...(m.allowedUserGroups || [])],
+    })).sort((a, b) => a.id.localeCompare(b.id)));
+  }
+
+  function commitBaseline() {
+    syncPanel();
+    baselineJson = snapshot();
+  }
+
+  function isDirty() {
+    syncPanel();
+    return snapshot() !== baselineJson;
+  }
+
+  function discardChanges() {
+    methods = JSON.parse(baselineJson);
+    if (selectedId && !methods.some(m => m.id === selectedId)) {
+      selectedId = methods[0]?.id || null;
+    }
+  }
+
+  commitBaseline();
 
   function selectedMethod() {
     return methods.find(m => m.id === selectedId) || null;
@@ -225,6 +256,7 @@ export function createPaymentsEditor(host, {
               </button>
             </div>
             <div class="footer-action-bar">
+              ${renderAvrCancelButton('pay-cancel')}
               <button
                 type="button"
                 class="action-btn action-btn-primary btn-press"
@@ -283,26 +315,66 @@ export function createPaymentsEditor(host, {
     });
   }
 
+  async function persistCurrent() {
+    syncPanel();
+    const method = selectedMethod();
+    if (!method?.name?.trim()) {
+      showError('Укажите название способа оплаты');
+      return false;
+    }
+    saving = true;
+    render();
+    try {
+      await savePaymentMethod(method);
+      commitBaseline();
+      showToast('Способ оплаты сохранён');
+      await onSaved?.();
+      return true;
+    } catch (err) {
+      showError(err.message || 'Не удалось сохранить');
+      return false;
+    } finally {
+      saving = false;
+      render();
+    }
+  }
+
   function bind() {
     host.querySelector('#pay-create')?.addEventListener('click', () => {
-      const id = uniqueId('Новый способ');
-      methods.push({
-        id,
-        name: 'Новый способ',
-        currency: PAYMENT_CURRENCY.RUB,
-        receiptType: RECEIPT_TYPE.FISCAL,
-        allowedCategories: [],
-        allowedUserGroups: [],
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: persistCurrent,
+        proceed: () => {
+          const id = uniqueId('Новый способ');
+          methods.push({
+            id,
+            name: 'Новый способ',
+            currency: PAYMENT_CURRENCY.RUB,
+            receiptType: RECEIPT_TYPE.FISCAL,
+            allowedCategories: [],
+            allowedUserGroups: [],
+          });
+          selectedId = id;
+          render();
+        },
       });
-      selectedId = id;
-      render();
     });
 
     host.querySelector('#pay-list')?.addEventListener('click', e => {
       const row = e.target.closest('[data-id]');
       if (!row || !e.target.closest('[data-action="select"]')) return;
-      selectedId = row.dataset.id;
-      render();
+      const id = row.dataset.id;
+      if (!id || id === selectedId) return;
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: persistCurrent,
+        proceed: () => {
+          selectedId = id;
+          render();
+        },
+      });
     });
 
     host.querySelector('#pay-detail-panel')?.addEventListener('input', () => syncPanel());
@@ -321,24 +393,11 @@ export function createPaymentsEditor(host, {
       if (btn) btn.disabled = !e.target.checked;
     });
 
-    host.querySelector('#pay-save')?.addEventListener('click', async () => {
-      syncPanel();
-      const method = selectedMethod();
-      if (!method?.name?.trim()) {
-        showError('Укажите название способа оплаты');
-        return;
-      }
-      saving = true;
+    host.querySelector('#pay-save')?.addEventListener('click', persistCurrent);
+    host.querySelector('#pay-cancel')?.addEventListener('click', () => {
+      if (!isDirty()) return;
+      discardChanges();
       render();
-      try {
-        await savePaymentMethod(method);
-        showToast('Способ оплаты сохранён');
-        await onSaved?.();
-      } catch (err) {
-        saving = false;
-        render();
-        showError(err.message || 'Не удалось сохранить');
-      }
     });
 
     host.querySelector('#pay-delete')?.addEventListener('click', async () => {
@@ -350,6 +409,7 @@ export function createPaymentsEditor(host, {
         await deletePaymentMethod(method.id);
         methods = methods.filter(m => m.id !== method.id);
         selectedId = methods[0]?.id || null;
+        commitBaseline();
         saving = false;
         showToast('Способ оплаты удалён');
         await onSaved?.();
@@ -367,6 +427,7 @@ export function createPaymentsEditor(host, {
     destroy() {
       host.innerHTML = '';
     },
+    isDirty,
   };
 }
 

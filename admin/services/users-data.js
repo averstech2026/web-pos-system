@@ -491,6 +491,7 @@ export function filterCrmUsers(users, {
   groupIds = [],
   statuses = [],
   loyaltyCategoryIds = [],
+  activeOnly = false,
 }) {
 
   const q = search.trim().toLowerCase();
@@ -506,6 +507,8 @@ export function filterCrmUsers(users, {
   return users.filter(u => {
 
     if (groupSet && !groupSet.has(u.userGroupId || '')) return false;
+
+    if (activeOnly && (u.status || USER_STATUS.ACTIVE) !== USER_STATUS.ACTIVE) return false;
 
     if (statusSet && !statusSet.has(u.status || USER_STATUS.ACTIVE)) return false;
 

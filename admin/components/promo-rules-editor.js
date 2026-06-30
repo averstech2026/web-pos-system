@@ -12,6 +12,7 @@ import { formatAvailabilityRuleShort } from '../../shared/availability-rules.js'
 import { bindProductPickerFields, renderProductPickerField } from './product-picker-field.js';
 import { deletePromoRule, savePromoRule } from '../services/promo-rules-data.js';
 import { showToast } from '../utils/toast.js';
+import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -35,6 +36,35 @@ export function createPromoRulesEditor(host, {
   let selectedId = promos[0]?.id || null;
   /** @type {boolean} */
   let isNew = false;
+
+  /** @type {string} */
+  let baselineJson = '';
+
+  function snapshot() {
+    return JSON.stringify(
+      promos.map(p => normalizePromoRuleDoc(p, p.id)).sort((a, b) => a.id.localeCompare(b.id)),
+    );
+  }
+
+  function commitBaseline() {
+    syncPanelToState();
+    baselineJson = snapshot();
+  }
+
+  function isDirty() {
+    syncPanelToState();
+    return snapshot() !== baselineJson;
+  }
+
+  function discardChanges() {
+    promos = JSON.parse(baselineJson);
+    isNew = false;
+    if (selectedId && !promos.some(p => p.id === selectedId)) {
+      selectedId = promos[0]?.id || null;
+    }
+  }
+
+  commitBaseline();
 
   const activeRules = availabilityRules.filter(r => r.status !== 'archived');
 
@@ -411,6 +441,7 @@ export function createPromoRulesEditor(host, {
               </div>
             ` : ''}
             <div class="footer-action-bar">
+              ${renderAvrCancelButton('prm-detail-cancel')}
               <button type="button" class="action-btn action-btn-primary btn-press" id="prm-save-btn">Сохранить акцию</button>
             </div>
           </div>
@@ -617,15 +648,21 @@ export function createPromoRulesEditor(host, {
     bindPanelEvents();
 
     host.querySelector('#prm-create-btn')?.addEventListener('click', () => {
-      syncPanelToState();
-      const draft = createDefaultPromoRule(`draft-${Date.now()}`);
-      promos.push(draft);
-      selectedId = draft.id;
-      isNew = true;
-      render();
-      requestAnimationFrame(() => {
-        host.querySelector('[data-field="name"]')?.focus();
-        host.querySelector('[data-field="name"]')?.select();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save,
+        proceed: () => {
+          const draft = createDefaultPromoRule(`draft-${Date.now()}`);
+          promos.push(draft);
+          selectedId = draft.id;
+          isNew = true;
+          render();
+          requestAnimationFrame(() => {
+            host.querySelector('[data-field="name"]')?.focus();
+            host.querySelector('[data-field="name"]')?.select();
+          });
+        },
       });
     });
 
@@ -634,13 +671,24 @@ export function createPromoRulesEditor(host, {
       if (!btn) return;
       const id = btn.closest('.avr-row')?.dataset.id;
       if (!id || id === selectedId) return;
-      syncPanelToState();
-      selectedId = id;
-      isNew = false;
-      render();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save,
+        proceed: () => {
+          selectedId = id;
+          isNew = false;
+          render();
+        },
+      });
     });
 
     host.querySelector('#prm-save-btn')?.addEventListener('click', () => save());
+    host.querySelector('#prm-detail-cancel')?.addEventListener('click', () => {
+      if (!isDirty()) return;
+      discardChanges();
+      render();
+    });
     host.querySelector('#prm-delete-confirm')?.addEventListener('change', e => {
       const btn = host.querySelector('#prm-detail-delete');
       if (!btn) return;
@@ -672,16 +720,19 @@ export function createPromoRulesEditor(host, {
       promos = [...promos.filter(p => p.id !== saved.id), saved];
       selectedId = saved.id;
       isNew = false;
+      commitBaseline();
 
       render();
       showToast('Акция сохранена');
       await onSaved?.();
+      return true;
     } catch (err) {
       console.error('[promo-rules]', err);
       if (errEl) {
         errEl.textContent = err.message || 'Не удалось сохранить акцию';
         errEl.hidden = false;
       }
+      return false;
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -700,6 +751,7 @@ export function createPromoRulesEditor(host, {
       promos = promos.filter(p => p.id !== idToDelete);
       selectedId = promos[0]?.id || null;
       isNew = false;
+      commitBaseline();
       render();
       showToast('Акция удалена');
       await onSaved?.();
@@ -722,7 +774,7 @@ export function createPromoRulesEditor(host, {
   }
 
   render();
-  return { destroy };
+  return { destroy, isDirty };
 }
 
 function esc(s) {

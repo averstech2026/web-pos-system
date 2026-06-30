@@ -9,6 +9,7 @@ export default defineConfig({
   server: {
     ...devServer,
     port: 3002,
+    strictPort: true,
     fs: { allow: ['..'] },
   },
   resolve: {

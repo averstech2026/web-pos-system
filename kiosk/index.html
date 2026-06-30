@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ru" class="kiosk-app">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>IFCM TECH — Киоск самообслуживания</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: '#1E1B4B',
+            'navy-dark': '#1A1F4C',
+            kiosk: '#F3F4F6',
+            'kiosk-red': '#E11D48',
+            'pay-red': '#FF0000',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="preload" as="image" href="assets/logo.png" />
+  <link rel="preload" as="image" href="assets/card.png" />
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body class="kiosk-app min-h-screen bg-zinc-800 flex items-center justify-center overflow-hidden kiosk-desktop">
+
+  <!-- Масштабируемый контейнер киоска 1080×1920 -->
+  <div id="kiosk-wrapper" class="relative">
+    <div id="kiosk" class="absolute top-0 left-0 w-[1080px] h-[1920px] bg-kiosk text-navy origin-top-left overflow-hidden shadow-2xl rounded-sm">
+
+      <!-- ═══════════════════ ЭКРАН 0: СТАРТ ═══════════════════ -->
+      <div id="screen-start" class="screen active flex-col h-full">
+        <div class="flex-1 flex flex-col items-center justify-center px-16 gap-10">
+          <!-- Логотип -->
+          <img src="assets/logo.png" alt="FCM TECH" width="824" height="120" class="logo-img h-[120px] mt-8" />
+
+          <p class="text-center text-[38px] font-medium leading-snug tracking-wide uppercase">
+            Приложите карту<br/>или продолжите без неё
+          </p>
+
+          <!-- Иллюстрация карты -->
+          <img src="assets/card.png" alt="" width="340" height="303" class="card-icon w-[340px] h-[303px]" />
+
+          <button data-action="go-menu"
+                  class="btn-press bg-navy text-white text-[42px] font-bold uppercase tracking-wider py-8 px-20 rounded-full shadow-lg">
+            Начать покупки
+          </button>
+
+          <div class="text-center mt-4">
+            <p class="text-[28px] font-medium uppercase leading-relaxed tracking-wide">
+              Поделитесь вашим опытом<br/>использования кассы<br/>самообслуживания
+            </p>
+            <div class="mt-8 inline-block p-3 bg-white rounded-2xl border border-gray-200">
+              <svg viewBox="0 0 120 120" class="w-36 h-36">
+                <rect width="120" height="120" fill="white"/>
+                <g fill="#1E1B4B">
+                  <rect x="10" y="10" width="20" height="20"/><rect x="40" y="10" width="10" height="10"/><rect x="60" y="10" width="20" height="20"/>
+                  <rect x="90" y="10" width="20" height="20"/><rect x="10" y="40" width="10" height="10"/><rect x="30" y="40" width="20" height="20"/>
+                  <rect x="60" y="40" width="10" height="10"/><rect x="80" y="40" width="10" height="10"/><rect x="100" y="40" width="10" height="10"/>
+                  <rect x="10" y="60" width="20" height="20"/><rect x="40" y="60" width="10" height="10"/><rect x="70" y="60" width="20" height="20"/>
+                  <rect x="100" y="60" width="10" height="10"/><rect x="10" y="90" width="10" height="10"/><rect x="30" y="90" width="10" height="10"/>
+                  <rect x="50" y="90" width="20" height="20"/><rect x="80" y="90" width="10" height="10"/><rect x="100" y="90" width="10" height="10"/>
+                </g>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ ЭКРАН 1: МЕНЮ ═══════════════════ -->
+      <div id="screen-menu" class="screen flex-col h-full relative">
+        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <!-- Шапка -->
+        <header class="flex flex-col gap-4 px-14 pt-12 pb-4 bg-kiosk shrink-0">
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-4 shrink-0">
+              <div class="search-split-btn">
+                <button data-action="open-search" type="button"
+                        class="btn-press search-split-text text-[28px] font-semibold uppercase tracking-wider">
+                  Поиск
+                </button>
+                <div class="search-split-divider" aria-hidden="true"></div>
+                <button data-action="open-voice-search" type="button"
+                        class="btn-press search-split-mic"
+                        title="Голосовой поиск">
+                  <svg class="w-9 h-9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a4 4 0 014 4v5a4 4 0 01-8 0V5a4 4 0 014-4z"/>
+                    <path stroke-linecap="round" d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/>
+                  </svg>
+                </button>
+              </div>
+              <button data-action="open-customer-card" type="button"
+                      class="btn-press w-[72px] h-[72px] bg-white border border-gray-300 rounded-full flex items-center justify-center shrink-0"
+                      title="Применить карту клиента">
+                <svg class="w-9 h-9 text-navy" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <rect x="2" y="5" width="20" height="14" rx="2"/>
+                  <path d="M2 10h20M6 15h4"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <div class="flex-1 min-w-0">
+              <div id="customer-status-bar" data-customer-panel data-customer-panel-fixed
+                   class="customer-bar customer-bar--compact invisible opacity-0 pointer-events-none flex w-full items-center gap-3 px-4">
+                <svg class="customer-bar-icon" viewBox="0 0 28 20" aria-hidden="true">
+                  <rect x="0" y="0" width="28" height="20" rx="3" fill="#22C55E"/>
+                  <rect x="0" y="5" width="28" height="5" fill="#86EFAC"/>
+                </svg>
+                <span data-customer-line class="customer-bar-text text-navy truncate min-w-0 flex-1"></span>
+                <button data-action="remove-customer" type="button"
+                        class="btn-press shrink-0 w-7 h-7 rounded-full text-gray-400 flex items-center justify-center text-lg leading-none hover:text-gray-600"
+                        title="Отменить применение">×</button>
+              </div>
+            </div>
+            <div class="inline-flex rounded-full overflow-hidden border border-gray-200 bg-white text-[17px] font-semibold uppercase tracking-wide shrink-0 ml-auto">
+              <button type="button" id="layout-btn-1" data-action="set-menu-view" data-view="scroll"
+                      class="btn-press px-5 py-3 bg-navy text-white whitespace-nowrap">Макет 1</button>
+              <button type="button" id="layout-btn-2" data-action="set-menu-view" data-view="grid"
+                      class="btn-press px-5 py-3 text-gray-500 whitespace-nowrap">Макет 2</button>
+              <button type="button" id="layout-btn-3" data-action="set-menu-view" data-view="browse"
+                      class="btn-press px-5 py-3 text-gray-500 whitespace-nowrap">Макет 3</button>
+            </div>
+          </div>
+        </header>
+
+        <div class="flex flex-1 min-h-0">
+          <!-- Сайдбар -->
+          <nav id="sidebar" class="w-[200px] bg-navy shrink-0 flex flex-col overflow-y-auto hide-scrollbar"></nav>
+
+          <div class="flex flex-1 flex-col min-h-0 min-w-0">
+            <div id="kiosk-marketing-host" class="shrink-0 px-6 pt-2 bg-kiosk"></div>
+            <!-- Контент меню -->
+            <main id="menu-content" class="relative flex-1 overflow-y-auto kiosk-scroll px-6 pb-4 bg-kiosk"></main>
+          </div>
+        </div>
+
+        <!-- Футер меню -->
+        <footer class="shrink-0 bg-white border-t border-gray-200 px-8 py-6 flex items-stretch gap-6">
+          <button data-action="cancel-order"
+                  class="btn-press shrink-0 bg-white border-2 border-kiosk-red text-kiosk-red text-[24px] font-bold uppercase tracking-wide px-8 rounded-full min-h-[96px] h-[96px] flex items-center justify-center text-center leading-tight">
+            Отменить<br/>покупку
+          </button>
+          <button data-action="try-pay"
+                  class="btn-press btn-kiosk-pay flex-1 min-w-0 min-h-[96px] h-[96px]">
+            <span class="flex w-full h-full items-center justify-center bg-navy text-white text-[30px] font-bold uppercase tracking-wide rounded-full whitespace-nowrap px-6">
+              Оплатить покупку
+            </span>
+          </button>
+          <button data-action="go-cart" class="btn-press shrink-0 flex flex-col items-center gap-1 relative">
+            <div class="w-20 h-20 bg-navy rounded-2xl flex items-center justify-center relative">
+              <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.5 5M17 13l2.5 5M9 19a1 1 0 100 2 1 1 0 000-2zm8 0a1 1 0 100 2 1 1 0 000-2z"/>
+              </svg>
+              <span data-cart-badge class="hidden absolute -top-2 -right-2 w-10 h-10 bg-kiosk-red text-white text-[22px] font-bold rounded-full flex items-center justify-center">0</span>
+            </div>
+            <span class="text-[20px] font-semibold text-navy uppercase">Корзина</span>
+          </button>
+        </footer>
+      </div>
+
+      <!-- ═══════════════════ ЭКРАН: ПОИСК ═══════════════════ -->
+      <div id="screen-search" class="screen flex-col h-full bg-kiosk relative">
+        <header class="kiosk-screen-header">
+          <h1>Результат поиска</h1>
+          <p class="kiosk-screen-subtitle is-placeholder" aria-hidden="true">Статус</p>
+        </header>
+
+        <div class="kiosk-screen-body">
+          <div class="kiosk-results-panel search-results-panel">
+            <div class="voice-results-header">
+              <span class="voice-results-title">Результаты поиска</span>
+              <div class="voice-results-actions">
+                <div class="voice-results-count-wrap" aria-label="Количество результатов">
+                  <span id="search-results-count">0</span>
+                </div>
+              </div>
+            </div>
+            <div id="search-results" class="flex-1 overflow-y-auto kiosk-scroll min-h-0"></div>
+            <div class="kiosk-results-subtotal">
+              <span class="kiosk-results-subtotal-label">Подытог</span>
+              <span id="search-total" class="kiosk-results-subtotal-value">0 ₽</span>
+            </div>
+          </div>
+
+          <div class="kiosk-input-panel search-keyboard-panel">
+            <div class="search-input-bar">
+              <button type="button" data-action="search-esc"
+                      class="btn-press search-input-esc">Esc</button>
+              <div class="search-input-field">
+                <svg class="w-6 h-6 text-gray-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>
+                </svg>
+                <span id="search-query-display" class="text-[26px] text-gray-800 truncate min-w-0 flex-1"></span>
+                <span id="search-cursor" class="w-0.5 h-7 bg-gray-800 animate-pulse shrink-0"></span>
+              </div>
+              <button type="button" data-action="search-clear-query"
+                      class="btn-press search-input-clear">
+                <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path d="M9 6l6 6-6 6"/>
+                  <path d="M6 7h10a2 2 0 012 2v6a2 2 0 01-2 2H6l3.5-5L6 7z"/>
+                  <path d="M13.5 10.5l3 3M16.5 10.5l-3 3"/>
+                </svg>
+                Clear
+              </button>
+              <button type="button" data-action="open-voice-search"
+                      class="btn-press search-input-mic"
+                      title="Голосовой поиск">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M12 1a4 4 0 014 4v5a4 4 0 01-8 0V5a4 4 0 014-4zM19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/>
+                </svg>
+              </button>
+            </div>
+            <div id="search-keyboard" class="search-keyboard-wrap"></div>
+          </div>
+        </div>
+
+        <footer class="shrink-0 bg-white border-t border-gray-200 px-8 py-6 flex items-stretch gap-6">
+          <button data-action="go-menu" type="button"
+                  class="btn-press shrink-0 bg-white border-2 border-gray-300 text-navy text-[24px] font-bold uppercase tracking-wide px-10 rounded-full min-h-[96px] h-[96px] flex items-center justify-center text-center">
+            В меню
+          </button>
+          <button data-action="open-voice-search" type="button"
+                  class="btn-press btn-kiosk-pay flex-1 min-w-0 min-h-[96px] h-[96px]">
+            <span class="flex w-full h-full items-center justify-center bg-navy text-white text-[30px] font-bold uppercase tracking-wide rounded-full whitespace-nowrap px-6">
+              Голосом
+            </span>
+          </button>
+          <button data-action="go-cart" type="button"
+                  class="btn-press shrink-0 flex flex-col items-center gap-1 relative">
+            <div class="w-20 h-20 bg-navy rounded-2xl flex items-center justify-center relative">
+              <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.5 5M17 13l2.5 5M9 19a1 1 0 100 2 1 1 0 000-2zm8 0a1 1 0 100 2 1 1 0 000-2z"/>
+              </svg>
+              <span data-cart-badge class="hidden absolute -top-2 -right-2 w-10 h-10 bg-kiosk-red text-white text-[22px] font-bold rounded-full flex items-center justify-center">0</span>
+            </div>
+            <span class="text-[20px] font-semibold text-navy uppercase">Корзина</span>
+          </button>
+        </footer>
+      </div>
+
+      <!-- ═══════════════════ ЭКРАН: ГОЛОСОВОЙ ПОИСК ═══════════════════ -->
+      <div id="screen-voice" class="screen flex-col h-full bg-kiosk relative">
+        <header class="kiosk-screen-header">
+          <h1>Голосовой поиск</h1>
+          <p id="voice-status-text" class="kiosk-screen-subtitle">Скажите название товара</p>
+        </header>
+
+        <div class="kiosk-screen-body">
+          <div class="kiosk-results-panel voice-results-panel">
+            <div class="voice-results-header">
+              <span class="voice-results-title">Найденные товары</span>
+              <div class="voice-results-actions">
+                <div class="voice-results-count-wrap" aria-label="Количество позиций">
+                  <span id="voice-results-count">0</span>
+                </div>
+                <span class="voice-results-actions-divider" aria-hidden="true"></span>
+                <button data-action="voice-clear-all" type="button" disabled
+                        class="btn-press voice-clear-btn">
+                  Очистить все
+                </button>
+              </div>
+            </div>
+            <div id="voice-results" class="flex-1 overflow-y-auto kiosk-scroll min-h-0"></div>
+            <div class="kiosk-results-subtotal">
+              <span class="kiosk-results-subtotal-label">Подытог</span>
+              <span id="voice-subtotal" class="kiosk-results-subtotal-value">0 ₽</span>
+            </div>
+          </div>
+
+          <div class="kiosk-input-panel voice-control-panel">
+            <div class="flex flex-col items-center">
+              <div id="voice-mic-wrap" class="voice-mic-wrap">
+                <span class="voice-mic-pulse" aria-hidden="true"></span>
+                <span class="voice-mic-pulse" aria-hidden="true"></span>
+                <span class="voice-mic-pulse" aria-hidden="true"></span>
+                <button type="button" data-action="voice-toggle-listen"
+                        class="btn-press voice-mic-circle" title="Начать / остановить запись">
+                  <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" d="M12 1a4 4 0 014 4v5a4 4 0 01-8 0V5a4 4 0 014-4z"/>
+                    <path stroke-linecap="round" d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="voice-wave" aria-hidden="true">
+                <span class="voice-wave-bar"></span>
+                <span class="voice-wave-bar"></span>
+                <span class="voice-wave-bar"></span>
+                <span class="voice-wave-bar"></span>
+                <span class="voice-wave-bar"></span>
+              </div>
+            </div>
+            <div id="voice-transcript-box" class="voice-transcript-box mt-4">
+              <p id="voice-transcript" class="text-[24px] text-gray-400 font-medium leading-snug">
+                «Кофе», «салат цезарь», «бизнес ланч»…
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <footer class="shrink-0 bg-white border-t border-gray-200 px-8 py-6 flex items-stretch gap-6">
+          <button data-action="go-menu" type="button"
+                  class="btn-press shrink-0 bg-white border-2 border-gray-300 text-navy text-[24px] font-bold uppercase tracking-wide px-10 rounded-full min-h-[96px] h-[96px] flex items-center justify-center text-center">
+            В меню
+          </button>
+          <button data-action="voice-apply-search" type="button"
+                  class="btn-press btn-kiosk-pay flex-1 min-w-0 min-h-[96px] h-[96px]">
+            <span class="flex w-full h-full items-center justify-center bg-navy text-white text-[30px] font-bold uppercase tracking-wide rounded-full whitespace-nowrap px-6">
+              В поиск
+            </span>
+          </button>
+          <button data-action="go-cart" type="button"
+                  class="btn-press shrink-0 flex flex-col items-center gap-1 relative">
+            <div class="w-20 h-20 bg-navy rounded-2xl flex items-center justify-center relative">
+              <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.5 5M17 13l2.5 5M9 19a1 1 0 100 2 1 1 0 000-2zm8 0a1 1 0 100 2 1 1 0 000-2z"/>
+              </svg>
+              <span data-cart-badge class="hidden absolute -top-2 -right-2 w-10 h-10 bg-kiosk-red text-white text-[22px] font-bold rounded-full flex items-center justify-center">0</span>
+            </div>
+            <span class="text-[20px] font-semibold text-navy uppercase">Корзина</span>
+          </button>
+        </footer>
+      </div>
+
+      <!-- ═══════════════════ ЭКРАН: КАРТОЧКА ТОВАРА ═══════════════════ -->
+      <div id="screen-product" class="screen flex-col h-full bg-kiosk relative">
+        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <div class="flex-1 flex flex-col min-h-0 px-10 pt-36 pb-0">
+          <div class="flex-1 bg-white rounded-t-3xl rounded-b-3xl p-10 overflow-y-auto kiosk-scroll">
+          <div class="flex gap-10">
+            <div class="shrink-0">
+              <img id="product-image" src="" alt="" class="w-[340px] h-[340px] object-cover rounded-3xl" />
+              <div id="product-cart-action" class="mt-6"></div>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center gap-4 mb-4">
+                <span id="product-category" class="bg-purple-100 text-purple-700 text-[22px] font-semibold px-5 py-2 rounded-full flex items-center gap-2">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z"/></svg>
+                  Категория
+                </span>
+                <span class="bg-green-100 text-green-700 text-[22px] font-semibold px-4 py-2 rounded-full flex items-center gap-1">
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                  0
+                </span>
+              </div>
+              <h1 id="product-title" class="text-[56px] font-bold text-gray-900 leading-tight mb-6">Товар</h1>
+              <div class="flex items-center gap-2 text-[28px] text-gray-600 mb-8">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+                Состав:
+              </div>
+              <p id="product-composition" class="text-[26px] text-gray-500 leading-relaxed mb-10"></p>
+
+              <div class="flex items-center gap-2 text-[24px] text-gray-500 mb-5">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                Пищевая ценность на порцию
+              </div>
+              <div class="grid grid-cols-4 gap-4">
+                <div class="bg-green-50 border border-green-200 rounded-2xl p-5 text-center">
+                  <div class="text-3xl mb-2">🍗</div>
+                  <div class="text-[36px] font-bold text-gray-800">0</div>
+                  <div class="text-[20px] text-gray-500 mt-1">белки</div>
+                </div>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-5 text-center">
+                  <div class="text-3xl mb-2">💧</div>
+                  <div class="text-[36px] font-bold text-gray-800">0</div>
+                  <div class="text-[20px] text-gray-500 mt-1">жиры</div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5 text-center">
+                  <div class="text-3xl mb-2">🌾</div>
+                  <div class="text-[36px] font-bold text-gray-800">0</div>
+                  <div class="text-[20px] text-gray-500 mt-1">углеводы</div>
+                </div>
+                <div class="bg-red-50 border border-red-200 rounded-2xl p-5 text-center">
+                  <div class="text-3xl mb-2">🔥</div>
+                  <div class="text-[36px] font-bold text-gray-800">0</div>
+                  <div class="text-[20px] text-gray-500 mt-1">ккал</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+        <footer class="shrink-0 bg-kiosk px-10 py-8">
+          <button data-action="go-menu"
+                  class="btn-press w-full bg-white border-2 border-gray-300 text-navy text-[32px] font-bold uppercase tracking-wide py-7 rounded-full">
+            В меню
+          </button>
+        </footer>
+      </div>
+
+      <!-- ═══════════════════ ЭКРАН 2: КОРЗИНА ═══════════════════ -->
+      <div id="screen-cart" class="screen flex-col h-full bg-kiosk relative">
+        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <header class="flex items-center px-14 pt-12 pb-8 bg-kiosk shrink-0 pr-[280px]">
+          <h1 class="text-[52px] font-extrabold text-navy uppercase tracking-wide leading-none">Корзина</h1>
+        </header>
+
+        <div class="flex flex-col flex-1 min-h-0 mx-6 mb-2 bg-white rounded-2xl overflow-hidden">
+          <div id="cart-toolbar" class="shrink-0 px-8 pt-6 pb-2 flex justify-end hidden">
+            <button type="button" data-action="clear-cart"
+                    class="btn-press border-2 border-kiosk-red text-kiosk-red text-[24px] font-bold uppercase tracking-wide px-10 py-4 rounded-full whitespace-nowrap">
+              Очистить корзину
+            </button>
+          </div>
+          <div id="cart-items" class="flex-1 overflow-y-auto kiosk-scroll px-8 py-2 min-h-0"></div>
+        </div>
+
+        <div class="bg-kiosk px-14 pt-4 pb-5 shrink-0">
+          <div class="border-t-2 border-gray-300 pt-5">
+            <div data-customer-panel class="customer-bar hidden w-full items-center gap-3 px-5 py-3 mb-4">
+              <svg class="customer-bar-icon" viewBox="0 0 28 20" aria-hidden="true">
+                <rect x="0" y="0" width="28" height="20" rx="3" fill="#22C55E"/>
+                <rect x="0" y="5" width="28" height="5" fill="#86EFAC"/>
+              </svg>
+              <span data-customer-line class="customer-bar-text text-navy min-w-0 flex-1"></span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-[34px] font-extrabold text-navy uppercase tracking-wide">Сумма заказа</span>
+              <span id="cart-total" class="text-[52px] font-extrabold text-navy leading-none">0 ₽</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-kiosk px-14 py-6 shrink-0">
+          <p class="text-[30px] font-extrabold text-navy uppercase tracking-wide mb-5">Также вам могут понадобиться:</p>
+          <div class="flex gap-5">
+            <button data-action="go-menu-category" data-category="disposable"
+                    class="btn-press flex-1 bg-white rounded-2xl py-8 px-4 flex flex-col items-center gap-4 shadow-sm border border-gray-100">
+              <svg class="w-[72px] h-[72px] text-gray-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 64 64">
+                <path d="M18 12h28M22 12v6M42 12v6M14 22h36M20 22v28M44 22v28M26 36h12"/>
+              </svg>
+              <span class="text-[22px] font-bold text-navy text-center leading-tight uppercase">Одноразовая<br/>посуда</span>
+            </button>
+            <button data-action="go-menu-category" data-category="drinks"
+                    class="btn-press flex-1 bg-white rounded-2xl py-8 px-4 flex flex-col items-center gap-4 shadow-sm border border-gray-100">
+              <svg class="w-[72px] h-[72px] text-gray-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 64 64">
+                <path d="M20 14h24l-4 38H24L20 14zM28 14V8h8v6"/>
+              </svg>
+              <span class="text-[22px] font-bold text-navy text-center uppercase">Напитки</span>
+            </button>
+            <button data-action="go-menu-category" data-category="bread"
+                    class="btn-press flex-1 bg-white rounded-2xl py-8 px-4 flex flex-col items-center gap-4 shadow-sm border border-gray-100">
+              <svg class="w-[72px] h-[72px] text-gray-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 64 64">
+                <path d="M12 36c0-12 8-20 20-20s20 8 20 20M16 36h32M20 42h24"/>
+              </svg>
+              <span class="text-[22px] font-bold text-navy text-center uppercase">Хлеб</span>
+            </button>
+          </div>
+        </div>
+
+        <footer class="shrink-0 bg-kiosk px-14 py-8 flex items-stretch gap-5">
+          <button data-action="go-menu"
+                  class="btn-press flex-1 bg-white border-2 border-navy text-navy text-[28px] font-bold uppercase rounded-full flex items-center justify-center text-center pay-footer-btn">
+            В меню
+          </button>
+          <button data-action="try-pay"
+                  class="btn-press btn-kiosk-pay flex-1 pay-footer-btn">
+            <span class="flex w-full h-full items-center justify-center bg-navy text-white text-[28px] font-bold uppercase rounded-full">
+              Оплатить покупку
+            </span>
+          </button>
+        </footer>
+      </div>
+
+      <!-- ═══════════════════ ЭКРАН 3: ОПЛАТА ═══════════════════ -->
+      <div id="screen-payment" class="screen flex-col h-full bg-kiosk relative">
+        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <header class="flex items-center px-14 pt-12 pb-6 shrink-0 pr-[280px]">
+          <h1 class="text-[48px] font-extrabold text-navy uppercase tracking-wide leading-none">Оплатить покупку</h1>
+        </header>
+
+        <div class="flex-1 min-h-0"></div>
+
+        <div class="px-14 pb-8 shrink-0">
+          <div data-customer-panel class="customer-bar hidden w-full items-center gap-3 px-5 py-3 mb-5">
+            <svg class="customer-bar-icon" viewBox="0 0 28 20" aria-hidden="true">
+              <rect x="0" y="0" width="28" height="20" rx="3" fill="#22C55E"/>
+              <rect x="0" y="5" width="28" height="5" fill="#86EFAC"/>
+            </svg>
+            <span data-customer-line class="customer-bar-text text-navy min-w-0 flex-1"></span>
+          </div>
+          <div class="flex justify-between items-baseline text-[32px] text-navy font-semibold mb-5">
+            <span class="uppercase tracking-wide">Сумма заказа</span>
+            <span id="pay-subtotal" class="font-extrabold">0 ₽</span>
+          </div>
+          <div id="pay-upsell-row" class="hidden flex justify-between text-[28px] text-gray-500 mb-5">
+            <span>Пакет</span>
+            <span>+50 ₽</span>
+          </div>
+          <div class="flex justify-between items-baseline text-[36px] text-navy font-extrabold mb-6">
+            <span class="uppercase tracking-wide">Итого к оплате</span>
+            <span id="pay-total">0 ₽</span>
+          </div>
+          <hr class="border-t-2 border-gray-400 mb-8" />
+
+          <div class="flex flex-col gap-5 mb-8">
+            <button data-action="pay-subsidy"
+                    class="btn-press btn-kiosk-pay w-full">
+              <span class="block w-full bg-pay-red text-white text-[30px] font-bold uppercase py-8 rounded-full text-center tracking-wide">
+                Оплатить картой дотации
+              </span>
+            </button>
+            <button data-action="pay-bank"
+                    class="btn-press btn-kiosk-pay w-full">
+              <span class="block w-full bg-navy text-white text-[30px] font-bold uppercase py-8 rounded-full text-center tracking-wide">
+                Оплатить банковской картой
+              </span>
+            </button>
+            <button type="button" data-action="toggle-print-receipt"
+                    class="btn-press flex items-center justify-center gap-5 bg-white border-2 border-gray-300 text-navy text-[28px] font-bold uppercase py-7 rounded-full w-full">
+              <span id="print-receipt-indicator"
+                    class="w-9 h-9 rounded border-2 border-navy bg-navy text-white flex items-center justify-center shrink-0 text-[22px] leading-none">✓</span>
+              Печать чека
+            </button>
+          </div>
+
+          <div class="flex items-stretch gap-5 pb-4">
+            <button data-action="go-menu"
+                    class="btn-press flex-1 bg-white border-2 border-navy text-navy text-[26px] font-bold uppercase rounded-full flex items-center justify-center pay-footer-btn">
+              В меню
+            </button>
+            <button data-action="cancel-order"
+                    class="btn-press flex-1 bg-white border-2 border-kiosk-red text-kiosk-red text-[26px] font-bold uppercase rounded-full flex items-center justify-center pay-footer-btn">
+              Отменить покупку
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ ПОП-АП: ВЫБОР ТОВАРА (ГОЛОС) ═══════════════════ -->
+      <div id="modal-voice-choice" class="hidden absolute inset-0 z-[110] flex items-center justify-center bg-black/50">
+        <div class="modal-voice-choice mx-8">
+          <div class="voice-choice-panel">
+            <div class="voice-choice-header">
+              <div class="min-w-0 text-left">
+                <p id="voice-choice-title" class="voice-choice-title"></p>
+                <p id="voice-choice-subtitle" class="voice-choice-subtitle"></p>
+              </div>
+            </div>
+            <div id="voice-choice-list" class="voice-choice-list kiosk-scroll"></div>
+            <div class="voice-choice-footer">
+              <button data-action="voice-choice-dismiss" type="button"
+                      class="btn-press voice-choice-done-btn">
+                Готово
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ ПОП-АП: ДОКУПИТЬ ПАКЕТ ═══════════════════ -->
+      <div id="modal-upsell" class="hidden absolute inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="modal-panel bg-white rounded-3xl mx-12 p-10 shadow-2xl">
+          <div class="modal-panel-body text-center">
+            <div class="flex justify-center mb-8">
+              <img src="assets/paket.png" alt="Пакет" class="h-[240px] w-auto object-contain" />
+            </div>
+            <h2 class="text-[44px] font-extrabold text-navy text-center leading-tight mb-4">
+              Добавить пакет?
+            </h2>
+            <p class="text-[28px] text-gray-500 text-center leading-relaxed">
+              Многие гости берут пакет<br/>для переноски еды
+            </p>
+          </div>
+          <div class="modal-panel-footer flex flex-col gap-5">
+            <button data-action="upsell-add"
+                    class="btn-press bg-navy text-white text-[32px] font-bold uppercase py-7 rounded-full">
+              Добавить пакет — 50 ₽
+            </button>
+            <button data-action="upsell-skip"
+                    class="btn-press bg-white border-2 border-gray-300 text-gray-600 text-[30px] font-bold uppercase py-7 rounded-full">
+              Пропустить
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ ЭКРАН: ОПЛАТА УСПЕШНА ═══════════════════ -->
+      <div id="screen-pay-success" class="screen flex-col h-full bg-kiosk relative">
+        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <div class="flex-1 flex flex-col items-center justify-center px-14 gap-14">
+          <h1 class="text-[52px] font-extrabold text-navy uppercase text-center leading-tight tracking-wide">
+            Оплата прошла успешно!
+          </h1>
+          <div class="w-[120px] h-[120px] rounded-full bg-[#4CAF50] flex items-center justify-center">
+            <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" stroke-width="4" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+        </div>
+
+        <footer class="px-14 pb-10 shrink-0">
+          <button data-action="pay-success-done" type="button"
+                  class="btn-press w-full bg-navy text-white text-[32px] font-bold uppercase py-8 rounded-full tracking-wide">
+            Готово
+          </button>
+        </footer>
+      </div>
+
+      <!-- ═══════════════════ ЭКРАН: ОЦЕНКА СЕРВИСА ═══════════════════ -->
+      <div id="screen-rating" class="screen flex-col h-full bg-kiosk relative">
+        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <div class="flex-1 flex flex-col items-center justify-center px-16 gap-16">
+          <h1 class="text-[42px] font-semibold text-navy text-center tracking-wide">Оцените наш сервис</h1>
+          <div class="flex items-start justify-center gap-10 w-full max-w-[920px]">
+            <button data-action="submit-rating" data-rating="4" type="button"
+                    class="rating-emoji btn-press flex flex-col items-center gap-4 flex-1 max-w-[200px]">
+              <span class="w-[120px] h-[120px] rounded-full border-[5px] border-[#4CAF50] flex items-center justify-center text-[64px] leading-none bg-white">😄</span>
+              <span class="text-[22px] font-medium text-navy text-center leading-tight">очень<br/>доволен</span>
+            </button>
+            <button data-action="submit-rating" data-rating="3" type="button"
+                    class="rating-emoji btn-press flex flex-col items-center gap-4 flex-1 max-w-[200px]">
+              <span class="w-[120px] h-[120px] rounded-full border-[5px] border-[#8BC34A] flex items-center justify-center text-[64px] leading-none bg-white">🙂</span>
+              <span class="text-[22px] font-medium text-navy text-center leading-tight">доволен</span>
+            </button>
+            <button data-action="submit-rating" data-rating="2" type="button"
+                    class="rating-emoji btn-press flex flex-col items-center gap-4 flex-1 max-w-[200px]">
+              <span class="w-[120px] h-[120px] rounded-full border-[5px] border-[#FF9800] flex items-center justify-center text-[64px] leading-none bg-white">😐</span>
+              <span class="text-[22px] font-medium text-navy text-center leading-tight">не<br/>доволен</span>
+            </button>
+            <button data-action="submit-rating" data-rating="1" type="button"
+                    class="rating-emoji btn-press flex flex-col items-center gap-4 flex-1 max-w-[200px]">
+              <span class="w-[120px] h-[120px] rounded-full border-[5px] border-[#F44336] flex items-center justify-center text-[64px] leading-none bg-white">☹️</span>
+              <span class="text-[22px] font-medium text-navy text-center leading-tight">очень<br/>недоволен</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ ПОП-АП: ОПЛАТА НА ТЕРМИНАЛЕ ═══════════════════ -->
+      <div id="modal-terminal-pay" class="hidden absolute inset-0 z-[100] flex items-center justify-center bg-black/50">
+        <div class="modal-panel bg-[#E8E8E8] rounded-3xl mx-12 p-10 shadow-2xl text-center">
+          <div class="modal-panel-body">
+            <h2 class="text-[34px] font-extrabold text-black uppercase leading-snug tracking-wide mb-4">
+              Следуйте инструкциям<br/>на терминале
+            </h2>
+            <p class="text-[22px] text-gray-600 mb-6 leading-relaxed">
+              Приложите карту справа.<br/>
+              Чтобы прервать операцию, нажмите «отмена» на терминале
+            </p>
+            <div class="flex justify-center mb-6">
+              <img src="assets/sber-terminal.png" alt="Терминал Сбер" class="h-[320px] w-auto max-w-full object-contain" />
+            </div>
+            <p class="text-[28px] font-semibold text-black mb-2">Стоимость покупки</p>
+            <p id="terminal-pay-total" class="text-[56px] font-extrabold text-black leading-none">0 ₽</p>
+            <p id="terminal-pay-error" class="hidden text-[22px] font-semibold text-kiosk-red mt-4 leading-snug"></p>
+          </div>
+          <div class="modal-panel-footer flex gap-5">
+            <button data-action="confirm-terminal-pay" type="button"
+                    class="btn-press flex-1 bg-navy text-white text-[28px] font-bold uppercase py-6 rounded-full">
+              ОК
+            </button>
+            <button data-action="cancel-terminal-pay" type="button"
+                    class="btn-press flex-1 bg-white border-2 border-gray-400 text-gray-700 text-[28px] font-bold uppercase py-6 rounded-full">
+              Отмена
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ ПОП-АП: КАРТА КЛИЕНТА ═══════════════════ -->
+      <div id="modal-customer-card" class="hidden absolute inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div class="modal-panel bg-[#E8E8E8] rounded-3xl mx-12 p-10 shadow-2xl text-center">
+          <div class="modal-panel-body">
+            <h2 class="text-[34px] font-extrabold text-black uppercase leading-snug tracking-wide mb-4">
+              Чтобы авторизоваться<br/>приложите карту
+            </h2>
+            <div class="flex justify-center mt-8 mb-6">
+              <img src="assets/card.png" alt="" class="h-[320px] w-auto max-w-full object-contain" />
+            </div>
+          </div>
+          <div class="modal-panel-footer flex gap-5">
+            <button data-action="apply-customer" type="button"
+                    class="btn-press flex-1 bg-navy text-white text-[28px] font-bold uppercase py-6 rounded-full">
+              ОК
+            </button>
+            <button data-action="cancel-customer-card" type="button"
+                    class="btn-press flex-1 bg-white border-2 border-gray-400 text-gray-700 text-[28px] font-bold uppercase py-6 rounded-full">
+              Отмена
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ ПОП-АП: ЧЕК НА EMAIL (КЛИЕНТ) ═══════════════════ -->
+      <div id="modal-receipt-customer" class="hidden absolute inset-0 z-[100] flex items-center justify-center bg-black/50">
+        <div class="modal-panel bg-white rounded-3xl mx-12 p-10 shadow-2xl text-center">
+          <div class="modal-panel-body">
+            <div class="text-6xl mb-6">📧</div>
+            <p class="text-[32px] text-navy font-semibold leading-relaxed">
+              Чек будет отправлен на<br/>
+              <span id="receipt-customer-email" class="font-extrabold"></span>
+            </p>
+          </div>
+          <div class="modal-panel-footer">
+            <button data-action="confirm-receipt-customer" type="button"
+                    class="btn-press w-full bg-navy text-white text-[30px] font-bold uppercase py-6 rounded-full">
+              ОК
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════════ ПОП-АП: ЧЕК НА EMAIL (ГОСТЬ) ═══════════════════ -->
+      <div id="modal-receipt-email" class="hidden absolute inset-0 z-[100] flex items-center justify-center bg-black/50">
+        <div class="modal-panel bg-white rounded-3xl mx-12 p-10 shadow-2xl">
+          <div class="modal-panel-body justify-start">
+            <h2 class="text-[36px] font-extrabold text-navy text-center leading-tight mb-6">
+              Введите адрес электронной почты<br/>для отправки чека
+            </h2>
+            <div id="receipt-email-input"
+                 class="w-full bg-gray-100 border-2 border-gray-300 rounded-2xl px-6 py-5 text-[28px] font-semibold text-navy mb-6 min-h-[72px] break-all">
+            </div>
+            <div id="email-keyboard" class="flex flex-col gap-2 w-full"></div>
+          </div>
+          <div class="modal-panel-footer flex gap-5">
+            <button data-action="confirm-receipt-email" type="button"
+                    class="btn-press flex-1 bg-navy text-white text-[28px] font-bold uppercase py-6 rounded-full">
+              ОК
+            </button>
+            <button data-action="cancel-receipt-email" type="button"
+                    class="btn-press flex-1 bg-white border-2 border-gray-400 text-gray-700 text-[28px] font-bold uppercase py-6 rounded-full">
+              Отмена
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /kiosk -->
+  </div><!-- /wrapper -->
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
+import { ORDER_STATUS, ORDER_SOURCE, PAYMENT_STATUS } from '../../shared/schema.js';
 
 const STATUS_LABELS = {
   [ORDER_STATUS.PENDING]: 'Ожидает',
@@ -25,6 +25,19 @@ export function orderStatusBadgeClass(status) {
 
 export function paymentStatusLabel(status) {
   return status === PAYMENT_STATUS.PAID ? 'Оплачен' : 'Не оплачен';
+}
+
+/** @param {string | undefined} source */
+export function orderSalesChannelLabel(source) {
+  const src = source || ORDER_SOURCE.WEB;
+  if (src === ORDER_SOURCE.KIOSK) return 'Киоск';
+  return 'Веб';
+}
+
+/** @param {string | undefined} source */
+export function orderSalesChannelBadgeClass(source) {
+  const src = source || ORDER_SOURCE.WEB;
+  return src === ORDER_SOURCE.KIOSK ? 'orders-source-badge--kiosk' : 'orders-source-badge--web';
 }
 
 export function orderTotal(items = []) {

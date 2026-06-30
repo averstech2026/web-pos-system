@@ -1,20 +1,28 @@
 import { bindAdminShell, renderAdminShell } from '../components/layout.js';
 import {
   openBulkAllergensModal,
+  openBulkArchiveModal,
   openBulkAvailabilityModal,
   openBulkGroupModal,
+  openBulkScheduleModal,
+  openBulkUnarchiveModal,
 } from '../components/bulk-operations-modals.js';
 import { openItemFormModal } from '../components/item-form-modal.js';
 import { fetchMenuSettings } from '../services/menu-settings-data.js';
 import {
+  bulkArchiveItems,
+  bulkUnarchiveItems,
   bulkSetAllergens,
-  bulkSetAvailability,
+  bulkSetAvailabilityRule,
+  bulkSetChannelVisibility,
+  channelFlagsFromMode,
+  ITEM_CHANNEL_MODES,
   bulkSetCategory,
   collectCategories,
-  archiveItem,
   fetchAllItems,
   filterItems,
-  setItemAvailability,
+  isItemVisibleInKiosk,
+  isItemVisibleInWeb,
 } from '../services/products-data.js';
 import { fmtCount, fmtMoney } from '../utils/format.js';
 import { productThumbHtml } from '../utils/product-image.js';
@@ -24,10 +32,9 @@ import { formatAvailabilityRuleShort, buildGroupsByName, matchesScheduleFilter }
 import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
 import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
 
-const AVAILABILITY_OPTIONS = [
+const CHANNEL_FILTER_TABS = [
   { id: 'all', label: 'Все' },
-  { id: 'available', label: 'В продаже' },
-  { id: 'hidden', label: 'Скрытые' },
+  ...ITEM_CHANNEL_MODES,
 ];
 
 export class ProductsPage {
@@ -47,12 +54,12 @@ export class ProductsPage {
     this.allergenFilters = [];
     this.allergenDropdownOpen = false;
     this.search = '';
-    this.availabilityFilter = 'all';
+    this.channelFilter = 'all';
     this.scheduleFilter = 'all';
+    this.showArchived = false;
     this.groupsByName = new Map();
     this.loading = true;
     this.error = null;
-    this.savingId = null;
     this.handleFilterDropdownOutside = this.handleFilterDropdownOutside.bind(this);
     this._onContainerClick = this._onContainerClick.bind(this);
     this._onContainerInput = this._onContainerInput.bind(this);
@@ -94,13 +101,16 @@ export class ProductsPage {
   }
 
   filteredItems() {
-    let result = this.items.filter(i => i.isArchived !== true);
+    let result = this.items;
+    if (!this.showArchived) {
+      result = result.filter(i => i.isArchived !== true);
+    }
 
     result = filterItems(result, {
       categories: this.categoryFilters,
       allergens: this.allergenFilters,
       search: this.search,
-      availability: this.availabilityFilter,
+      channel: this.channelFilter,
     });
 
     if (this.scheduleFilter !== 'all') {
@@ -116,7 +126,8 @@ export class ProductsPage {
       || this.categoryFilters.length
       || this.allergenFilters.length
       || this.scheduleFilter !== 'all'
-      || this.availabilityFilter !== 'all',
+      || this.channelFilter !== 'all'
+      || this.showArchived,
     );
   }
 
@@ -125,12 +136,15 @@ export class ProductsPage {
     this.categoryFilters = [];
     this.allergenFilters = [];
     this.scheduleFilter = 'all';
-    this.availabilityFilter = 'all';
+    this.channelFilter = 'all';
+    this.showArchived = false;
     this.closeFilterDropdowns();
     const searchInput = this.container.querySelector('#products-search');
     if (searchInput) searchInput.value = '';
     const scheduleSelect = this.container.querySelector('#products-schedule-filter');
     if (scheduleSelect) scheduleSelect.value = 'all';
+    const archivedCheck = this.container.querySelector('#products-show-archived');
+    if (archivedCheck) archivedCheck.checked = false;
     this.renderShell();
   }
 
@@ -160,11 +174,18 @@ export class ProductsPage {
 
   categoryFilterSummary() {
     const selected = this.categoryFilters;
-    if (!selected.length) return 'Все категории';
+    if (!selected.length) return 'Все группы';
     if (selected.length === 1) return selected[0];
     if (selected.length === 2) return selected.join(', ');
     const n = selected.length;
-    return `${n} категории`;
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    const word = mod10 === 1 && mod100 !== 11
+      ? 'группа'
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+        ? 'группы'
+        : 'групп';
+    return `${n} ${word}`;
   }
 
   allergenLabels(ids = []) {
@@ -334,6 +355,29 @@ export class ProductsPage {
     this.syncBulkUi();
   }
 
+  selectedArchivedItems() {
+    return this.selectedItems().filter(i => i.isArchived === true);
+  }
+
+  selectedActiveItems() {
+    return this.selectedItems().filter(i => i.isArchived !== true);
+  }
+
+  renderBulkActions() {
+    const archivedCount = this.selectedArchivedItems().length;
+    const activeCount = this.selectedActiveItems().length;
+    const disabled = this.bulkSaving ? 'disabled' : '';
+
+    return `
+      <button type="button" class="btn btn-outline btn-press products-bulk-btn" data-bulk-action="group" ${disabled}>Изменить группу</button>
+      <button type="button" class="btn btn-outline btn-press products-bulk-btn" data-bulk-action="allergens" ${disabled}>Указать аллергены</button>
+      <button type="button" class="btn btn-outline btn-press products-bulk-btn" data-bulk-action="availability" ${disabled}>Доступность</button>
+      <button type="button" class="btn btn-outline btn-press products-bulk-btn" data-bulk-action="schedule" ${disabled}>Расписание</button>
+      ${activeCount ? `<button type="button" class="btn btn-outline btn-press products-bulk-btn products-bulk-btn--danger" data-bulk-action="archive" ${disabled}>В архив</button>` : ''}
+      ${archivedCount ? `<button type="button" class="btn btn-outline btn-press products-bulk-btn products-bulk-btn--restore" data-bulk-action="unarchive" ${disabled}>Из архива</button>` : ''}
+    `;
+  }
+
   renderBulkBar() {
     const count = this.selectedIds.size;
     const visible = count > 0;
@@ -342,9 +386,7 @@ export class ProductsPage {
       <div class="products-bulk-bar ${visible ? 'products-bulk-bar--visible' : ''}" role="toolbar" aria-label="Массовые действия" aria-hidden="${visible ? 'false' : 'true'}">
         <span class="products-bulk-count">Выбрано товаров: ${fmtCount(count)}</span>
         <div class="products-bulk-actions">
-          <button type="button" class="btn btn-outline btn-press products-bulk-btn" data-bulk-action="group" ${this.bulkSaving ? 'disabled' : ''}>Изменить группу</button>
-          <button type="button" class="btn btn-outline btn-press products-bulk-btn" data-bulk-action="allergens" ${this.bulkSaving ? 'disabled' : ''}>Указать аллергены</button>
-          <button type="button" class="btn btn-outline btn-press products-bulk-btn" data-bulk-action="availability" ${this.bulkSaving ? 'disabled' : ''}>Статус продажи</button>
+          ${this.renderBulkActions()}
         </div>
         <button type="button" class="products-bulk-dismiss btn-press" data-bulk-action="clear" aria-label="Снять выделение" ${this.bulkSaving ? 'disabled' : ''}>✕</button>
       </div>
@@ -407,34 +449,63 @@ export class ProductsPage {
     `;
   }
 
+  renderChannelFilterTabs() {
+    return `
+      <div class="products-availability-inline" role="group" aria-label="Фильтр по доступности">
+        <span class="products-filter-label products-filter-label--inline">Доступность:</span>
+        <div class="period-tabs products-channel-tabs" role="tablist">
+          ${CHANNEL_FILTER_TABS.map(o => `
+            <button
+              type="button"
+              class="period-tab btn-press ${this.channelFilter === o.id ? 'period-tab--active' : ''}"
+              data-channel-filter="${o.id}"
+              role="tab"
+              aria-selected="${this.channelFilter === o.id}"
+            >${esc(o.label)}</button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  renderArchivedToggle() {
+    return `
+      <label class="avr-active-toggle products-archived-toggle mkb-status-toggle" title="${this.showArchived ? 'Скрыть архивные' : 'Показать архивные'}">
+        <input type="checkbox" id="products-show-archived" ${this.showArchived ? 'checked' : ''} />
+        <span class="avr-switch" aria-hidden="true"></span>
+        <span class="avr-active-label products-archived-label">${this.showArchived ? 'Включая архивные' : 'Без архивных'}</span>
+      </label>
+    `;
+  }
+
   renderFilters() {
     return `
       <section class="products-filters card">
-        <div class="products-filters-primary">
-          <div class="products-filter-inline products-filter-search">
+        <div class="products-filters-row products-filters-row--data">
+          <div class="products-filter-field products-filter-field--search">
             <span class="products-filter-label">Поиск</span>
             <input
               type="search"
-              class="products-search-input"
+              class="products-search-input products-filter-control"
               id="products-search"
               placeholder="Название или описание…"
               value="${escAttr(this.search)}"
             />
           </div>
 
-          <div class="products-filter-inline">
-            <span class="products-filter-label">Категория</span>
+          <div class="products-filter-field products-filter-field--group">
+            <span class="products-filter-label">Группа</span>
             ${this.renderCategoryDropdown()}
           </div>
 
-          <div class="products-filter-inline">
+          <div class="products-filter-field products-filter-field--allergens">
             <span class="products-filter-label">Аллергены</span>
             ${this.renderAllergenDropdown()}
           </div>
 
-          <div class="products-filter-inline products-filter-schedule">
+          <div class="products-filter-field products-filter-field--schedule">
             <span class="products-filter-label">Расписание</span>
-            <select class="products-schedule-select" id="products-schedule-filter" aria-label="Фильтр по расписанию">
+            <select class="products-schedule-select products-filter-control" id="products-schedule-filter" aria-label="Фильтр по расписанию">
               <option value="all" ${this.scheduleFilter === 'all' ? 'selected' : ''}>Все</option>
               <option value="none" ${this.scheduleFilter === 'none' ? 'selected' : ''}>Доступно всегда (Без ограничений)</option>
               ${this.availabilityRules.map(r => `
@@ -443,28 +514,22 @@ export class ProductsPage {
             </select>
           </div>
 
-          ${renderFiltersResetBtn(this.hasActiveFilters())}
+          <div class="products-filters-reset-wrap">
+            ${renderFiltersResetBtn(this.hasActiveFilters())}
+          </div>
         </div>
 
-        <div class="products-filters-toolbar">
-          <div class="admin-filters-toolbar-left">
-            <button type="button" class="btn btn-primary btn-press products-create-btn" id="products-create-btn">
-              + Добавить
-            </button>
+        <div class="products-filters-row products-filters-row--controls">
+          <button type="button" class="btn btn-primary btn-press orders-create-btn products-create-btn" id="products-create-btn">
+            + Добавить
+          </button>
 
-            <div class="products-filter-inline">
-              <span class="products-filter-label">Доступность</span>
-              <div class="products-chip-group">
-                ${AVAILABILITY_OPTIONS.map(o => `
-                  <button type="button" class="products-chip btn-press ${this.availabilityFilter === o.id ? 'products-chip--active' : ''}" data-availability="${o.id}">${o.label}</button>
-                `).join('')}
-              </div>
-            </div>
+          <div class="products-filters-controls-group">
+            ${this.renderChannelFilterTabs()}
+            ${this.renderArchivedToggle()}
           </div>
 
-          <div class="admin-filters-toolbar-right">
-            <span class="admin-filters-count">Найдено <span class="products-count">${this.itemsCountText()}</span></span>
-          </div>
+          <span class="admin-filters-count products-filters-count">Найдено <span class="products-count">${this.itemsCountText()}</span></span>
         </div>
       </section>
     `;
@@ -501,8 +566,9 @@ export class ProductsPage {
               <th>Категория</th>
               <th class="products-th-num">Цена</th>
               <th class="products-th-num">Ккал</th>
-              <th>Доступность</th>
-              <th class="products-th-actions">Действия</th>
+              <th class="products-th-channel">В Вебе</th>
+              <th class="products-th-channel">На Киоске</th>
+              <th class="products-th-archived">В архиве</th>
             </tr>
           </thead>
           <tbody>
@@ -513,16 +579,26 @@ export class ProductsPage {
     `;
   }
 
+  renderChannelStatus(active, channelLabel) {
+    return `
+      <span class="products-channel-status" title="${active ? `Активен: ${channelLabel}` : `Не отображается: ${channelLabel}`}">
+        <span class="prm-row-status ${active ? 'prm-row-status--on' : 'prm-row-status--off'}" aria-hidden="true"></span>
+        ${active ? '<span class="products-channel-label">Активен</span>' : '<span class="products-channel-label products-channel-label--off">—</span>'}
+      </span>
+    `;
+  }
+
   renderRow(item) {
     const nutrition = resolveItemNutrition(item);
-    const available = item.isAvailable !== false;
-    const isSaving = this.savingId === item.id;
+    const visibleInWeb = isItemVisibleInWeb(item);
+    const visibleInKiosk = isItemVisibleInKiosk(item);
+    const archived = item.isArchived === true;
     const allergenText = this.allergenLabels(item.allergens);
     const rule = item.availabilityRuleId ? this.rulesMap.get(item.availabilityRuleId) : null;
     const scheduleText = rule ? formatAvailabilityRuleShort(rule) : '';
 
     return `
-      <tr class="orders-row products-row ${this.selectedIds.has(item.id) ? 'products-row--selected' : ''}" data-item-id="${item.id}" tabindex="0">
+      <tr class="orders-row products-row ${archived ? 'products-row--archived' : ''} ${this.selectedIds.has(item.id) ? 'products-row--selected' : ''}" data-item-id="${item.id}" tabindex="0">
         <td class="products-td-check" data-stop-row="1">
           <input
             type="checkbox"
@@ -542,24 +618,10 @@ export class ProductsPage {
         <td><span class="products-category">${esc(item.category || '—')}</span></td>
         <td class="products-td-num">${fmtMoney(item.price)}</td>
         <td class="products-td-num">${nutrition?.kcal ?? '—'}</td>
-        <td class="products-td-avail" data-stop-row="1">
-          <button
-            type="button"
-            class="products-avail-toggle btn-press ${available ? 'products-avail-toggle--on' : ''}"
-            data-action="toggle-avail"
-            data-item-id="${item.id}"
-            aria-pressed="${available}"
-            ${isSaving ? 'disabled' : ''}
-          >
-            <span class="products-avail-knob" aria-hidden="true"></span>
-            <span class="products-avail-label">${available ? 'В продаже' : 'Скрыт'}</span>
-          </button>
-        </td>
-        <td class="products-td-actions" data-stop-row="1">
-          <div class="products-actions-inner">
-            <button type="button" class="products-action btn-press" data-action="edit" data-item-id="${item.id}">Изменить</button>
-            <button type="button" class="products-action products-action--danger btn-press" data-action="archive" data-item-id="${item.id}">В архив</button>
-          </div>
+        <td class="products-td-channel">${this.renderChannelStatus(visibleInWeb, 'Личный кабинет')}</td>
+        <td class="products-td-channel">${this.renderChannelStatus(visibleInKiosk, 'Киоск')}</td>
+        <td class="products-td-archived">
+          <span class="products-archived-flag ${archived ? 'products-archived-flag--yes' : ''}">${archived ? 'Да' : 'Нет'}</span>
         </td>
       </tr>
     `;
@@ -608,6 +670,21 @@ export class ProductsPage {
       this.categoryFilters = this.categoryFilters.filter(c => this.filterCategories().includes(c));
       this.closeFilterDropdowns();
       this.renderShell();
+      return;
+    }
+
+    if (e.target.id === 'products-show-archived') {
+      this.showArchived = e.target.checked;
+      const label = this.container.querySelector('.products-archived-label');
+      const toggle = e.target.closest('.products-archived-toggle');
+      if (label) {
+        label.textContent = e.target.checked ? 'Включая архивные' : 'Без архивных';
+      }
+      if (toggle) {
+        toggle.title = e.target.checked ? 'Скрыть архивные' : 'Показать архивные';
+      }
+      this.closeFilterDropdowns();
+      this.refreshTable();
       return;
     }
 
@@ -702,17 +779,18 @@ export class ProductsPage {
 
     if (e.target.closest('#products-schedule-filter')) return;
 
-    const bulkAction = e.target.closest('[data-bulk-action]');
-    if (bulkAction) {
-      this.handleBulkAction(bulkAction.dataset.bulkAction);
+    const channelTab = e.target.closest('[data-channel-filter]');
+    if (channelTab) {
+      this.channelFilter = channelTab.dataset.channelFilter || 'all';
+      this.closeFilterDropdowns();
+      this.syncChannelFilterTabs();
+      this.refreshTable();
       return;
     }
 
-    const availBtn = e.target.closest('[data-availability]');
-    if (availBtn) {
-      this.availabilityFilter = availBtn.dataset.availability;
-      this.closeFilterDropdowns();
-      this.renderShell();
+    const bulkAction = e.target.closest('[data-bulk-action]');
+    if (bulkAction) {
+      this.handleBulkAction(bulkAction.dataset.bulkAction);
       return;
     }
 
@@ -726,37 +804,26 @@ export class ProductsPage {
           categories: this.categories,
           allergens: this.allergens,
           onSaved: () => this.loadData(),
+          onArchived: id => {
+            this.items = this.items.filter(i => i.id !== id);
+            this.selectedIds.delete(id);
+            this.refreshTable();
+            showToast('Товар перемещён в архив');
+          },
         });
       }
-      return;
     }
+  }
 
-    const actionBtn = e.target.closest('[data-action]');
-    if (!actionBtn) return;
+  syncChannelFilterTabs() {
+    const page = this.container.querySelector('.products-page');
+    if (!page) return;
 
-    const itemId = actionBtn.dataset.itemId;
-    const item = this.items.find(i => i.id === itemId);
-    if (!item) return;
-
-    if (actionBtn.dataset.action === 'edit') {
-      this.openItemModal({
-        item,
-        categories: this.categories,
-        allergens: this.allergens,
-        onSaved: () => this.loadData(),
-      });
-      return;
-    }
-
-    if (actionBtn.dataset.action === 'archive') {
-      if (!confirm(`Переместить «${item.name}» в архив? Товар исчезнет из меню, но останется в истории заказов.`)) return;
-      this.archiveItem(itemId);
-      return;
-    }
-
-    if (actionBtn.dataset.action === 'toggle-avail') {
-      this.toggleAvailability(item);
-    }
+    page.querySelectorAll('[data-channel-filter]').forEach(btn => {
+      const active = btn.dataset.channelFilter === this.channelFilter;
+      btn.classList.toggle('period-tab--active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
   }
 
   refreshTable() {
@@ -789,9 +856,9 @@ export class ProductsPage {
       bar.setAttribute('aria-hidden', visible ? 'false' : 'true');
       const countEl = bar.querySelector('.products-bulk-count');
       if (countEl) countEl.textContent = `Выбрано товаров: ${fmtCount(count)}`;
-      bar.querySelectorAll('.products-bulk-btn, .products-bulk-dismiss').forEach(btn => {
-        btn.disabled = this.bulkSaving;
-      });
+      const actions = bar.querySelector('.products-bulk-actions');
+      if (actions) actions.innerHTML = this.renderBulkActions();
+      bar.querySelector('.products-bulk-dismiss')?.toggleAttribute('disabled', this.bulkSaving);
     }
 
     const selectAll = page.querySelector('#products-select-all');
@@ -858,10 +925,74 @@ export class ProductsPage {
     if (action === 'availability') {
       this.closeFilterDropdowns();
       openBulkAvailabilityModal({
-        onApply: async isAvailable => {
+        modes: ITEM_CHANNEL_MODES,
+        onApply: async mode => {
           await this.runBulkUpdate(async () => {
-            const n = await bulkSetAvailability([...this.selectedIds], isAvailable);
-            for (const item of selected) item.isAvailable = isAvailable;
+            const flags = channelFlagsFromMode(mode);
+            const n = await bulkSetChannelVisibility([...this.selectedIds], mode);
+            for (const item of selected) Object.assign(item, flags);
+            return n;
+          });
+        },
+      });
+      return;
+    }
+
+    if (action === 'schedule') {
+      this.closeFilterDropdowns();
+      openBulkScheduleModal({
+        availabilityRules: this.availabilityRules,
+        onApply: async ruleId => {
+          await this.runBulkUpdate(async () => {
+            const n = await bulkSetAvailabilityRule([...this.selectedIds], ruleId);
+            for (const item of selected) {
+              item.availabilityRuleId = ruleId || null;
+            }
+            return n;
+          });
+        },
+      });
+      return;
+    }
+
+    if (action === 'archive') {
+      const active = this.selectedActiveItems();
+      if (!active.length) {
+        showToast('Среди выбранных нет активных товаров');
+        return;
+      }
+      this.closeFilterDropdowns();
+      openBulkArchiveModal({
+        count: active.length,
+        onApply: async () => {
+          const ids = active.map(i => i.id);
+          await this.runBulkUpdate(async () => {
+            const n = await bulkArchiveItems(ids);
+            for (const item of active) {
+              item.isArchived = true;
+              item.isAvailable = false;
+            }
+            return n;
+          });
+        },
+      });
+      return;
+    }
+
+    if (action === 'unarchive') {
+      const archived = this.selectedArchivedItems();
+      if (!archived.length) {
+        showToast('Среди выбранных нет архивных товаров');
+        return;
+      }
+      this.closeFilterDropdowns();
+      openBulkUnarchiveModal({
+        count: archived.length,
+        onApply: async () => {
+          const ids = archived.map(i => i.id);
+          await this.runBulkUpdate(async () => {
+            const n = await bulkUnarchiveItems(ids);
+            for (const item of archived) item.isArchived = false;
             return n;
           });
         },
@@ -884,36 +1015,6 @@ export class ProductsPage {
     } finally {
       this.bulkSaving = false;
       this.syncBulkUi();
-    }
-  }
-
-  async toggleAvailability(item) {
-    const next = item.isAvailable === false;
-    this.savingId = item.id;
-    this.refreshTable();
-
-    try {
-      await setItemAvailability(item.id, next);
-      item.isAvailable = next;
-    } catch (err) {
-      console.error('[products] toggle', err);
-      alert(err.message || 'Не удалось изменить доступность');
-    } finally {
-      this.savingId = null;
-      this.refreshTable();
-    }
-  }
-
-  async archiveItem(id) {
-    try {
-      await archiveItem(id);
-      this.items = this.items.filter(i => i.id !== id);
-      this.selectedIds.delete(id);
-      this.refreshTable();
-      showToast('Товар перемещён в архив');
-    } catch (err) {
-      console.error('[products] archive', err);
-      alert(err.message || 'Не удалось переместить товар в архив');
     }
   }
 

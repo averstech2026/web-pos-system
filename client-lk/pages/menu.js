@@ -1,16 +1,24 @@
 import { auth, db } from '../../shared/firebase.js';
 import {
-  collection, doc, getDoc, getDocs, addDoc, query, where,
+  collection, doc, getDoc, getDocs, addDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { COL, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
+import { COL, ORDER_STATUS, PAYMENT_STATUS, ORDER_SOURCE } from '../../shared/schema.js';
 import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-images.js';
 import { cart } from '../store.js';
 import { openItemDetailModal } from '../components/item-detail.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { filterActiveRules, isMenuItemAvailableAt, normalizeAvailabilityRuleDoc } from '../../shared/availability-rules.js';
 import { normalizePromoRuleDoc } from '../../shared/promo-rules.js';
-import { mergeCategoryGroups } from '../../shared/menu-catalog.js';
+import { filterWebVisibleCategoryGroups, mergeCategoryGroups, sortCategoryGroupsByChannel } from '../../shared/menu-catalog.js';
+import { fetchWebMenuItems } from '../../shared/menu-items-data.js';
+import { fetchMarketingBannersForLk } from '../services/marketing-banners-data.js';
+import { getStoredLocationId } from '../../shared/marketing-banners.js';
+import {
+  bindMarketingBlock,
+  getVisibleMarketingContent,
+  renderMarketingBlockHtml,
+} from '../components/marketing-block.js';
 
 function resolveImageUrl(item) {
   return resolveProductImageUrl(item.imageUrl) || getItemImageUrl(item.name);
@@ -47,6 +55,7 @@ export class MenuPage {
     this.allRules = [];
     this.promoRules = [];
     this.categoryGroups = [];
+    this._marketingBanners = [];
     this._cartUnsub = null;
     this.init();
   }
@@ -56,7 +65,12 @@ export class MenuPage {
     if (!cart.dateSlot) { this.navigate('/home'); return; }
 
     this.renderSkeleton();
-    await this.fetchItems();
+    await Promise.all([
+      this.fetchItems(),
+      fetchMarketingBannersForLk()
+        .then(banners => { this._marketingBanners = banners; })
+        .catch(err => console.warn('[menu] marketing load failed', err)),
+    ]);
     this.renderFull();
     this._cartUnsub = cart.subscribe(() => this.updateCartBar());
   }
@@ -75,12 +89,16 @@ export class MenuPage {
   }
 
   async fetchItems() {
-    const [itemsSnap, rulesSnap, promosSnap, menuSnap] = await Promise.all([
-      getDocs(query(collection(db, COL.ITEMS), where('isAvailable', '==', true))),
+    const uid = auth.currentUser?.uid;
+    const [webItems, rulesSnap, promosSnap, menuSnap, userSnap] = await Promise.all([
+      fetchWebMenuItems(),
       getDocs(collection(db, COL.AVAILABILITY_RULES)),
       getDocs(collection(db, COL.PROMO_RULES)),
       getDoc(doc(db, COL.SETTINGS, 'menu')),
+      uid ? getDoc(doc(db, COL.USERS, uid)) : Promise.resolve(null),
     ]);
+
+    this._userGroupId = userSnap?.exists() ? userSnap.data().userGroupId : null;
 
     this.allRules = filterActiveRules(
       rulesSnap.docs.map(d => normalizeAvailabilityRuleDoc({ id: d.id, ...d.data() }, d.id)),
@@ -91,20 +109,19 @@ export class MenuPage {
       .filter(p => p.isActive);
 
     const menuData = menuSnap.exists() ? menuSnap.data() : {};
-    const groups = mergeCategoryGroups(menuData.categoryGroups || []);
+    const groups = sortCategoryGroupsByChannel(
+      filterWebVisibleCategoryGroups(mergeCategoryGroups(menuData.categoryGroups || [])),
+      'web',
+    );
     this.categoryGroups = groups;
     this.groupsByName = new Map(groups.map(g => [g.name, g]));
 
     const slot = { date: cart.dateSlot, time: cart.timeSlot };
 
-    const allItems = itemsSnap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id,
-        ...data,
-        nutrition: resolveItemNutrition(data),
-      };
-    });
+    const allItems = webItems.map(data => ({
+      ...data,
+      nutrition: resolveItemNutrition(data),
+    }));
 
     this.items = allItems.filter(item => isMenuItemAvailableAt(item, this.groupsByName, this.allRules, slot));
 
@@ -115,11 +132,11 @@ export class MenuPage {
       categoryGroups: this.categoryGroups,
     });
 
-    const order = ['Первые блюда', 'Вторые блюда', 'Салаты', 'Напитки', 'Выпечка'];
+    const groupNames = groups.map(g => g.name);
     const found = [...new Set(this.items.map(i => i.category))];
     this.categories = [
-      ...order.filter(c => found.includes(c)),
-      ...found.filter(c => !order.includes(c)),
+      ...groupNames.filter(c => found.includes(c)),
+      ...found.filter(c => !groupNames.includes(c)).sort((a, b) => a.localeCompare(b, 'ru')),
     ];
     this.activeCategory = this.categories[0] || null;
   }
@@ -147,6 +164,7 @@ export class MenuPage {
         </div>
 
         <div class="menu-scroll" id="menu-scroll">
+          <div id="mkt-block-host" class="menu-marketing-host"></div>
           <div class="items-grid" id="items-grid"></div>
         </div>
 
@@ -171,6 +189,7 @@ export class MenuPage {
     `;
 
     this.bindMenuEvents();
+    this.renderMarketing();
     this.renderItems();
     this.updateCartBar();
     requestAnimationFrame(() => this.scrollActiveCategory(false));
@@ -184,6 +203,22 @@ export class MenuPage {
       block: 'nearest',
       inline: 'center',
     });
+  }
+
+  renderMarketing() {
+    const host = document.getElementById('mkt-block-host');
+    if (!host) return;
+
+    const marketingCtx = {
+      userGroupId: this._userGroupId || null,
+      currentLocationId: getStoredLocationId(),
+      allRules: this.allRules,
+      slot: { date: cart.dateSlot, time: cart.timeSlot },
+      device: 'lk',
+    };
+    const content = getVisibleMarketingContent(this._marketingBanners, marketingCtx);
+    host.innerHTML = renderMarketingBlockHtml(content, marketingCtx);
+    bindMarketingBlock(host, content.all);
   }
 
   bindMenuEvents() {
@@ -328,6 +363,7 @@ export class MenuPage {
         items: cart.items,
         dateSlot: cart.dateSlot,
         timeSlot: cart.timeSlot,
+        source: ORDER_SOURCE.WEB,
         createdAt: serverTimestamp(),
       };
 
@@ -345,5 +381,6 @@ export class MenuPage {
   destroy() {
     this._cartUnsub?.();
     document.getElementById('item-detail-modal')?.remove();
+    document.getElementById('mkt-detail-modal')?.remove();
   }
 }

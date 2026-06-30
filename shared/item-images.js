@@ -29,10 +29,19 @@ export const ITEM_IMAGE_BY_NAME = {
 /** @param {string|null|undefined} url */
 export function resolveProductImageUrl(url) {
   if (!url) return null;
-  if (url.startsWith('/products/')) {
-    return `${import.meta.env.BASE_URL}${url.slice(1)}`;
+  const raw = String(url).trim();
+  if (!raw) return null;
+  if (raw.startsWith('blob:')) return null;
+  if (raw.startsWith('data:')) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base = import.meta.env.BASE_URL || '/';
+  if (raw.startsWith('/')) {
+    return `${base}${raw.replace(/^\//, '')}`;
   }
-  return url;
+  if (raw.startsWith('products/')) {
+    return `${base}${raw}`;
+  }
+  return raw;
 }
 
 /** @param {string} name */

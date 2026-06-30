@@ -24,6 +24,14 @@ service cloud.firestore {
       return isAuth() && getUserRole() in ['cook', 'cashier', 'manager', 'admin'];
     }
 
+    function isStaffBalanceDebit() {
+      return isStaff()
+        && request.resource.data.balance is number
+        && resource.data.balance is number
+        && request.resource.data.balance < resource.data.balance
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance']);
+    }
+
     // ── users ────────────────────────────────────────────────
     match /users/{userId} {
       // Any authenticated user can read their own doc.
@@ -33,7 +41,7 @@ service cloud.firestore {
       // User can create/update their own doc (registration).
       // Admin can update anyone.
       allow create: if isAuth();
-      allow update: if isOwner(userId) || isRole('admin') || isRole('manager');
+      allow update: if isOwner(userId) || isRole('admin') || isRole('manager') || isStaffBalanceDebit();
       allow delete: if isRole('admin');
 
       match /wallet_history/{entryId} {
@@ -98,6 +106,12 @@ service cloud.firestore {
       allow write: if isRole('admin') || isRole('manager');
     }
 
+    // ── marketing_banners (stories & hero promos) ─────────
+    match /marketing_banners/{bannerId} {
+      allow read: if isAuth();
+      allow write: if isRole('admin') || isRole('manager');
+    }
+
     function isOrderOwner() {
       return isAuth() && resource.data.userId == request.auth.uid;
     }
@@ -135,6 +149,19 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkId', 'paymentStatus', 'status', 'paidAt']);
     }
 
+    function isKioskGuestOrderPayment() {
+      return isAuth()
+        && resource.data.userId == 'kiosk-guest'
+        && isUnpaidPendingOrder()
+        && request.resource.data.paymentStatus == 'paid'
+        && request.resource.data.status == 'cooking'
+        && request.resource.data.checkId is string
+        && request.resource.data.checkId.size() > 0
+        && request.resource.data.items == resource.data.items
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkId', 'paymentStatus', 'status', 'paidAt']);
+    }
+
     // ── orders ───────────────────────────────────────────────
     match /orders/{orderId} {
       // Client reads own orders; staff reads all.
@@ -143,7 +170,7 @@ service cloud.firestore {
       );
       // Client creates orders; staff updates status.
       allow create: if isAuth();
-      allow update: if isStaff() || isClientOrderCancel() || isClientOrderItemsUpdate() || isClientOrderPayment();
+      allow update: if isStaff() || isClientOrderCancel() || isClientOrderItemsUpdate() || isClientOrderPayment() || isKioskGuestOrderPayment();
       allow delete: if isRole('admin');
     }
 

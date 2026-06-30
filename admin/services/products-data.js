@@ -13,6 +13,7 @@ import { getItemImageUrl } from '../../shared/item-images.js';
 import { mergeCategories } from '../../shared/menu-catalog.js';
 
 export { DEFAULT_CATEGORIES } from '../../shared/menu-catalog.js';
+export { fetchWebMenuItems } from '../../shared/menu-items-data.js';
 
 export async function fetchAllItems() {
   const snap = await getDocs(collection(db, COL.ITEMS));
@@ -34,11 +35,66 @@ export function collectCategories(catalogCategories, items) {
   return mergeCategories(catalogCategories, fromItems);
 }
 
+/** @typedef {'everywhere'|'web'|'kiosk'|'hidden'} ItemChannelMode */
+
+export const ITEM_CHANNEL_MODES = [
+  { id: 'everywhere', label: 'Везде', desc: 'Личный кабинет и киоск' },
+  { id: 'web', label: 'Только Веб', desc: 'Личный кабинет' },
+  { id: 'kiosk', label: 'Только Киоск', desc: 'Самообслуживание на киоске' },
+  { id: 'hidden', label: 'Скрыт', desc: 'Не отображается ни в одном канале' },
+];
+
+/** @param {boolean} visibleInWeb @param {boolean} visibleInKiosk @returns {ItemChannelMode} */
+export function resolveChannelMode(visibleInWeb, visibleInKiosk) {
+  const web = visibleInWeb !== false;
+  const kiosk = visibleInKiosk === true;
+  if (web && kiosk) return 'everywhere';
+  if (web) return 'web';
+  if (kiosk) return 'kiosk';
+  return 'hidden';
+}
+
+/** @param {ItemChannelMode|string} mode */
+export function channelFlagsFromMode(mode) {
+  switch (mode) {
+    case 'everywhere':
+      return { visibleInWeb: true, visibleInKiosk: true, isAvailable: true };
+    case 'web':
+      return { visibleInWeb: true, visibleInKiosk: false, isAvailable: true };
+    case 'kiosk':
+      return { visibleInWeb: false, visibleInKiosk: true, isAvailable: true };
+    case 'hidden':
+      return { visibleInWeb: false, visibleInKiosk: false, isAvailable: false };
+    default:
+      return { visibleInWeb: true, visibleInKiosk: false, isAvailable: true };
+  }
+}
+
+/** @param {object} item */
+export function isItemVisibleInWeb(item) {
+  return item?.visibleInWeb !== false;
+}
+
+/** @param {object} item */
+export function isItemVisibleInKiosk(item) {
+  return item?.visibleInKiosk === true;
+}
+
+/** @param {object} item */
+export function isItemVisibleSomewhere(item) {
+  return isItemVisibleInWeb(item) || isItemVisibleInKiosk(item);
+}
+
 /**
  * @param {Array<object>} items
- * @param {{ categories?: string[], allergens?: string[], search?: string, availability?: string }} filters
+ * @param {{ categories?: string[], allergens?: string[], search?: string, channel?: string }} filters
  */
-export function filterItems(items, { categories = [], allergens = [], search = '', availability = 'all' } = {}) {
+export function filterItems(items, {
+  categories = [],
+  allergens = [],
+  search = '',
+  channel = 'all',
+} = {}) {
   let result = items;
 
   if (categories?.length) {
@@ -60,10 +116,8 @@ export function filterItems(items, { categories = [], allergens = [], search = '
     );
   }
 
-  if (availability === 'available') {
-    result = result.filter(i => i.isAvailable !== false);
-  } else if (availability === 'hidden') {
-    result = result.filter(i => i.isAvailable === false);
+  if (channel && channel !== 'all') {
+    result = result.filter(i => resolveChannelMode(i.visibleInWeb, i.visibleInKiosk) === channel);
   }
 
   return result;
@@ -110,6 +164,8 @@ export function buildItemPayload(data) {
     imageUrl: data.imageUrl || getItemImageUrl(name) || null,
     nutrition: nutrition || undefined,
     allergens,
+    visibleInWeb: data.visibleInWeb,
+    visibleInKiosk: data.visibleInKiosk,
   });
 
   return payload;
@@ -158,6 +214,11 @@ export async function archiveItem(id) {
     isArchived: true,
     isAvailable: false,
   });
+}
+
+/** @param {string} id */
+export async function unarchiveItem(id) {
+  await updateDoc(doc(db, COL.ITEMS, id), { isArchived: false });
 }
 
 /** @param {string} id @param {boolean} isAvailable */
@@ -215,9 +276,39 @@ export async function bulkSetAllergens(items, allergenIds, mode) {
   return items.length;
 }
 
-/** @param {string[]} itemIds @param {boolean} isAvailable */
-export async function bulkSetAvailability(itemIds, isAvailable) {
-  const updates = itemIds.map(id => ({ id, data: { isAvailable } }));
+/** @param {string[]} itemIds @param {ItemChannelMode|string} mode */
+export async function bulkSetChannelVisibility(itemIds, mode) {
+  const flags = channelFlagsFromMode(mode);
+  const updates = itemIds.map(id => ({ id, data: flags }));
+  await commitItemUpdates(updates);
+  return itemIds.length;
+}
+
+/** @param {string[]} itemIds @param {string|null} ruleId */
+export async function bulkSetAvailabilityRule(itemIds, ruleId) {
+  const updates = itemIds.map(id => ({
+    id,
+    data: ruleId
+      ? { availabilityRuleId: ruleId, availability: deleteField() }
+      : { availabilityRuleId: deleteField(), availability: deleteField() },
+  }));
+  await commitItemUpdates(updates);
+  return itemIds.length;
+}
+
+/** @param {string[]} itemIds */
+export async function bulkArchiveItems(itemIds) {
+  const updates = itemIds.map(id => ({
+    id,
+    data: { isArchived: true, isAvailable: false },
+  }));
+  await commitItemUpdates(updates);
+  return itemIds.length;
+}
+
+/** @param {string[]} itemIds */
+export async function bulkUnarchiveItems(itemIds) {
+  const updates = itemIds.map(id => ({ id, data: { isArchived: false } }));
   await commitItemUpdates(updates);
   return itemIds.length;
 }

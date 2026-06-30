@@ -165,36 +165,114 @@ export function openBulkAllergensModal({ allergens, onApply }) {
 
 /**
  * @param {object} p
- * @param {(isAvailable: boolean) => void|Promise<void>} p.onApply
+ * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} p.availabilityRules
+ * @param {(ruleId: string|null) => void|Promise<void>} p.onApply
  */
-export function openBulkAvailabilityModal({ onApply }) {
+export function openBulkScheduleModal({ availabilityRules, onApply }) {
+  const ruleOptions = availabilityRules.map(r => `
+    <option value="${escAttr(r.id)}">${esc(r.name)}</option>
+  `).join('');
+
   openBulkModal({
-    title: 'Статус продажи',
-    submitLabel: 'Сохранить',
+    title: 'Расписание',
+    submitLabel: 'Применить',
     bodyHtml: `
-      <p class="bulk-modal-hint">Установите доступность выбранных товаров в меню.</p>
+      <p class="bulk-modal-hint">Установите шаблон расписания для выбранных товаров.</p>
+      <label class="bulk-modal-field">
+        <span>Шаблон расписания</span>
+        <select id="bulk-schedule-select" class="bulk-modal-select">
+          <option value="">Доступно всегда (Без ограничений)</option>
+          ${ruleOptions}
+        </select>
+      </label>
+    `,
+    onSubmit: async ({ overlay }) => {
+      const ruleId = overlay.querySelector('#bulk-schedule-select')?.value || '';
+      await onApply(ruleId || null);
+    },
+  });
+}
+
+/**
+ * @param {object} p
+ * @param {number} p.count
+ * @param {() => void|Promise<void>} p.onApply
+ */
+export function openBulkArchiveModal({ count, onApply }) {
+  openBulkModal({
+    title: 'В архив',
+    submitLabel: 'Переместить в архив',
+    bodyHtml: `
+      <p class="bulk-modal-hint">
+        Переместить <strong>${fmtCount(count)}</strong> в архив? Товары исчезнут из меню, но останутся в истории заказов.
+      </p>
+    `,
+    onSubmit: async () => {
+      await onApply();
+    },
+  });
+}
+
+/**
+ * @param {object} p
+ * @param {number} p.count
+ * @param {() => void|Promise<void>} p.onApply
+ */
+export function openBulkUnarchiveModal({ count, onApply }) {
+  openBulkModal({
+    title: 'Из архива',
+    submitLabel: 'Вернуть из архива',
+    bodyHtml: `
+      <p class="bulk-modal-hint">
+        Вернуть <strong>${fmtCount(count)}</strong> из архива? Товары снова появятся в справочнике.
+      </p>
+    `,
+    onSubmit: async () => {
+      await onApply();
+    },
+  });
+}
+
+/**
+ * @param {object} p
+ * @param {import('../services/products-data.js').ItemChannelMode[]} [p.modes]
+ * @param {(mode: import('../services/products-data.js').ItemChannelMode) => void|Promise<void>} p.onApply
+ */
+export function openBulkAvailabilityModal({ modes, onApply }) {
+  const options = modes ?? [
+    { id: 'everywhere', label: 'Везде', desc: 'Личный кабинет и киоск' },
+    { id: 'web', label: 'Только Веб', desc: 'Личный кабинет' },
+    { id: 'kiosk', label: 'Только Киоск', desc: 'Самообслуживание на киоске' },
+    { id: 'hidden', label: 'Скрыт', desc: 'Не отображается ни в одном канале' },
+  ];
+
+  openBulkModal({
+    title: 'Доступность',
+    submitLabel: 'Применить',
+    bodyHtml: `
+      <p class="bulk-modal-hint">Укажите, в каких каналах будут видны выбранные товары.</p>
       <div class="bulk-avail-options">
-        <label class="bulk-avail-option">
-          <input type="radio" name="bulk-avail" value="true" checked />
-          <span class="bulk-avail-option-body">
-            <span class="bulk-avail-option-title">Включить продажи</span>
-            <span class="bulk-avail-option-desc">Товары будут доступны для заказа</span>
-          </span>
-        </label>
-        <label class="bulk-avail-option">
-          <input type="radio" name="bulk-avail" value="false" />
-          <span class="bulk-avail-option-body">
-            <span class="bulk-avail-option-title">Выключить продажи</span>
-            <span class="bulk-avail-option-desc">Товары будут скрыты из меню</span>
-          </span>
-        </label>
+        ${options.map((o, i) => `
+          <label class="bulk-avail-option">
+            <input type="radio" name="bulk-channel" value="${escAttr(o.id)}" ${i === 0 ? 'checked' : ''} />
+            <span class="bulk-avail-option-body">
+              <span class="bulk-avail-option-title">${esc(o.label)}</span>
+              <span class="bulk-avail-option-desc">${esc(o.desc)}</span>
+            </span>
+          </label>
+        `).join('')}
       </div>
     `,
     onSubmit: async ({ overlay }) => {
-      const value = overlay.querySelector('input[name="bulk-avail"]:checked')?.value;
-      await onApply(value === 'true');
+      const mode = overlay.querySelector('input[name="bulk-channel"]:checked')?.value || 'everywhere';
+      await onApply(/** @type {import('../services/products-data.js').ItemChannelMode} */ (mode));
     },
   });
+}
+
+/** @param {number} n */
+function fmtCount(n) {
+  return new Intl.NumberFormat('ru-RU').format(n);
 }
 
 /** @param {string} s */

@@ -73,9 +73,11 @@ async function renderRoute(path) {
     '/products': () => import('./pages/products.js').then(m => m.ProductsPage),
     '/groups': () => import('./pages/category-groups.js').then(m => m.CategoryGroupsPage),
     '/allergens': () => import('./pages/allergens.js').then(m => m.AllergensPage),
+    '/data-import': () => import('./pages/data-import.js').then(m => m.DataImportPage),
     '/schedules': () => import('./pages/availability-schedules.js').then(m => m.AvailabilitySchedulesPage),
     '/calendar': () => import('./pages/calendar-days.js').then(m => m.CalendarDaysPage),
     '/marketing': () => import('./pages/marketing.js').then(m => m.MarketingPage),
+    '/marketing-banners': () => import('./pages/marketing-banners.js').then(m => m.MarketingBannersPage),
     '/users': () => import('./pages/users.js').then(m => m.UsersPage),
     '/crm-groups': () => import('./pages/crm-user-groups.js').then(m => m.CrmUserGroupsPage),
     '/crm-loyalty': () => import('./pages/crm-loyalty-categories.js').then(m => m.CrmLoyaltyCategoriesPage),
@@ -91,9 +93,14 @@ async function renderRoute(path) {
 
 onAuthStateChanged(auth, () => {
   authReady = true;
+  if (window.__SEED_STAFF_AUTH__) return;
   renderRoute(parseHash());
 });
 
 window.addEventListener('hashchange', () => {
+  if (authReady) renderRoute(parseHash());
+});
+
+window.addEventListener('seed-staff-auth-done', () => {
   if (authReady) renderRoute(parseHash());
 });

@@ -5,8 +5,9 @@ import { batchSetItemCategories } from '../services/products-data.js';
  * @param {string} p.groupName
  * @param {Array<{ id: string, name?: string, category?: string }>} p.items
  * @param {(updates: Array<{ id: string, category: string }>) => void|Promise<void>} [p.onApplied]
+ * @param {boolean} [p.deferPersistence] — only update in-memory state; persist on parent Save
  */
-export function openGroupProductsPickerModal({ groupName, items, onApplied }) {
+export function openGroupProductsPickerModal({ groupName, items, onApplied, deferPersistence = false }) {
   document.getElementById('group-products-picker-modal')?.remove();
 
   const overlay = document.createElement('div');
@@ -161,7 +162,9 @@ export function openGroupProductsPickerModal({ groupName, items, onApplied }) {
     if (btn) btn.disabled = true;
 
     try {
-      await batchSetItemCategories(updates);
+      if (!deferPersistence && updates.length) {
+        await batchSetItemCategories(updates);
+      }
       close();
       await onApplied?.(updates);
     } catch (err) {

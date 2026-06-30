@@ -6,7 +6,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../shared/firebase.js';
-import { COL, ORDER_STATUS, ROLES } from '../../shared/schema.js';
+import { COL, ORDER_SOURCE, ORDER_STATUS, PAYMENT_STATUS, ROLES } from '../../shared/schema.js';
+import { resolveOrderLocation } from './reports-data.js';
 import { endOfDay, startOfDay, toDateInputValue } from '../utils/dates.js';
 
 /**
@@ -75,24 +76,37 @@ export function filterByStatus(orders, statuses) {
 export function filterOrders(orders, usersById, {
   statuses = [],
   search = '',
-  groupIds = [],
-  loyaltyCategoryIds = [],
+  sourceFilter = 'all',
+  locationId = 'all',
+  paymentFilter = 'all',
+  itemsById = new Map(),
+  rulesById = new Map(),
 } = {}) {
   let result = filterByStatus(orders, statuses);
 
   const q = search.trim().toLowerCase();
-  const groupSet = groupIds.length ? new Set(groupIds) : null;
-  const loyaltySet = loyaltyCategoryIds.length ? new Set(loyaltyCategoryIds) : null;
+
+  if (sourceFilter === 'web') {
+    result = result.filter(o => {
+      const src = o.source || ORDER_SOURCE.WEB;
+      return src === ORDER_SOURCE.WEB || src === ORDER_SOURCE.ADMIN;
+    });
+  } else if (sourceFilter === 'kiosk') {
+    result = result.filter(o => o.source === ORDER_SOURCE.KIOSK);
+  }
+
+  if (paymentFilter === PAYMENT_STATUS.PAID) {
+    result = result.filter(o => o.paymentStatus === PAYMENT_STATUS.PAID);
+  } else if (paymentFilter === PAYMENT_STATUS.UNPAID) {
+    result = result.filter(o => o.paymentStatus !== PAYMENT_STATUS.PAID);
+  }
+
+  if (locationId && locationId !== 'all') {
+    result = result.filter(o => resolveOrderLocation(o, itemsById, rulesById).id === locationId);
+  }
 
   return result.filter(order => {
     const user = usersById.get(order.userId);
-
-    if (groupSet && !groupSet.has(user?.userGroupId || '')) return false;
-
-    if (loyaltySet) {
-      const catKey = user?.loyaltyCategoryId || '__none__';
-      if (!loyaltySet.has(catKey)) return false;
-    }
 
     if (!q) return true;
 

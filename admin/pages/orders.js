@@ -17,13 +17,22 @@ import {
   fmtPickupSlot,
   orderStatusBadgeClass,
   orderStatusLabel,
+  orderSalesChannelBadgeClass,
+  orderSalesChannelLabel,
   orderTotal,
   paymentStatusLabel,
 } from '../utils/order-format.js';
-import { ORDER_STATUS } from '../../shared/schema.js';
+import { ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
 import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
 import { fetchMenuSettings } from '../services/menu-settings-data.js';
+import { collectLocationOptions } from '../services/reports-data.js';
 import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
+
+const SOURCE_FILTER_TABS = [
+  { id: 'all', label: 'Все' },
+  { id: 'web', label: 'Веб (ЛК)' },
+  { id: 'kiosk', label: 'Киоск' },
+];
 
 function hashOrderId() {
   const q = location.hash.split('?')[1];
@@ -45,11 +54,10 @@ export class OrdersPage {
     this.view = 'list';
     this.search = '';
     this.statusFilters = [];
-    this.groupFilters = [];
-    this.loyaltyFilters = [];
+    this.sourceFilter = 'all';
+    this.locationFilter = 'all';
+    this.paymentFilter = 'all';
     this.statusDropdownOpen = false;
-    this.groupDropdownOpen = false;
-    this.loyaltyDropdownOpen = false;
     this.dateField = 'createdAt';
     this.periodPreset = 'week';
     this.customFrom = toDateInputValue(new Date(Date.now() - 6 * 86400000));
@@ -62,6 +70,7 @@ export class OrdersPage {
     this.allRules = [];
     this.groupsByName = new Map();
     this.itemsById = new Map();
+    this.rulesById = new Map();
     this.usersById = new Map();
     this.loading = true;
     this.detailOrderId = null;
@@ -76,34 +85,25 @@ export class OrdersPage {
   }
 
   _onScrollClose() {
-    if (!this.statusDropdownOpen && !this.groupDropdownOpen && !this.loyaltyDropdownOpen) return;
+    if (!this.statusDropdownOpen) return;
     this.closeFilterDropdowns();
   }
 
   _onWindowResize() {
-    if (!this.statusDropdownOpen && !this.groupDropdownOpen && !this.loyaltyDropdownOpen) return;
+    if (!this.statusDropdownOpen) return;
     this.syncAllDropdowns();
   }
 
   closeFilterDropdowns() {
     this.statusDropdownOpen = false;
-    this.groupDropdownOpen = false;
-    this.loyaltyDropdownOpen = false;
     this.syncAllDropdowns();
   }
 
   syncDropdown(idPrefix) {
-    const openMap = {
-      status: this.statusDropdownOpen,
-      group: this.groupDropdownOpen,
-      loyalty: this.loyaltyDropdownOpen,
-    };
+    const open = idPrefix === 'status' ? this.statusDropdownOpen : false;
     const summaryMap = {
       status: () => this.statusFilterSummary(),
-      group: () => this.groupFilterSummary(),
-      loyalty: () => this.loyaltyFilterSummary(),
     };
-    const open = openMap[idPrefix];
     const dropdown = this.container.querySelector(`#orders-${idPrefix}-dropdown`);
     const menu = this.container.querySelector(`#orders-${idPrefix}-menu`);
     const trigger = this.container.querySelector(`#orders-${idPrefix}-trigger`);
@@ -132,8 +132,6 @@ export class OrdersPage {
 
   syncAllDropdowns() {
     this.syncDropdown('status');
-    this.syncDropdown('group');
-    this.syncDropdown('loyalty');
   }
 
   bindScrollClose() {
@@ -150,12 +148,8 @@ export class OrdersPage {
   handleStatusDropdownOutside(e) {
     const statusDropdown = this.container.querySelector('#orders-status-dropdown');
     if (statusDropdown?.contains(e.target)) return;
-    const groupDropdown = this.container.querySelector('#orders-group-dropdown');
-    if (groupDropdown?.contains(e.target)) return;
-    const loyaltyDropdown = this.container.querySelector('#orders-loyalty-dropdown');
-    if (loyaltyDropdown?.contains(e.target)) return;
 
-    if (!this.statusDropdownOpen && !this.groupDropdownOpen && !this.loyaltyDropdownOpen) return;
+    if (!this.statusDropdownOpen) return;
     this.closeFilterDropdowns();
   }
 
@@ -166,13 +160,162 @@ export class OrdersPage {
     const countEl = page.querySelector('.orders-count');
     if (countEl) countEl.textContent = this.ordersCountText();
 
+    this.syncPeriodSummary();
+    this.syncLocationFilterSelect();
+
     const listHost = page.querySelector('[data-orders-list]');
     if (listHost) {
       listHost.innerHTML = this.view === 'list' ? this.renderList() : this.renderPlan();
+      listHost.classList.remove('orders-list--loading');
     }
 
     this.syncAllDropdowns();
     syncFiltersResetBtn(page, this.hasActiveFilters());
+  }
+
+  resolveActivePeriod() {
+    if (this.periodPreset === 'custom') {
+      return {
+        start: startOfDay(fromDateInputValue(this.customFrom)),
+        end: endOfDay(fromDateInputValue(this.customTo)),
+        preset: 'custom',
+      };
+    }
+    return resolvePeriod(this.periodPreset, this.customFrom, this.customTo);
+  }
+
+  formatPeriodDate(d) {
+    return d.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }
+
+  periodSummaryParts() {
+    const { start, end, preset } = this.resolveActivePeriod();
+    const presetLabels = {
+      day: 'День',
+      week: 'Неделя',
+      month: 'Месяц',
+      custom: 'Произвольный период',
+    };
+    return {
+      range: `${this.formatPeriodDate(start)} — ${this.formatPeriodDate(end)}`,
+      preset: presetLabels[preset] || preset,
+      field: this.dateField === 'dateSlot' ? 'по дате выдачи' : 'по дате создания',
+    };
+  }
+
+  renderPeriodSummary() {
+    const { range, preset, field } = this.periodSummaryParts();
+    return `
+      <div class="orders-period-summary" data-orders-period-summary>
+        <span class="orders-period-summary-label">Период отбора:</span>
+        <strong class="orders-period-summary-range">${esc(range)}</strong>
+        <span class="orders-period-summary-meta">${esc(preset)} · ${esc(field)}</span>
+      </div>
+    `;
+  }
+
+  syncPeriodSummary() {
+    const page = this.container.querySelector('.orders-page');
+    if (!page) return;
+
+    const host = page.querySelector('[data-orders-period-summary]');
+    if (!host) return;
+
+    const { range, preset, field } = this.periodSummaryParts();
+    const rangeEl = host.querySelector('.orders-period-summary-range');
+    const metaEl = host.querySelector('.orders-period-summary-meta');
+    if (rangeEl) rangeEl.textContent = range;
+    if (metaEl) metaEl.textContent = `${preset} · ${field}`;
+  }
+
+  syncLocationFilterSelect() {
+    const select = this.container.querySelector('#orders-location-filter');
+    if (!select) return;
+
+    const locations = this.locationOptions();
+    const validIds = new Set(locations.map(loc => loc.id));
+    if (this.locationFilter !== 'all' && !validIds.has(this.locationFilter)) {
+      this.locationFilter = 'all';
+    }
+
+    select.innerHTML = `
+      <option value="all" ${this.locationFilter === 'all' ? 'selected' : ''}>Все точки</option>
+      ${locations.map(loc => `
+        <option value="${escAttr(loc.id)}" ${this.locationFilter === loc.id ? 'selected' : ''}>${esc(loc.name)}</option>
+      `).join('')}
+    `;
+  }
+
+  syncFilterSegmentTabs(selector, activeValue, attr) {
+    const page = this.container.querySelector('.orders-page');
+    if (!page) return;
+
+    page.querySelectorAll(selector).forEach(btn => {
+      const value = btn.dataset[attr];
+      const active = value === activeValue;
+      btn.classList.toggle('period-tab--active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+  }
+
+  syncViewFilterTabs() {
+    this.syncFilterSegmentTabs('[data-view]', this.view, 'view');
+  }
+
+  syncPeriodFilterTabs() {
+    this.syncFilterSegmentTabs('[data-period]', this.periodPreset, 'period');
+  }
+
+  syncDateFieldFilterTabs() {
+    this.syncFilterSegmentTabs('[data-date-field]', this.dateField, 'dateField');
+  }
+
+  syncCustomDatesVisibility() {
+    const page = this.container.querySelector('.orders-page');
+    const block = page?.querySelector('.orders-custom-dates-inline');
+    if (block) {
+      block.classList.toggle('orders-custom-dates-inline--hidden', this.periodPreset !== 'custom');
+    }
+  }
+
+  async reloadOrders() {
+    const page = this.container.querySelector('.orders-page');
+    const listHost = page?.querySelector('[data-orders-list]');
+    listHost?.classList.add('orders-list--loading');
+
+    try {
+      const period = this.resolveActivePeriod();
+      this.orders = await fetchOrdersFiltered(period.start, period.end, this.dateField);
+      this.error = null;
+    } catch (err) {
+      console.error('[orders]', err);
+      this.error = err.message || 'Не удалось загрузить заказы';
+      listHost?.classList.remove('orders-list--loading');
+      if (page) {
+        const host = page.querySelector('[data-orders-list]');
+        if (host) {
+          host.innerHTML = `<div class="admin-error card">${esc(this.error)}</div>`;
+        }
+      }
+      return;
+    }
+
+    this.refreshOrdersList();
+  }
+
+  syncSourceFilterTabs() {
+    const page = this.container.querySelector('.orders-page');
+    if (!page) return;
+
+    page.querySelectorAll('[data-source-filter]').forEach(btn => {
+      const active = btn.dataset.sourceFilter === this.sourceFilter;
+      btn.classList.toggle('period-tab--active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
   }
 
   _onContainerClick(e) {
@@ -194,29 +337,21 @@ export class OrdersPage {
       return;
     }
 
-    const viewTab = e.target.closest('.orders-view-tabs [data-view]');
-    if (viewTab) {
+    const channelTab = e.target.closest('[data-source-filter]');
+    if (channelTab) {
+      this.sourceFilter = channelTab.dataset.sourceFilter || 'all';
+      this.closeFilterDropdowns();
+      this.syncSourceFilterTabs();
+      this.refreshOrdersList();
+      return;
+    }
+
+    const viewTab = e.target.closest('[data-view]');
+    if (viewTab && this.container.querySelector('.orders-page')?.contains(viewTab)) {
       this.view = viewTab.dataset.view;
       this.closeFilterDropdowns();
-      this.renderShell();
-      return;
-    }
-
-    if (e.target.closest('#orders-group-trigger')) {
-      e.stopPropagation();
-      this.groupDropdownOpen = !this.groupDropdownOpen;
-      this.statusDropdownOpen = false;
-      this.loyaltyDropdownOpen = false;
-      this.syncAllDropdowns();
-      return;
-    }
-
-    if (e.target.closest('#orders-loyalty-trigger')) {
-      e.stopPropagation();
-      this.loyaltyDropdownOpen = !this.loyaltyDropdownOpen;
-      this.statusDropdownOpen = false;
-      this.groupDropdownOpen = false;
-      this.syncAllDropdowns();
+      this.syncViewFilterTabs();
+      this.refreshOrdersList();
       return;
     }
 
@@ -224,47 +359,28 @@ export class OrdersPage {
     if (statusTrigger) {
       e.stopPropagation();
       this.statusDropdownOpen = !this.statusDropdownOpen;
-      this.groupDropdownOpen = false;
-      this.loyaltyDropdownOpen = false;
       this.syncAllDropdowns();
       return;
     }
 
-    if (e.target.closest('[data-group-action="clear"]')) {
+    if (e.target.closest('[data-status-action="clear"]')) {
       e.preventDefault();
-      this.groupFilters = [];
-      this.refreshOrdersList();
-      return;
-    }
-
-    if (e.target.closest('[data-loyalty-action="clear"]')) {
-      e.preventDefault();
-      this.loyaltyFilters = [];
-      this.refreshOrdersList();
-      return;
-    }
-
-    const statusAction = e.target.closest('[data-status-action]');
-    if (statusAction) {
-      e.preventDefault();
-      if (statusAction.dataset.statusAction === 'clear') {
-        this.statusFilters = [];
-      }
+      this.statusFilters = [];
       this.refreshOrdersList();
       return;
     }
 
     if (e.target.closest('#orders-status-menu')) return;
-    if (e.target.closest('#orders-group-menu')) return;
-    if (e.target.closest('#orders-loyalty-menu')) return;
 
     const periodTab = e.target.closest('[data-period]');
     if (periodTab) {
       e.preventDefault();
       this.periodPreset = periodTab.dataset.period;
       this.closeFilterDropdowns();
-      if (this.periodPreset !== 'custom') this.loadData();
-      else this.renderShell();
+      this.syncPeriodFilterTabs();
+      this.syncCustomDatesVisibility();
+      this.syncPeriodSummary();
+      void this.reloadOrders();
       return;
     }
 
@@ -272,7 +388,9 @@ export class OrdersPage {
     if (modeBtn) {
       this.dateField = modeBtn.dataset.dateField;
       this.closeFilterDropdowns();
-      this.loadData();
+      this.syncDateFieldFilterTabs();
+      this.syncPeriodSummary();
+      void this.reloadOrders();
       return;
     }
 
@@ -280,7 +398,8 @@ export class OrdersPage {
       this.customFrom = this.container.querySelector('#orders-from')?.value || this.customFrom;
       this.customTo = this.container.querySelector('#orders-to')?.value || this.customTo;
       this.closeFilterDropdowns();
-      this.loadData();
+      this.syncPeriodSummary();
+      void this.reloadOrders();
       return;
     }
 
@@ -320,26 +439,16 @@ export class OrdersPage {
       return;
     }
 
-    const groupCb = e.target.closest('[data-group-filter]');
-    if (groupCb) {
-      const id = groupCb.dataset.groupFilter;
-      if (groupCb.checked) {
-        if (!this.groupFilters.includes(id)) this.groupFilters.push(id);
-      } else {
-        this.groupFilters = this.groupFilters.filter(x => x !== id);
-      }
+    if (e.target.id === 'orders-location-filter') {
+      this.locationFilter = e.target.value || 'all';
+      this.closeFilterDropdowns();
       this.refreshOrdersList();
       return;
     }
 
-    const loyaltyCb = e.target.closest('[data-loyalty-filter]');
-    if (loyaltyCb) {
-      const id = loyaltyCb.dataset.loyaltyFilter;
-      if (loyaltyCb.checked) {
-        if (!this.loyaltyFilters.includes(id)) this.loyaltyFilters.push(id);
-      } else {
-        this.loyaltyFilters = this.loyaltyFilters.filter(x => x !== id);
-      }
+    if (e.target.id === 'orders-payment-filter') {
+      this.paymentFilter = e.target.value || 'all';
+      this.closeFilterDropdowns();
       this.refreshOrdersList();
     }
   }
@@ -374,6 +483,7 @@ export class OrdersPage {
       this.loyaltyCategories = loyaltyCategories;
       this.items = items;
       this.allRules = availabilityRules;
+      this.rulesById = new Map(availabilityRules.map(r => [r.id, r]));
       this.groupsByName = new Map(
         (menuSettings.categoryGroups || []).map(g => [g.name, g]),
       );
@@ -415,8 +525,11 @@ export class OrdersPage {
     return filterOrders(this.orders, this.usersById, {
       statuses: this.statusFilters,
       search: this.search,
-      groupIds: this.groupFilters,
-      loyaltyCategoryIds: this.loyaltyFilters,
+      sourceFilter: this.sourceFilter,
+      locationId: this.locationFilter,
+      paymentFilter: this.paymentFilter,
+      itemsById: this.itemsById,
+      rulesById: this.rulesById,
     });
   }
 
@@ -424,42 +537,31 @@ export class OrdersPage {
     return Boolean(
       this.search.trim()
       || this.statusFilters.length
-      || this.groupFilters.length
-      || this.loyaltyFilters.length,
+      || this.sourceFilter !== 'all'
+      || this.locationFilter !== 'all'
+      || this.paymentFilter !== 'all',
     );
   }
 
   resetFilters() {
     this.search = '';
     this.statusFilters = [];
-    this.groupFilters = [];
-    this.loyaltyFilters = [];
+    this.sourceFilter = 'all';
+    this.locationFilter = 'all';
+    this.paymentFilter = 'all';
     this.closeFilterDropdowns();
     const searchInput = this.container.querySelector('#orders-search');
     if (searchInput) searchInput.value = '';
+    const locationSelect = this.container.querySelector('#orders-location-filter');
+    if (locationSelect) locationSelect.value = 'all';
+    const paymentSelect = this.container.querySelector('#orders-payment-filter');
+    if (paymentSelect) paymentSelect.value = 'all';
+    this.syncSourceFilterTabs();
     this.refreshOrdersList();
   }
 
-  groupName(id) {
-    if (!id) return '—';
-    return this.userGroups.find(g => g.id === id)?.name || id;
-  }
-
-  loyaltyName(id) {
-    if (!id || id === '__none__') return 'Без категории';
-    return this.loyaltyCategories.find(c => c.id === id)?.name || id;
-  }
-
-  groupFilterSummary() {
-    if (!this.groupFilters.length) return 'Все группы';
-    if (this.groupFilters.length === 1) return this.groupName(this.groupFilters[0]);
-    return `${this.groupFilters.length} группы`;
-  }
-
-  loyaltyFilterSummary() {
-    if (!this.loyaltyFilters.length) return 'Все категории';
-    if (this.loyaltyFilters.length === 1) return this.loyaltyName(this.loyaltyFilters[0]);
-    return `${this.loyaltyFilters.length} категории`;
+  locationOptions() {
+    return collectLocationOptions(this.orders, this.itemsById, this.rulesById);
   }
 
   ordersCountText() {
@@ -558,67 +660,74 @@ export class OrdersPage {
     return `
       <div class="orders-page">
         ${this.renderFilters()}
+        ${this.renderPeriodSummary()}
         <div data-orders-list>${this.view === 'list' ? this.renderList() : this.renderPlan()}</div>
       </div>
     `;
   }
 
-  renderGroupDropdown() {
+  renderSourceFilterTabs() {
     return `
-      <div class="orders-status-dropdown ${this.groupDropdownOpen ? 'orders-status-dropdown--open' : ''}" id="orders-group-dropdown">
-        <button
-          type="button"
-          class="orders-status-trigger btn-press"
-          id="orders-group-trigger"
-          aria-expanded="${this.groupDropdownOpen}"
-          aria-haspopup="listbox"
-        >
-          <span class="orders-status-trigger-label">${esc(this.groupFilterSummary())}</span>
-          <span class="orders-status-trigger-caret" aria-hidden="true">▾</span>
-        </button>
-        <div class="orders-status-menu" id="orders-group-menu" role="listbox" ${this.groupDropdownOpen ? '' : 'hidden'}>
-          ${this.userGroups.map(g => `
-            <label class="orders-status-option">
-              <input type="checkbox" data-group-filter="${escAttr(g.id)}" ${this.groupFilters.includes(g.id) ? 'checked' : ''} />
-              <span>${esc(g.name)}</span>
-            </label>
+      <div class="products-availability-inline" role="group" aria-label="Фильтр по месту продажи">
+        <span class="products-filter-label products-filter-label--inline">Место продажи:</span>
+        <div class="period-tabs products-channel-tabs" role="tablist">
+          ${SOURCE_FILTER_TABS.map(o => `
+            <button
+              type="button"
+              class="period-tab btn-press ${this.sourceFilter === o.id ? 'period-tab--active' : ''}"
+              data-source-filter="${o.id}"
+              role="tab"
+              aria-selected="${this.sourceFilter === o.id}"
+            >${esc(o.label)}</button>
           `).join('')}
-          <div class="orders-status-menu-foot">
-            <button type="button" class="orders-status-reset btn-press" data-group-action="clear">Сбросить</button>
-          </div>
         </div>
       </div>
     `;
   }
 
-  renderLoyaltyDropdown() {
+  renderViewFilterTabs() {
     return `
-      <div class="orders-status-dropdown ${this.loyaltyDropdownOpen ? 'orders-status-dropdown--open' : ''}" id="orders-loyalty-dropdown">
-        <button
-          type="button"
-          class="orders-status-trigger btn-press"
-          id="orders-loyalty-trigger"
-          aria-expanded="${this.loyaltyDropdownOpen}"
-          aria-haspopup="listbox"
-        >
-          <span class="orders-status-trigger-label">${esc(this.loyaltyFilterSummary())}</span>
-          <span class="orders-status-trigger-caret" aria-hidden="true">▾</span>
-        </button>
-        <div class="orders-status-menu" id="orders-loyalty-menu" role="listbox" ${this.loyaltyDropdownOpen ? '' : 'hidden'}>
-          <label class="orders-status-option">
-            <input type="checkbox" data-loyalty-filter="__none__" ${this.loyaltyFilters.includes('__none__') ? 'checked' : ''} />
-            <span>Без категории</span>
-          </label>
-          ${this.loyaltyCategories.map(c => `
-            <label class="orders-status-option">
-              <input type="checkbox" data-loyalty-filter="${escAttr(c.id)}" ${this.loyaltyFilters.includes(c.id) ? 'checked' : ''} />
-              <span>${esc(c.name)}</span>
-            </label>
-          `).join('')}
-          <div class="orders-status-menu-foot">
-            <button type="button" class="orders-status-reset btn-press" data-loyalty-action="clear">Сбросить</button>
-          </div>
+      <div class="products-availability-inline" role="group" aria-label="Вид списка">
+        <span class="products-filter-label products-filter-label--inline">Вид:</span>
+        <div class="period-tabs products-channel-tabs" role="tablist">
+          <button type="button" class="period-tab btn-press ${this.view === 'list' ? 'period-tab--active' : ''}" data-view="list" role="tab" aria-selected="${this.view === 'list'}">Список</button>
+          <button type="button" class="period-tab btn-press ${this.view === 'plan' ? 'period-tab--active' : ''}" data-view="plan" role="tab" aria-selected="${this.view === 'plan'}">Сводка</button>
         </div>
+      </div>
+    `;
+  }
+
+  renderPeriodFilterTabs(periodTabs) {
+    return `
+      <div class="products-availability-inline" role="group" aria-label="Период заказов">
+        <span class="products-filter-label products-filter-label--inline">Период:</span>
+        <div class="period-tabs products-channel-tabs" role="tablist">
+          ${periodTabs.map(t => `
+            <button type="button" class="period-tab btn-press ${this.periodPreset === t.id ? 'period-tab--active' : ''}" data-period="${t.id}" role="tab" aria-selected="${this.periodPreset === t.id}">${t.label}</button>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  renderDateFieldFilterTabs() {
+    return `
+      <div class="products-availability-inline" role="group" aria-label="Поле даты">
+        <span class="products-filter-label products-filter-label--inline">По:</span>
+        <div class="period-tabs products-channel-tabs" role="tablist">
+          <button type="button" class="period-tab btn-press ${this.dateField === 'createdAt' ? 'period-tab--active' : ''}" data-date-field="createdAt" role="tab" aria-selected="${this.dateField === 'createdAt'}">Созданию</button>
+          <button type="button" class="period-tab btn-press ${this.dateField === 'dateSlot' ? 'period-tab--active' : ''}" data-date-field="dateSlot" role="tab" aria-selected="${this.dateField === 'dateSlot'}">Выдаче</button>
+        </div>
+      </div>
+    `;
+  }
+
+  renderCustomDatesInline() {
+    return `
+      <div class="orders-custom-dates-inline ${this.periodPreset === 'custom' ? '' : 'orders-custom-dates-inline--hidden'}">
+        <label class="period-date period-date--compact"><span>С</span><input type="date" class="products-filter-control" id="orders-from" value="${this.customFrom}" /></label>
+        <label class="period-date period-date--compact"><span>По</span><input type="date" class="products-filter-control" id="orders-to" value="${this.customTo}" /></label>
+        <button type="button" class="btn btn-outline btn-press orders-apply-btn" id="orders-apply-dates">Применить</button>
       </div>
     `;
   }
@@ -630,15 +739,16 @@ export class OrdersPage {
       { id: 'month', label: 'Месяц' },
       { id: 'custom', label: 'Период' },
     ];
+    const locations = this.locationOptions();
 
     return `
-      <section class="orders-filters card">
-        <div class="orders-filters-primary">
-          <div class="orders-filter-inline orders-filter-search">
-            <span class="orders-filter-label">Поиск</span>
+      <section class="products-filters card orders-filters">
+        <div class="products-filters-row products-filters-row--data">
+          <div class="products-filter-field products-filter-field--search">
+            <span class="products-filter-label">Поиск</span>
             <input
               type="search"
-              class="orders-search-input"
+              class="products-search-input products-filter-control"
               id="orders-search"
               placeholder="№ заказа, ФИО, email, телефон…"
               value="${escAttr(this.search)}"
@@ -646,62 +756,45 @@ export class OrdersPage {
             />
           </div>
 
-          <div class="orders-filter-inline">
-            <span class="orders-filter-label">Статус</span>
+          <div class="products-filter-field products-filter-field--group">
+            <span class="products-filter-label">Статус</span>
             ${this.renderStatusDropdown()}
           </div>
 
-          <div class="orders-filter-inline">
-            <span class="orders-filter-label">Группа</span>
-            ${this.renderGroupDropdown()}
+          <div class="products-filter-field products-filter-field--schedule">
+            <span class="products-filter-label">Точка</span>
+            <select class="products-schedule-select products-filter-control" id="orders-location-filter" aria-label="Фильтр по точке">
+              <option value="all" ${this.locationFilter === 'all' ? 'selected' : ''}>Все точки</option>
+              ${locations.map(loc => `
+                <option value="${escAttr(loc.id)}" ${this.locationFilter === loc.id ? 'selected' : ''}>${esc(loc.name)}</option>
+              `).join('')}
+            </select>
           </div>
 
-          <div class="orders-filter-inline">
-            <span class="orders-filter-label">Категория</span>
-            ${this.renderLoyaltyDropdown()}
+          <div class="products-filter-field products-filter-field--allergens">
+            <span class="products-filter-label">Оплата</span>
+            <select class="products-schedule-select products-filter-control" id="orders-payment-filter" aria-label="Фильтр по оплате">
+              <option value="all" ${this.paymentFilter === 'all' ? 'selected' : ''}>Все</option>
+              <option value="${PAYMENT_STATUS.PAID}" ${this.paymentFilter === PAYMENT_STATUS.PAID ? 'selected' : ''}>Оплачен</option>
+              <option value="${PAYMENT_STATUS.UNPAID}" ${this.paymentFilter === PAYMENT_STATUS.UNPAID ? 'selected' : ''}>Не оплачен</option>
+            </select>
           </div>
 
-          ${renderFiltersResetBtn(this.hasActiveFilters())}
-        </div>
-
-        <div class="orders-filters-toolbar">
-          <div class="admin-filters-toolbar-left">
-            <button type="button" class="btn btn-primary btn-press orders-create-btn" id="orders-create-btn">
-              + Новый заказ
-            </button>
-
-            <div class="orders-view-tabs" role="tablist">
-              <button type="button" class="orders-view-tab btn-press ${this.view === 'list' ? 'orders-view-tab--active' : ''}" data-view="list">Список</button>
-              <button type="button" class="orders-view-tab btn-press ${this.view === 'plan' ? 'orders-view-tab--active' : ''}" data-view="plan">Сводка</button>
-            </div>
-
-            <div class="orders-filter-inline">
-              <span class="orders-filter-label">Период</span>
-              <div class="orders-chip-group">
-                ${periodTabs.map(t => `
-                  <button type="button" class="orders-chip btn-press ${this.periodPreset === t.id ? 'orders-chip--active' : ''}" data-period="${t.id}">${t.label}</button>
-                `).join('')}
-              </div>
-            </div>
-
-            <div class="orders-filter-inline">
-              <span class="orders-filter-label">По</span>
-              <div class="orders-chip-group">
-                <button type="button" class="orders-chip btn-press ${this.dateField === 'createdAt' ? 'orders-chip--active' : ''}" data-date-field="createdAt">Созданию</button>
-                <button type="button" class="orders-chip btn-press ${this.dateField === 'dateSlot' ? 'orders-chip--active' : ''}" data-date-field="dateSlot">Выдаче</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="admin-filters-toolbar-right">
-            <span class="admin-filters-count">Найдено <span class="orders-count">${this.ordersCountText()}</span></span>
+          <div class="products-filters-reset-wrap">
+            ${renderFiltersResetBtn(this.hasActiveFilters())}
           </div>
         </div>
 
-        <div class="orders-custom-dates ${this.periodPreset === 'custom' ? '' : 'orders-custom-dates--hidden'}">
-          <label class="period-date"><span>С</span><input type="date" id="orders-from" value="${this.customFrom}" /></label>
-          <label class="period-date"><span>По</span><input type="date" id="orders-to" value="${this.customTo}" /></label>
-          <button type="button" class="btn btn-outline btn-press orders-apply-btn" id="orders-apply-dates">Применить</button>
+        <div class="products-filters-row products-filters-row--controls orders-filters-row--controls">
+          <div class="orders-filters-segments">
+            ${this.renderViewFilterTabs()}
+            ${this.renderSourceFilterTabs()}
+            ${this.renderPeriodFilterTabs(periodTabs)}
+            ${this.renderDateFieldFilterTabs()}
+            ${this.renderCustomDatesInline()}
+          </div>
+
+          <span class="admin-filters-count products-filters-count">Найдено <span class="orders-count">${this.ordersCountText()}</span></span>
         </div>
       </section>
     `;
@@ -720,6 +813,7 @@ export class OrdersPage {
             <tr>
               <th>№</th>
               <th>Клиент</th>
+              <th>Место продажи</th>
               <th>Создан</th>
               <th>Выдача</th>
               <th>Статус</th>
@@ -739,6 +833,7 @@ export class OrdersPage {
     const user = this.usersById.get(order.userId);
     const total = orderTotal(order.items);
     const payClass = order.paymentStatus === 'paid' ? 'orders-pay--paid' : 'orders-pay--unpaid';
+    const sourceClass = orderSalesChannelBadgeClass(order.source);
 
     return `
       <tr class="orders-row" data-order-id="${order.id}" tabindex="0">
@@ -747,6 +842,7 @@ export class OrdersPage {
           <span class="orders-client">${user?.name || '—'}</span>
           ${user?.email ? `<span class="orders-client-email">${user.email}</span>` : ''}
         </td>
+        <td><span class="orders-source-badge ${sourceClass}">${orderSalesChannelLabel(order.source)}</span></td>
         <td>${fmtOrderDateTime(order.createdAt)}</td>
         <td>${fmtPickupSlot(order.dateSlot, order.timeSlot)}</td>
         <td><span class="badge ${orderStatusBadgeClass(order.status)}">${orderStatusLabel(order.status)}</span></td>

@@ -55,7 +55,7 @@ export class MarketingPage {
 
     this.container.innerHTML = renderAdminShell({
       active: 'marketing',
-      title: 'Маркетинг и Лояльность',
+      title: 'Конструктор акций',
       subtitle: 'Конструктор акций: условия, расписания и поощрения',
       bodyHtml,
     });

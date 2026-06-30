@@ -22,6 +22,7 @@ export const COL = {
   SETTINGS: 'settings',
   AVAILABILITY_RULES: 'availability_rules',
   PROMO_RULES: 'promo_rules',
+  MARKETING_BANNERS: 'marketing_banners',
 };
 
 /** Subcollection under users/{userId} */
@@ -357,24 +358,55 @@ export function createWalletHistoryDoc({
   };
 }
 
+/** Default visibility for new/existing items without explicit flags. */
+export const DEFAULT_ITEM_VISIBLE_IN_WEB = true;
+export const DEFAULT_ITEM_VISIBLE_IN_KIOSK = false;
+
 /**
  * items/{id}
+ * @typedef {object} MenuItemDoc
+ * @property {string} name
+ * @property {string} description
+ * @property {number} price
+ * @property {string} category
+ * @property {boolean} [isAvailable]
+ * @property {string|null} [availabilityRuleId]
+ * @property {string|null} [imageUrl]
+ * @property {{ protein?: number, fat?: number, carbs?: number, kcal?: number }|null} [nutrition]
+ * @property {string[]} [allergens]
+ * @property {boolean} [visibleInWeb] - show in personal account (web portal)
+ * @property {boolean} [visibleInKiosk] - show on self-service kiosk
+ */
+
+/**
  * @param {object} p
  * @param {string} p.name
  * @param {string} p.description
  * @param {number} p.price
  * @param {string} p.category
  * @param {boolean} [p.isAvailable=true]
- * @param {string|null} [p.availabilityRuleId=null] - ref to availability_rules/{id}
- * @param {string|null} [p.imageUrl=null] - local path, e.g. '/products/caesar.jpg'
+ * @param {string|null} [p.availabilityRuleId=null]
+ * @param {string|null} [p.imageUrl=null]
  * @param {{ protein?: number, fat?: number, carbs?: number, kcal?: number }|null} [p.nutrition=null]
- * @param {string[]} [p.allergens=[]] - allergen ids from settings/menu
+ * @param {string[]} [p.allergens=[]]
+ * @param {boolean} [p.visibleInWeb=true]
+ * @param {boolean} [p.visibleInKiosk=false]
  */
 export function createItemDoc({
   name, description, price, category, isAvailable = true, availabilityRuleId = null,
   imageUrl = null, nutrition = null, allergens = [],
+  visibleInWeb = DEFAULT_ITEM_VISIBLE_IN_WEB,
+  visibleInKiosk = DEFAULT_ITEM_VISIBLE_IN_KIOSK,
 }) {
-  const doc = { name, description, price, category, isAvailable };
+  const doc = {
+    name,
+    description,
+    price,
+    category,
+    isAvailable,
+    visibleInWeb: visibleInWeb !== false,
+    visibleInKiosk: visibleInKiosk === true,
+  };
   if (availabilityRuleId) doc.availabilityRuleId = availabilityRuleId;
   if (imageUrl) doc.imageUrl = imageUrl;
   if (nutrition) doc.nutrition = nutrition;
@@ -382,16 +414,26 @@ export function createItemDoc({
   return doc;
 }
 
+/** @type {Record<string, string>} */
+export const ORDER_SOURCE = {
+  WEB: 'web',
+  KIOSK: 'kiosk',
+  ADMIN: 'admin',
+};
+
 /**
  * orders/{id}
  * @param {object} p
- * @param {string} p.orderNumber  - 3-digit queue number, e.g. '042'
+ * @param {string} p.orderNumber
  * @param {string} p.userId
- * @param {string} p.dateSlot     - 'YYYY-MM-DD'
- * @param {string} p.timeSlot     - 'HH:MM'
+ * @param {string} p.dateSlot
+ * @param {string} p.timeSlot
  * @param {Array<{dishId:string, name:string, price:number, quantity:number, nutrition?:object}>} p.items
+ * @param {string} [p.source]
  */
-export function createOrderDoc({ orderNumber, userId, dateSlot, timeSlot, items }) {
+export function createOrderDoc({
+  orderNumber, userId, dateSlot, timeSlot, items, source = ORDER_SOURCE.WEB,
+}) {
   return {
     orderNumber,
     userId,
@@ -401,8 +443,8 @@ export function createOrderDoc({ orderNumber, userId, dateSlot, timeSlot, items 
     items,
     dateSlot,
     timeSlot,
+    source,
     createdAt: serverTimestamp(),
-    // paidAt is set in processOrderPayment when status becomes COOKING
   };
 }
 

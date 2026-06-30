@@ -11,6 +11,14 @@ import { qrDataUrl } from '../utils/qr.js';
 import { openOrderDetailModal } from '../components/order-detail.js';
 import { bindScrollFade } from '../utils/scroll-fade.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { fetchMarketingBannersForLk } from '../services/marketing-banners-data.js';
+import { fetchAllAvailabilityRules } from '../services/availability-rules-data.js';
+import { getStoredLocationId } from '../../shared/marketing-banners.js';
+import {
+  bindMarketingBlock,
+  getVisibleMarketingContent,
+  renderMarketingBlockHtml,
+} from '../components/marketing-block.js';
 
 /** Next N working dates (Mon–Fri), starting from tomorrow */
 function getDateOptions(n = 7) {
@@ -35,6 +43,8 @@ export class HomePage {
     this._unsubOrders = null;
     this._unsubNotif = null;
     this._orderDocs = [];
+    this._marketingBanners = [];
+    this._availabilityRules = [];
     this.init();
   }
 
@@ -53,6 +63,15 @@ export class HomePage {
       qrDataUrl(qrData, 220),
     ]);
 
+    try {
+      [this._marketingBanners, this._availabilityRules] = await Promise.all([
+        fetchMarketingBannersForLk(),
+        fetchAllAvailabilityRules(),
+      ]);
+    } catch (err) {
+      console.warn('[home] marketing banners load failed', err);
+    }
+
     this.renderShell();
     this.subscribeOrders();
     this.subscribeUnreadCount();
@@ -62,6 +81,16 @@ export class HomePage {
     const u = this.userData;
     const shortCode = this.user.uid.slice(0, 12).toUpperCase();
     const balanceDisplay = (u.balance ?? 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽';
+
+    const marketingCtx = {
+      userGroupId: u.userGroupId || null,
+      currentLocationId: getStoredLocationId(),
+      allRules: this._availabilityRules,
+      slot: { date: cart.dateSlot, time: cart.timeSlot },
+      device: 'lk',
+    };
+    const marketingContent = getVisibleMarketingContent(this._marketingBanners, marketingCtx);
+    const marketingHtml = renderMarketingBlockHtml(marketingContent, marketingCtx);
 
     this.container.innerHTML = `
       <div class="lk-shell">
@@ -84,6 +113,8 @@ export class HomePage {
         </header>
 
         <main class="lk-main" id="lk-main">
+          <div id="mkt-block-host">${marketingHtml}</div>
+
           <div class="lk-id-card">
             <div class="id-card-surface">
               <div class="id-card-pattern" aria-hidden="true"></div>
@@ -195,6 +226,23 @@ export class HomePage {
     `;
 
     this.bindEvents();
+    this.bindMarketing();
+  }
+
+  bindMarketing() {
+    const host = document.getElementById('mkt-block-host');
+    if (!host) return;
+
+    const marketingCtx = {
+      userGroupId: this.userData?.userGroupId || null,
+      currentLocationId: getStoredLocationId(),
+      allRules: this._availabilityRules,
+      slot: { date: cart.dateSlot, time: cart.timeSlot },
+      device: 'lk',
+    };
+    const { all } = getVisibleMarketingContent(this._marketingBanners, marketingCtx);
+
+    bindMarketingBlock(host, all);
   }
 
   bindEvents() {
@@ -392,5 +440,6 @@ export class HomePage {
     this._unsubOrders?.();
     this._unsubNotif?.();
     document.getElementById('order-detail-modal')?.remove();
+    document.getElementById('mkt-detail-modal')?.remove();
   }
 }

@@ -9,6 +9,7 @@ import {
   doc,
   setDoc,
   updateDoc,
+  getDoc,
   collection,
   getDocs,
   query,
@@ -20,7 +21,8 @@ import {
   signOut,
 } from 'firebase/auth';
 import { auth, db } from './firebase.js';
-import { COL, ROLES, createItemDoc, createUserDoc, USER_STATUS } from './schema.js';
+import { COL, ROLES, createItemDoc, createUserDoc, USER_STATUS, DEFAULT_ITEM_VISIBLE_IN_WEB, DEFAULT_ITEM_VISIBLE_IN_KIOSK } from './schema.js';
+import { DEFAULT_GROUP_VISIBLE_IN_WEB, DEFAULT_GROUP_VISIBLE_IN_KIOSK, normalizeCategoryGroup } from './menu-catalog.js';
 import { getItemImageUrl } from './item-images.js';
 import { DEMO_NUTRITION_BY_NAME } from './demo-nutrition.js';
 
@@ -113,6 +115,14 @@ export async function seedDatabase() {
   for (const user of DEMO_USERS) {
     await setDoc(doc(db, COL.USERS, user.id), user);
   }
+
+  await setDoc(doc(db, COL.USERS, 'kiosk-guest'), createUserDoc({
+    id: 'kiosk-guest',
+    name: 'Гость киоска',
+    email: 'guest@kiosk.local',
+    role: ROLES.CLIENT,
+    balance: 0,
+  }));
 
   console.log('[seed] Seeding user groups...');
   const DEMO_USER_GROUPS = [
@@ -243,6 +253,95 @@ export async function patchDemoItemCategories() {
   console.log(`[seed] Categories patched for ${updated} item(s).`);
 }
 
+/**
+ * Проставляет visibleInWeb / visibleInKiosk у существующих товаров.
+ * Вызов из консоли: await patchItemVisibilityFlags()
+ */
+export async function patchItemVisibilityFlags() {
+  const snap = await getDocs(collection(db, COL.ITEMS));
+  let updated = 0;
+  let failed = 0;
+
+  console.log(`[seed] Patching visibility flags for ${snap.size} items...`);
+
+  for (const docSnap of snap.docs) {
+    const data = docSnap.data();
+    /** @type {Record<string, boolean>} */
+    const patch = {};
+
+    if (data.visibleInWeb === undefined) patch.visibleInWeb = DEFAULT_ITEM_VISIBLE_IN_WEB;
+    if (data.visibleInKiosk === undefined) patch.visibleInKiosk = DEFAULT_ITEM_VISIBLE_IN_KIOSK;
+    if (!Object.keys(patch).length) continue;
+
+    try {
+      await updateDoc(doc(db, COL.ITEMS, docSnap.id), patch);
+      updated += 1;
+    } catch (err) {
+      failed += 1;
+      if (err.code === 'permission-denied') {
+        console.error('[seed] Permission denied while patching item visibility flags.');
+        break;
+      }
+      throw err;
+    }
+  }
+
+  if (updated) console.log(`[seed] Patched visibility for ${updated} item(s).`);
+  if (failed) console.warn(`[seed] ${failed} patch(es) failed.`);
+}
+
+/**
+ * Проставляет visibleInWeb / visibleInKiosk у групп в settings/menu.
+ * Вызов из консоли: await patchCategoryGroupVisibilityFlags()
+ */
+export async function patchCategoryGroupVisibilityFlags() {
+  const ref = doc(db, COL.SETTINGS, 'menu');
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    console.log('[seed] No menu settings document — nothing to patch.');
+    return;
+  }
+
+  const data = snap.data();
+  const groups = data.categoryGroups;
+  if (!Array.isArray(groups) || !groups.length) {
+    console.log('[seed] No category groups — nothing to patch.');
+    return;
+  }
+
+  let changed = false;
+  const patched = groups.map(raw => {
+    const g = normalizeCategoryGroup(raw);
+    const next = { ...raw, ...g };
+    if (raw.visibleInWeb === undefined) {
+      next.visibleInWeb = DEFAULT_GROUP_VISIBLE_IN_WEB;
+      changed = true;
+    }
+    if (raw.visibleInKiosk === undefined) {
+      next.visibleInKiosk = DEFAULT_GROUP_VISIBLE_IN_KIOSK;
+      changed = true;
+    }
+    return next;
+  });
+
+  if (!changed) {
+    console.log('[seed] Category group visibility flags already set.');
+    return;
+  }
+
+  await setDoc(ref, { categoryGroups: patched }, { merge: true });
+  console.log(`[seed] Patched visibility for ${patched.length} category group(s).`);
+}
+
+/**
+ * Проставляет флаги видимости у товаров и групп (миграция для интеграции с киоском).
+ * Вызов из консоли: await patchCatalogVisibilityFlags()
+ */
+export async function patchCatalogVisibilityFlags() {
+  await patchItemVisibilityFlags();
+  await patchCategoryGroupVisibilityFlags();
+}
+
 /** Demo password for all staff seed accounts */
 export const STAFF_DEMO_PASSWORD = 'demo1234';
 
@@ -251,6 +350,7 @@ const STAFF_ACCOUNTS = [
   { email: 'admin@ifcm.demo',   name: 'Администратор',   role: ROLES.ADMIN },
   { email: 'manager@ifcm.demo', name: 'Менеджер',        role: ROLES.MANAGER },
   { email: 'cashier@ifcm.demo', name: 'Кассир',          role: ROLES.CASHIER },
+  { email: 'kiosk@ifcm.demo',   name: 'Киоск',           role: ROLES.CASHIER },
 ];
 
 /**
@@ -261,54 +361,82 @@ const STAFF_ACCOUNTS = [
  * Then login on http://localhost:3003 with cook@ifcm.demo / demo1234
  */
 export async function seedStaffAuth(password = STAFF_DEMO_PASSWORD) {
-  await signOut(auth).catch(() => {});
+  if (typeof window !== 'undefined') window.__SEED_STAFF_AUTH__ = true;
 
-  for (const acc of STAFF_ACCOUNTS) {
-    let uid;
+  try {
+    await signOut(auth).catch(() => {});
 
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, acc.email, password);
-      uid = cred.user.uid;
-      console.log(`[seed] Created Auth user: ${acc.email}`);
-    } catch (err) {
-      if (err.code !== 'auth/email-already-in-use') throw err;
+    for (const acc of STAFF_ACCOUNTS) {
+      let uid;
+      let created = false;
+
       try {
         const cred = await signInWithEmailAndPassword(auth, acc.email, password);
         uid = cred.user.uid;
-        console.log(`[seed] Auth user exists: ${acc.email}`);
       } catch (signInErr) {
-        const badPass = signInErr.code === 'auth/invalid-credential'
-          || signInErr.code === 'auth/wrong-password';
-        if (badPass) {
-          console.error(
-            `[seed] ${acc.email} — аккаунт есть, но пароль не "${password}".\n` +
-            'Удалите пользователя в Firebase Console → Authentication → Users,\n' +
-            'затем снова: await seedStaffAuth()',
-          );
-          continue;
+        const notFound = signInErr.code === 'auth/user-not-found'
+          || signInErr.code === 'auth/invalid-login-credentials';
+        if (!notFound) {
+          const badPass = signInErr.code === 'auth/invalid-credential'
+            || signInErr.code === 'auth/wrong-password';
+          if (badPass) {
+            console.error(
+              `[seed] ${acc.email} — аккаунт есть, но пароль не "${password}".\n` +
+              'Удалите пользователя в Firebase Console → Authentication → Users,\n' +
+              'затем снова: await seedStaffAuth()',
+            );
+            continue;
+          }
+          throw signInErr;
         }
-        throw signInErr;
+
+        const cred = await createUserWithEmailAndPassword(auth, acc.email, password);
+        uid = cred.user.uid;
+        created = true;
       }
+
+      if (!uid) continue;
+
+      await setDoc(doc(db, COL.USERS, uid), {
+        id: uid,
+        name: acc.name,
+        email: acc.email,
+        role: acc.role,
+        balance: 0,
+        printReceipt: true,
+      });
+
+      console.log(`[seed] ${created ? 'Created' : 'Updated'} staff: ${acc.email}`);
+
+      await signOut(auth).catch(() => {});
     }
 
-    if (!uid) continue;
-
-    await setDoc(doc(db, COL.USERS, uid), {
-      id: uid,
-      name: acc.name,
-      email: acc.email,
-      role: acc.role,
-      balance: 0,
-      printReceipt: true,
+    // kiosk-guest — Firestore doc for card payments (no Auth account)
+    await signInWithEmailAndPassword(auth, 'admin@ifcm.demo', password).catch(async () => {
+      await signInWithEmailAndPassword(auth, 'kiosk@ifcm.demo', password);
     });
+    await setDoc(doc(db, COL.USERS, 'kiosk-guest'), createUserDoc({
+      id: 'kiosk-guest',
+      name: 'Гость киоска',
+      email: 'guest@kiosk.local',
+      role: ROLES.CLIENT,
+      balance: 0,
+    }), { merge: true });
+    console.log('[seed] kiosk-guest user doc ready');
+    await signOut(auth).catch(() => {});
+
+    console.log(
+      '%c[seed] Staff accounts ready!\n' +
+      'Kitchen login: cook@ifcm.demo / demo1234\n' +
+      'Kiosk login: kiosk@ifcm.demo / demo1234\n' +
+      'Also: admin@ifcm.demo, manager@ifcm.demo, cashier@ifcm.demo\n' +
+      'Перелогиньтесь в админке: admin@ifcm.demo / demo1234',
+      'color:#1E1B4B;font-weight:bold',
+    );
+  } finally {
+    if (typeof window !== 'undefined') {
+      window.__SEED_STAFF_AUTH__ = false;
+      window.dispatchEvent(new Event('seed-staff-auth-done'));
+    }
   }
-
-  await signOut(auth);
-
-  console.log(
-    '%c[seed] Staff accounts ready!\n' +
-    'Kitchen login: cook@ifcm.demo / demo1234\n' +
-    'Also: admin@ifcm.demo, manager@ifcm.demo, cashier@ifcm.demo',
-    'color:#1E1B4B;font-weight:bold',
-  );
 }

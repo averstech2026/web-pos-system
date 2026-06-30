@@ -3,7 +3,8 @@ import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-image
 /** @param {{ name?: string, imageUrl?: string|null }} item */
 export function productImageUrl(item) {
   const raw = item?.imageUrl;
-  if (raw && (raw.startsWith('blob:') || raw.startsWith('data:'))) return raw;
+  if (raw?.startsWith('data:')) return raw;
+  if (raw?.startsWith('blob:')) return null;
   return resolveProductImageUrl(raw) || getItemImageUrl(item?.name || '') || null;
 }
 

@@ -1,5 +1,6 @@
 import { saveLoyaltyCategory, deleteLoyaltyCategory } from '../services/crm-ref-data.js';
 import { showToast } from '../utils/toast.js';
+import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -13,6 +14,32 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
   /** @type {string|null} */
   let selectedId = categories[0]?.id || null;
   let saving = false;
+
+  /** @type {string} */
+  let baselineJson = '';
+
+  function snapshot() {
+    return JSON.stringify(categories.map(c => ({ ...c })).sort((a, b) => a.id.localeCompare(b.id)));
+  }
+
+  function commitBaseline() {
+    syncPanel();
+    baselineJson = snapshot();
+  }
+
+  function isDirty() {
+    syncPanel();
+    return snapshot() !== baselineJson;
+  }
+
+  function discardChanges() {
+    categories = JSON.parse(baselineJson);
+    if (selectedId && !categories.some(c => c.id === selectedId)) {
+      selectedId = categories[0]?.id || null;
+    }
+  }
+
+  commitBaseline();
 
   function selectedCategory() {
     return categories.find(c => c.id === selectedId) || null;
@@ -97,6 +124,7 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
               <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="lyc-delete" disabled>Удалить категорию</button>
             </div>
             <div class="footer-action-bar">
+              ${renderAvrCancelButton('lyc-cancel')}
               <button type="button" class="action-btn action-btn-primary btn-press" id="lyc-save" ${saving ? 'disabled' : ''}>
                 ${saving ? 'Сохранение…' : 'Сохранить'}
               </button>
@@ -148,6 +176,7 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
     render();
     try {
       await saveLoyaltyCategory(cat);
+      commitBaseline();
       showToast('Категория сохранена');
       await onSaved?.();
       return true;
@@ -162,24 +191,46 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
 
   function bind() {
     host.querySelector('#lyc-create')?.addEventListener('click', () => {
-      const id = uniqueId('новая_категория');
-      const draft = { id, name: 'Новая категория', discountPercent: 0, cashbackPercent: 0 };
-      categories = [...categories, draft];
-      selectedId = id;
-      render();
-      host.querySelector('[data-field="name"]')?.focus();
-      host.querySelector('[data-field="name"]')?.select();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: persistCurrent,
+        proceed: () => {
+          const id = uniqueId('новая_категория');
+          const draft = { id, name: 'Новая категория', discountPercent: 0, cashbackPercent: 0 };
+          categories = [...categories, draft];
+          selectedId = id;
+          render();
+          host.querySelector('[data-field="name"]')?.focus();
+          host.querySelector('[data-field="name"]')?.select();
+        },
+      });
     });
 
     host.querySelector('#lyc-list')?.addEventListener('click', e => {
       const btn = e.target.closest('[data-action="select"]');
       if (!btn) return;
-      syncPanel();
-      selectedId = btn.closest('.avr-row')?.dataset.id || null;
-      render();
+      const id = btn.closest('.avr-row')?.dataset.id;
+      if (!id || id === selectedId) return;
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: persistCurrent,
+        proceed: () => {
+          selectedId = id;
+          render();
+        },
+      });
     });
 
+    host.querySelector('#lyc-detail-panel')?.addEventListener('input', () => syncPanel());
+
     host.querySelector('#lyc-save')?.addEventListener('click', persistCurrent);
+    host.querySelector('#lyc-cancel')?.addEventListener('click', () => {
+      if (!isDirty()) return;
+      discardChanges();
+      render();
+    });
 
     host.querySelector('#lyc-delete-confirm')?.addEventListener('change', e => {
       host.querySelector('#lyc-delete').disabled = !e.target.checked;
@@ -192,6 +243,7 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
         await deleteLoyaltyCategory(selectedId);
         categories = categories.filter(c => c.id !== selectedId);
         selectedId = categories[0]?.id || null;
+        commitBaseline();
         showToast('Категория удалена');
         await onSaved?.();
       } catch (err) {
@@ -205,7 +257,7 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
 
   render();
 
-  return { destroy() { host.innerHTML = ''; } };
+  return { destroy() { host.innerHTML = ''; }, isDirty };
 }
 
 function esc(s) {

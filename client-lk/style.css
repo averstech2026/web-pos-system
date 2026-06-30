@@ -314,15 +314,16 @@
 }
 
 .order-card-meta {
-  font-size: var(--font-size-sm);
+  font-size: 10px;
   font-weight: 600;
   color: var(--color-navy);
   line-height: 1.35;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
 }
 
 .order-card-submeta {
-  font-size: var(--font-size-xs);
+  font-size: 9px;
   font-weight: 500;
   color: var(--color-text-muted);
   line-height: 1.35;
@@ -2113,3 +2114,478 @@ button.order-status-pill {
   min-height: 52px;
   margin-top: var(--space-sm);
 }
+
+/* ── Marketing: stories + hero banner (LK) ───────────────── */
+#mkt-block-host,
+.mkt-home-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  width: 100%;
+}
+
+.mkt-home-stack > section {
+  margin: 0;
+}
+
+.mkt-stories-section {
+  width: 100%;
+}
+
+.mkt-stories-carousel {
+  padding: 4px;
+  margin: -4px;
+  border-radius: 1.125rem;
+  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.04));
+}
+
+.mkt-stories-scroll {
+  --mkt-story-gap: 0.75rem;
+  display: flex;
+  overflow-x: auto;
+  gap: var(--mkt-story-gap);
+  padding: 4px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  border-radius: 1rem;
+}
+
+.mkt-stories-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.mkt-story-card {
+  flex: 0 0 auto;
+  width: calc((100% - (3 * var(--mkt-story-gap))) / 3.5);
+  aspect-ratio: 1;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 1rem;
+  scroll-snap-align: start;
+  transition: transform 0.2s ease;
+  cursor: pointer;
+}
+
+.mkt-story-card:active {
+  transform: scale(0.95);
+}
+
+.mkt-story-thumb-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(145deg, #eef1f6 0%, #d8dee8 100%);
+  box-shadow: none;
+}
+
+.mkt-story-thumb-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  pointer-events: none;
+}
+
+.mkt-story-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 1rem;
+  display: block;
+  background: linear-gradient(145deg, #eef1f6 0%, #d8dee8 100%);
+}
+
+.mkt-story-thumb--error {
+  display: none;
+}
+
+.mkt-hero-section {
+  width: 100%;
+}
+
+.mkt-hero-card {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 1;
+  border-radius: 20px;
+  overflow: hidden;
+  border: none;
+  padding: 0;
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4f46e5 100%);
+  font-family: var(--font-base);
+  box-shadow:
+    0 22px 44px -14px rgba(30, 27, 75, 0.52),
+    0 10px 20px -10px rgba(30, 27, 75, 0.34),
+    0 2px 6px rgba(30, 27, 75, 0.18);
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+@media (min-width: 768px) {
+  .mkt-hero-card {
+    aspect-ratio: 4 / 1;
+  }
+}
+
+.mkt-hero-card:active {
+  transform: scale(0.99);
+}
+
+.mkt-hero-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mkt-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  pointer-events: none;
+}
+
+.mkt-hero-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  height: 100%;
+  padding: 1rem 1.1rem;
+  text-align: left;
+}
+
+.mkt-hero-title {
+  font-family: var(--font-base);
+  font-size: clamp(1rem, 4.5vw, 1.25rem);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.mkt-hero-sub {
+  margin-top: 0.2rem;
+  font-family: var(--font-base);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+/* Marketing detail modal / drawer */
+.mkt-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  background: rgba(15, 23, 42, 0.55);
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.mkt-modal-overlay--open {
+  opacity: 1;
+}
+
+.mkt-modal-overlay--drawer {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.mkt-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90dvh;
+  background: var(--color-surface);
+  border-radius: 1.25rem;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(12px) scale(0.98);
+  opacity: 0;
+  transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+  box-shadow: 0 24px 48px rgba(30, 27, 75, 0.22);
+}
+
+.mkt-modal-overlay--open .mkt-modal {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.mkt-modal--drawer {
+  max-width: 100%;
+  border-radius: 1.25rem 1.25rem 0 0;
+  transform: translateY(100%);
+}
+
+.mkt-modal-overlay--open .mkt-modal--drawer {
+  transform: translateY(0);
+}
+
+.mkt-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--color-text);
+  font-size: 1rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.mkt-modal-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--color-bg);
+}
+
+.mkt-modal-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mkt-modal-body {
+  padding: var(--space-md);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.mkt-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-navy);
+  margin: 0 0 0.5rem;
+}
+
+.mkt-modal-short {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin: 0 0 0.75rem;
+}
+
+.mkt-modal-desc {
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  color: var(--color-text);
+}
+
+.mkt-modal-desc ul {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.mkt-modal-foot {
+  padding: var(--space-md);
+  border-top: 1px solid rgba(229, 231, 235, 0.8);
+}
+
+.mkt-modal-foot .btn {
+  width: 100%;
+}
+
+/* Horizontal promo cards */
+.mkt-cards-section {
+  width: 100%;
+}
+
+.mkt-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.mkt-promo-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+  background: #fff;
+  text-align: left;
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+}
+
+.mkt-promo-card:active {
+  transform: scale(0.99);
+}
+
+.mkt-promo-card:hover {
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(30, 27, 75, 0.08);
+}
+
+.mkt-promo-card-thumb {
+  width: 4rem;
+  height: 4rem;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-bg);
+}
+
+.mkt-promo-card-thumb--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.mkt-promo-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.mkt-promo-card-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-navy);
+  line-height: 1.25;
+}
+
+.mkt-promo-card-desc {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mkt-promo-card-arrow {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Horizontal promo banner (reference style) */
+.mkt-promo-horizontal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.mkt-promo-horizontal {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 8.5rem;
+  padding: 1.25rem 1rem;
+  border: none;
+  border-radius: 2rem;
+  background: var(--mkt-promo-bg, #7cb9bc);
+  overflow: hidden;
+  text-align: left;
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.mkt-promo-horizontal:active {
+  transform: scale(0.99);
+}
+
+.mkt-promo-horizontal-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 58%;
+  padding-right: 0.5rem;
+}
+
+.mkt-promo-horizontal-title {
+  font-size: clamp(1.05rem, 4.8vw, 1.35rem);
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.15;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.12);
+}
+
+.mkt-promo-horizontal-sub {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1.4;
+}
+
+.mkt-promo-badge {
+  display: inline-block;
+  margin: 0 0.15rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.28);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.mkt-promo-horizontal-art {
+  position: absolute;
+  right: 0.25rem;
+  bottom: 0;
+  width: 46%;
+  max-width: 11rem;
+  height: 110%;
+  object-fit: contain;
+  object-position: right bottom;
+  pointer-events: none;
+}
+
+.menu-marketing-host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: 0 var(--space-md) var(--space-md);
+}
+
+.menu-marketing-host:empty {
+  display: none;
+  padding: 0;
+}
+

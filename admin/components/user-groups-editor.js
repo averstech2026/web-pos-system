@@ -1,5 +1,6 @@
 import { saveUserGroup, deleteUserGroup } from '../services/crm-ref-data.js';
 import { showToast } from '../utils/toast.js';
+import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -13,6 +14,32 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
   /** @type {string|null} */
   let selectedId = groups[0]?.id || null;
   let saving = false;
+
+  /** @type {string} */
+  let baselineJson = '';
+
+  function snapshot() {
+    return JSON.stringify(groups.map(g => ({ ...g })).sort((a, b) => a.id.localeCompare(b.id)));
+  }
+
+  function commitBaseline() {
+    syncPanel();
+    baselineJson = snapshot();
+  }
+
+  function isDirty() {
+    syncPanel();
+    return snapshot() !== baselineJson;
+  }
+
+  function discardChanges() {
+    groups = JSON.parse(baselineJson);
+    if (selectedId && !groups.some(g => g.id === selectedId)) {
+      selectedId = groups[0]?.id || null;
+    }
+  }
+
+  commitBaseline();
 
   function selectedGroup() {
     return groups.find(g => g.id === selectedId) || null;
@@ -85,6 +112,7 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
               <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="ugg-delete" disabled>Удалить группу</button>
             </div>
             <div class="footer-action-bar">
+              ${renderAvrCancelButton('ugg-cancel')}
               <button type="button" class="action-btn action-btn-primary btn-press" id="ugg-save" ${saving ? 'disabled' : ''}>
                 ${saving ? 'Сохранение…' : 'Сохранить'}
               </button>
@@ -136,6 +164,7 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
     render();
     try {
       await saveUserGroup(group);
+      commitBaseline();
       showToast('Группа сохранена');
       await onSaved?.();
       return true;
@@ -150,24 +179,46 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
 
   function bind() {
     host.querySelector('#ugg-create')?.addEventListener('click', () => {
-      const id = uniqueId('новая_группа');
-      const draft = { id, name: 'Новая группа', description: '' };
-      groups = [...groups, draft];
-      selectedId = id;
-      render();
-      host.querySelector('[data-field="name"]')?.focus();
-      host.querySelector('[data-field="name"]')?.select();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: persistCurrent,
+        proceed: () => {
+          const id = uniqueId('новая_группа');
+          const draft = { id, name: 'Новая группа', description: '' };
+          groups = [...groups, draft];
+          selectedId = id;
+          render();
+          host.querySelector('[data-field="name"]')?.focus();
+          host.querySelector('[data-field="name"]')?.select();
+        },
+      });
     });
 
     host.querySelector('#ugg-list')?.addEventListener('click', e => {
       const btn = e.target.closest('[data-action="select"]');
       if (!btn) return;
-      syncPanel();
-      selectedId = btn.closest('.avr-row')?.dataset.id || null;
-      render();
+      const id = btn.closest('.avr-row')?.dataset.id;
+      if (!id || id === selectedId) return;
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: persistCurrent,
+        proceed: () => {
+          selectedId = id;
+          render();
+        },
+      });
     });
 
+    host.querySelector('#ugg-detail-panel')?.addEventListener('input', () => syncPanel());
+
     host.querySelector('#ugg-save')?.addEventListener('click', persistCurrent);
+    host.querySelector('#ugg-cancel')?.addEventListener('click', () => {
+      if (!isDirty()) return;
+      discardChanges();
+      render();
+    });
 
     host.querySelector('#ugg-delete-confirm')?.addEventListener('change', e => {
       host.querySelector('#ugg-delete').disabled = !e.target.checked;
@@ -180,6 +231,7 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
         await deleteUserGroup(selectedId);
         groups = groups.filter(g => g.id !== selectedId);
         selectedId = groups[0]?.id || null;
+        commitBaseline();
         showToast('Группа удалена');
         await onSaved?.();
       } catch (err) {
@@ -193,7 +245,7 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
 
   render();
 
-  return { destroy() { host.innerHTML = ''; } };
+  return { destroy() { host.innerHTML = ''; }, isDirty };
 }
 
 function esc(s) {

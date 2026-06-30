@@ -1,5 +1,6 @@
 import { saveWallet, deleteWallet } from '../services/wallets-data.js';
 import { showToast } from '../utils/toast.js';
+import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -20,6 +21,33 @@ export function createWalletsEditor(host, {
   /** @type {string|null} */
   let selectedId = wallets[0]?.id || null;
   let saving = false;
+
+  /** @type {string} */
+  let baselineJson = '';
+
+  function snapshot() {
+    return JSON.stringify(wallets.map(w => ({ ...w, restrictions: [...(w.restrictions || [])] }))
+      .sort((a, b) => a.id.localeCompare(b.id)));
+  }
+
+  function commitBaseline() {
+    syncPanel();
+    baselineJson = snapshot();
+  }
+
+  function isDirty() {
+    syncPanel();
+    return snapshot() !== baselineJson;
+  }
+
+  function discardChanges() {
+    wallets = JSON.parse(baselineJson);
+    if (selectedId && !wallets.some(w => w.id === selectedId)) {
+      selectedId = wallets[0]?.id || null;
+    }
+  }
+
+  commitBaseline();
 
   function selectedWallet() {
     return wallets.find(w => w.id === selectedId) || null;
@@ -107,10 +135,15 @@ export function createWalletsEditor(host, {
       <div class="avr-detail-panel" id="wal-detail-panel">
         <div class="avr-detail-scroll">
           <section class="cgr-detail-card">
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Название</span>
-              <input type="text" class="cgr-detail-name-input" data-field="name" value="${escAttr(wallet.name)}" maxlength="80" placeholder="Дотация" />
-            </label>
+            <div class="cgr-detail-name-row wallet-detail-name-row">
+              <label class="cgr-detail-name-field">
+                <span class="cgr-detail-label">Название</span>
+                <input type="text" class="cgr-detail-name-input" data-field="name" value="${escAttr(wallet.name)}" maxlength="80" placeholder="Дотация" />
+              </label>
+              <button type="button" class="action-btn action-btn-secondary btn-press wallet-detail-distribute-btn" id="wal-distribute-detail" ${saving ? 'disabled' : ''}>
+                Распределить средства
+              </button>
+            </div>
             <label class="cgr-detail-name-field cgr-detail-name-field--solo">
               <span class="cgr-detail-label">Описание</span>
               <textarea class="cgr-detail-name-input ufm-textarea" data-field="description" rows="3" placeholder="Назначение кошелька">${esc(wallet.description || '')}</textarea>
@@ -130,9 +163,7 @@ export function createWalletsEditor(host, {
               <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="wal-delete" disabled>Удалить кошелёк</button>
             </div>
             <div class="footer-action-bar">
-              <button type="button" class="action-btn action-btn-secondary btn-press" id="wal-distribute-detail" ${saving ? 'disabled' : ''}>
-                Распределить средства
-              </button>
+              ${renderAvrCancelButton('wal-cancel')}
               <button type="button" class="action-btn action-btn-primary btn-press" id="wal-save" ${saving ? 'disabled' : ''}>
                 ${saving ? 'Сохранение…' : 'Сохранить'}
               </button>
@@ -175,21 +206,61 @@ export function createWalletsEditor(host, {
     }
   }
 
+  async function persistCurrent() {
+    syncPanel();
+    const wallet = selectedWallet();
+    if (!wallet?.name?.trim()) {
+      showError('Укажите название кошелька');
+      return false;
+    }
+    saving = true;
+    render();
+    try {
+      await saveWallet(wallet);
+      commitBaseline();
+      showToast('Кошелёк сохранён');
+      await onSaved?.();
+      return true;
+    } catch (err) {
+      showError(err.message || 'Не удалось сохранить');
+      return false;
+    } finally {
+      saving = false;
+      render();
+    }
+  }
+
   function bind() {
     host.querySelector('#wal-distribute-detail')?.addEventListener('click', () => onDistribute?.(selectedId));
 
     host.querySelector('#wal-create')?.addEventListener('click', () => {
-      const id = uniqueId('Новый кошелёк');
-      wallets.push({ id, name: 'Новый кошелёк', description: '', restrictions: [] });
-      selectedId = id;
-      render();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: persistCurrent,
+        proceed: () => {
+          const id = uniqueId('Новый кошелёк');
+          wallets.push({ id, name: 'Новый кошелёк', description: '', restrictions: [] });
+          selectedId = id;
+          render();
+        },
+      });
     });
 
     host.querySelector('#wal-list')?.addEventListener('click', e => {
       const row = e.target.closest('[data-id]');
       if (!row || !e.target.closest('[data-action="select"]')) return;
-      selectedId = row.dataset.id;
-      render();
+      const id = row.dataset.id;
+      if (!id || id === selectedId) return;
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save: persistCurrent,
+        proceed: () => {
+          selectedId = id;
+          render();
+        },
+      });
     });
 
     host.querySelector('#wal-detail-panel')?.addEventListener('input', () => syncPanel());
@@ -202,24 +273,11 @@ export function createWalletsEditor(host, {
       if (btn) btn.disabled = !e.target.checked;
     });
 
-    host.querySelector('#wal-save')?.addEventListener('click', async () => {
-      syncPanel();
-      const wallet = selectedWallet();
-      if (!wallet?.name?.trim()) {
-        showError('Укажите название кошелька');
-        return;
-      }
-      saving = true;
+    host.querySelector('#wal-save')?.addEventListener('click', persistCurrent);
+    host.querySelector('#wal-cancel')?.addEventListener('click', () => {
+      if (!isDirty()) return;
+      discardChanges();
       render();
-      try {
-        await saveWallet(wallet);
-        showToast('Кошелёк сохранён');
-        await onSaved?.();
-      } catch (err) {
-        saving = false;
-        render();
-        showError(err.message || 'Не удалось сохранить');
-      }
     });
 
     host.querySelector('#wal-delete')?.addEventListener('click', async () => {
@@ -231,6 +289,7 @@ export function createWalletsEditor(host, {
         await deleteWallet(wallet.id);
         wallets = wallets.filter(w => w.id !== wallet.id);
         selectedId = wallets[0]?.id || null;
+        commitBaseline();
         saving = false;
         showToast('Кошелёк удалён');
         await onSaved?.();
@@ -248,6 +307,7 @@ export function createWalletsEditor(host, {
     destroy() {
       host.innerHTML = '';
     },
+    isDirty,
   };
 }
 

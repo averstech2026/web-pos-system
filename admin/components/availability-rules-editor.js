@@ -19,6 +19,7 @@ import {
   saveAvailabilityRule,
 } from '../services/availability-rules-data.js';
 import { showToast } from '../utils/toast.js';
+import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -44,6 +45,35 @@ export function createAvailabilityRulesEditor(host, {
   let selectedId = filterActiveRules(rules)[0]?.id || null;
   /** @type {boolean} */
   let isNew = false;
+
+  /** @type {string} */
+  let baselineJson = '';
+
+  function snapshot() {
+    return JSON.stringify(
+      rules.map(r => normalizeAvailabilityRuleDoc(r, r.id)).sort((a, b) => a.id.localeCompare(b.id)),
+    );
+  }
+
+  function commitBaseline() {
+    syncPanelToState();
+    baselineJson = snapshot();
+  }
+
+  function isDirty() {
+    syncPanelToState();
+    return snapshot() !== baselineJson;
+  }
+
+  function discardChanges() {
+    rules = JSON.parse(baselineJson);
+    isNew = false;
+    if (selectedId && !rules.some(r => r.id === selectedId)) {
+      selectedId = activeRules()[0]?.id || null;
+    }
+  }
+
+  commitBaseline();
 
   function activeRules() {
     return filterActiveRules(rules);
@@ -240,6 +270,7 @@ export function createAvailabilityRulesEditor(host, {
             ` : ''}
             <div class="footer-action-bar">
               ${!isNew ? `<button type="button" class="action-btn action-btn-secondary btn-press" id="avr-archive-btn">В архив</button>` : ''}
+              ${renderAvrCancelButton('avr-detail-cancel')}
               <button type="button" class="action-btn action-btn-primary btn-press" id="avr-save-btn">Сохранить шаблон</button>
             </div>
           </div>
@@ -352,15 +383,21 @@ export function createAvailabilityRulesEditor(host, {
     bindConditionEvents();
 
     host.querySelector('#avr-create-btn')?.addEventListener('click', () => {
-      syncPanelToState();
-      const draft = createDefaultAvailabilityRuleDoc(`draft-${Date.now()}`);
-      rules.push(draft);
-      selectedId = draft.id;
-      isNew = true;
-      render();
-      requestAnimationFrame(() => {
-        host.querySelector('[data-field="name"]')?.focus();
-        host.querySelector('[data-field="name"]')?.select();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save,
+        proceed: () => {
+          const draft = createDefaultAvailabilityRuleDoc(`draft-${Date.now()}`);
+          rules.push(draft);
+          selectedId = draft.id;
+          isNew = true;
+          render();
+          requestAnimationFrame(() => {
+            host.querySelector('[data-field="name"]')?.focus();
+            host.querySelector('[data-field="name"]')?.select();
+          });
+        },
       });
     });
 
@@ -369,13 +406,24 @@ export function createAvailabilityRulesEditor(host, {
       if (!btn) return;
       const id = btn.closest('.avr-row')?.dataset.id;
       if (!id || id === selectedId) return;
-      syncPanelToState();
-      selectedId = id;
-      isNew = false;
-      render();
+      runWithUnsavedGuard({
+        isDirty,
+        discard: discardChanges,
+        save,
+        proceed: () => {
+          selectedId = id;
+          isNew = false;
+          render();
+        },
+      });
     });
 
     host.querySelector('#avr-save-btn')?.addEventListener('click', () => save());
+    host.querySelector('#avr-detail-cancel')?.addEventListener('click', () => {
+      if (!isDirty()) return;
+      discardChanges();
+      render();
+    });
     host.querySelector('#avr-archive-btn')?.addEventListener('click', () => archiveRule());
     host.querySelector('#avr-delete-confirm')?.addEventListener('change', e => {
       const btn = host.querySelector('#avr-detail-delete');
@@ -485,15 +533,18 @@ export function createAvailabilityRulesEditor(host, {
       rules = [...rules.filter(r => r.id !== saved.id), saved];
       selectedId = saved.id;
       isNew = false;
+      commitBaseline();
 
       render();
       await onSaved?.();
+      return true;
     } catch (err) {
       console.error('[availability-rules]', err);
       if (errEl) {
         errEl.textContent = err.message || 'Не удалось сохранить шаблон';
         errEl.hidden = false;
       }
+      return false;
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -509,6 +560,7 @@ export function createAvailabilityRulesEditor(host, {
       rules = rules.map(r => (r.id === idToArchive ? { ...r, status: 'archived' } : r));
       selectedId = activeRules()[0]?.id || null;
       isNew = false;
+      commitBaseline();
       render();
       await onSaved?.();
     } catch (err) {
@@ -539,6 +591,7 @@ export function createAvailabilityRulesEditor(host, {
       rules = rules.filter(r => r.id !== idToDelete);
       selectedId = activeRules()[0]?.id || null;
       isNew = false;
+      commitBaseline();
       render();
       await onSaved?.();
     } catch (err) {
@@ -560,7 +613,7 @@ export function createAvailabilityRulesEditor(host, {
   }
 
   render();
-  return { destroy };
+  return { destroy, isDirty };
 }
 
 function esc(s) {

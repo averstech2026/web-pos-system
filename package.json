@@ -4,17 +4,24 @@
   "description": "Demo POS system and personal lunch ordering account",
   "type": "module",
   "scripts": {
-    "dev:lk": "vite client-lk --config client-lk/vite.config.js",
-    "dev:admin": "vite admin --config admin/vite.config.js --port 3002",
-    "dev:kitchen": "vite kitchen-terminal --config kitchen-terminal/vite.config.js --port 3003",
-    "dev:delivery": "vite delivery-terminal --config delivery-terminal/vite.config.js --port 3004",
-    "dev:queue": "vite queue-screen --config queue-screen/vite.config.js --port 3005",
+    "dev:lk": "vite client-lk --config client-lk/vite.config.js --host 0.0.0.0",
+    "dev:admin": "vite admin --config admin/vite.config.js --port 3002 --host 0.0.0.0",
+    "dev:kitchen": "vite kitchen-terminal --config kitchen-terminal/vite.config.js --port 3003 --host 0.0.0.0",
+    "dev:delivery": "vite delivery-terminal --config delivery-terminal/vite.config.js --port 3004 --host 0.0.0.0",
+    "dev:queue": "vite queue-screen --config queue-screen/vite.config.js --port 3005 --host 0.0.0.0",
     "build:lk": "vite build client-lk --outDir ../dist/client-lk && cp -r products dist/client-lk/products",
     "build:admin": "vite build admin --outDir ../dist/admin && cp -r products dist/admin/products",
     "build:kitchen": "vite build kitchen-terminal --outDir ../dist/kitchen-terminal",
     "build:delivery": "vite build delivery-terminal --outDir ../dist/delivery-terminal",
     "build:queue": "vite build queue-screen --outDir ../dist/queue-screen",
-    "build": "npm run build:lk && npm run build:admin && npm run build:kitchen && npm run build:delivery && npm run build:queue"
+    "build:kiosk": "vite build kiosk --outDir ../dist/kiosk && cp -r products dist/kiosk/products",
+    "build": "npm run build:lk && npm run build:admin && npm run build:kitchen && npm run build:delivery && npm run build:queue && npm run build:kiosk",
+    "dev:kiosk": "vite kiosk --config kiosk/vite.config.js --port 3006 --host 0.0.0.0",
+    "migrate:kiosk": "node scripts/migrate-kiosk-catalog.js",
+    "migrate:kiosk:dry": "node scripts/migrate-kiosk-catalog.js --dry-run",
+    "build:kiosk-catalog": "node scripts/build-kiosk-catalog-data.mjs",
+    "sync:kiosk-assets": "node scripts/sync-kiosk-assets.mjs",
+    "patch:kiosk-images": "node scripts/patch-kiosk-images.mjs"
   },
   "dependencies": {
     "firebase": "^11.0.0",
@@ -22,6 +29,7 @@
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
+    "firebase-admin": "^13.0.0",
     "vite": "^6.0.0"
   }
 }
