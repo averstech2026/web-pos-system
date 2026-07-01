@@ -103,3 +103,11 @@ export function isLineIssued(issuedLines, key) {
 export function allLinesIssued(items, issuedLines) {
   return expandItemLines(items).every(l => isLineIssued(issuedLines, l.key));
 }
+
+const KIOSK_GUEST_ID = 'kiosk-guest';
+
+/** @param {string} [userId] */
+export function clientDisplayName(userId, usersById = {}) {
+  if (!userId || userId === KIOSK_GUEST_ID) return 'Гость киоска';
+  return usersById[userId]?.name || 'Клиент';
+}

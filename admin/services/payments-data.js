@@ -97,7 +97,21 @@ export function paymentMethodMeta(method) {
   const receiptLabel = method.receiptType === RECEIPT_TYPE.NON_FISCAL
     ? 'Не фискальный'
     : 'Фискальный';
-  const restrCount = method.allowedCategories?.length || 0;
-  if (restrCount) return `${receiptLabel} · ${restrCount} кат.`;
-  return receiptLabel;
+  const parts = [receiptLabel];
+  const catCount = method.allowedCategories?.length || 0;
+  const groupCount = method.allowedUserGroups?.length || 0;
+
+  if (catCount) parts.push(`${catCount} кат.`);
+  if (groupCount) parts.push(`${groupCount} ${clientGroupsCountLabel(groupCount)}`);
+
+  return parts.join(' · ');
+}
+
+/** @param {number} count */
+function clientGroupsCountLabel(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'группа клиентов';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'группы клиентов';
+  return 'групп клиентов';
 }

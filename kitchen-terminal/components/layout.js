@@ -7,10 +7,10 @@ import { fmtClock, fmtDateLong } from '../utils/format.js';
  * @param {object} p
  * @param {string} p.title
  * @param {'orders'|'assembly'} p.activeTab
- * @param {string} p.toolbarHtml
+ * @param {string} [p.toolbarClass]
  * @param {string} p.bodyHtml
  */
-export function renderKitchenShell({ title, activeTab, toolbarHtml = '', bodyHtml }) {
+export function renderKitchenShell({ title, activeTab, toolbarHtml = '', toolbarClass = '', bodyHtml }) {
   return `
     <div class="kt-shell">
       <div class="kt-top-fixed">
@@ -22,7 +22,7 @@ export function renderKitchenShell({ title, activeTab, toolbarHtml = '', bodyHtm
             <span class="kt-clock-date" id="kt-clock-date">${fmtDateLong()}</span>
           </div>
         </header>
-        ${toolbarHtml ? `<div class="kt-toolbar">${toolbarHtml}</div>` : ''}
+        ${toolbarHtml ? `<div class="kt-toolbar ${toolbarClass}">${toolbarHtml}</div>` : ''}
       </div>
 
       <main class="kt-main kiosk-scroll" id="kt-main">${bodyHtml}</main>

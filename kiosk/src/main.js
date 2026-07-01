@@ -9,6 +9,7 @@ import { fitKiosk } from './ui/layout.js';
 import { bindKioskEvents } from './ui/events.js';
 import { loadKioskCatalog } from './services/catalog.js';
 import { ensureKioskSession } from './services/auth.js';
+import { renderKioskMaintenanceIfNeeded } from './services/sales-channel.js';
 
 if (import.meta.env.DEV) {
   import('@shared/seed.js').then(({ seedStaffAuth, STAFF_DEMO_PASSWORD }) => {
@@ -50,7 +51,13 @@ async function init() {
   fitKiosk();
   showBootLoading();
 
+  const wrapper = document.getElementById('kiosk-wrapper');
   try {
+    if (wrapper && await renderKioskMaintenanceIfNeeded(wrapper)) {
+      hideBootLoading();
+      return;
+    }
+
     await ensureKioskSession();
     await loadKioskCatalog();
   } catch (err) {

@@ -1,6 +1,6 @@
 import { saveAllergens } from '../services/menu-settings-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+import { renderAvrDetailStickyHead, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -122,7 +122,13 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
     const count = productCount(allergen.id);
     return `
       <div class="avr-detail-panel" id="alr-detail-panel">
-        <div class="avr-detail-scroll alr-detail-scroll">
+        ${renderAvrDetailStickyHead({
+          title: 'Редактирование аллергена',
+          cancelId: 'alr-detail-cancel',
+          saveId: 'alr-detail-save',
+          saveLabel: 'Сохранить изменения',
+        })}
+        <div class="avr-detail-body">
           <div class="admin-form-stack">
             <div class="admin-field-block">
               <label class="admin-field-label" for="alr-name">Название</label>
@@ -146,7 +152,7 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
         </div>
 
         <div class="avr-detail-foot">
-          <div class="avr-detail-foot-row">
+          <div class="avr-detail-foot-row avr-detail-foot-row--danger-only">
             <div class="cgr-detail-danger cgr-detail-danger--wide">
               <label class="cgr-delete-confirm">
                 <input type="checkbox" id="alr-delete-confirm" />
@@ -155,10 +161,6 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
               <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="alr-detail-delete" disabled>
                 Удалить аллерген
               </button>
-            </div>
-            <div class="footer-action-bar">
-              ${renderAvrCancelButton('alr-detail-cancel')}
-              <button type="button" class="action-btn action-btn-primary btn-press" id="alr-detail-save">Сохранить изменения</button>
             </div>
           </div>
         </div>

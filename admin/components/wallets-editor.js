@@ -1,6 +1,6 @@
 import { saveWallet, deleteWallet } from '../services/wallets-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+import { renderAvrDetailStickyHead, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -133,7 +133,14 @@ export function createWalletsEditor(host, {
   function renderDetail(wallet) {
     return `
       <div class="avr-detail-panel" id="wal-detail-panel">
-        <div class="avr-detail-scroll">
+        ${renderAvrDetailStickyHead({
+          title: 'Редактирование кошелька',
+          cancelId: 'wal-cancel',
+          saveId: 'wal-save',
+          saveLabel: saving ? 'Сохранение…' : 'Сохранить изменения',
+          saveDisabled: saving,
+        })}
+        <div class="avr-detail-body">
           <div class="admin-form-stack">
             <div class="admin-field-block">
               <label class="admin-field-label" for="wal-name">Название</label>
@@ -154,19 +161,13 @@ export function createWalletsEditor(host, {
           <p class="ifm-error" id="wal-error" hidden></p>
         </div>
         <div class="avr-detail-foot">
-          <div class="avr-detail-foot-row">
-            <div class="cgr-detail-danger">
+          <div class="avr-detail-foot-row avr-detail-foot-row--danger-only">
+            <div class="cgr-detail-danger cgr-detail-danger--wide">
               <label class="cgr-delete-confirm">
                 <input type="checkbox" id="wal-delete-confirm" />
                 <span>Подтверждаю удаление кошелька</span>
               </label>
               <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="wal-delete" disabled>Удалить кошелёк</button>
-            </div>
-            <div class="footer-action-bar">
-              ${renderAvrCancelButton('wal-cancel')}
-              <button type="button" class="action-btn action-btn-primary btn-press" id="wal-save" ${saving ? 'disabled' : ''}>
-                ${saving ? 'Сохранение…' : 'Сохранить'}
-              </button>
             </div>
           </div>
         </div>

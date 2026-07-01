@@ -423,6 +423,11 @@ export const ORDER_SOURCE = {
 
 /**
  * orders/{id}
+ * Lifecycle fields (set by modules):
+ *   paidAt — payment (client/kiosk)
+ *   preparedLines — kitchen cooking checkmarks
+ *   readyAt, status=ready — kitchen «Заказ готов»
+ *   issuedLines, completedAt, issuedBy — delivery terminal
  * @param {object} p
  * @param {string} p.orderNumber
  * @param {string} p.userId

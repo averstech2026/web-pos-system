@@ -28,7 +28,8 @@ export function renderAdminFieldLabel(text, { forId } = {}) {
  * @param {string} [p.kioskOrderField] data-field for kiosk order input
  * @param {string} [p.webOrderId]
  * @param {string} [p.kioskOrderId]
- * @param {boolean} [p.showOrderFields=true]
+ *   @param {string} [p.fieldLabel]
+  @param {boolean} [p.showOrderFields=true]
  */
 export function renderChannelAvailabilityGrid({
   id = 'entity-visibility-section',
@@ -38,6 +39,7 @@ export function renderChannelAvailabilityGrid({
   kioskOrder = 0,
   modeDataAttr,
   ariaLabel = 'Доступность',
+  fieldLabel = 'Доступность',
   webOrderField = 'web-order',
   kioskOrderField = 'kiosk-order',
   webOrderId = 'admin-web-order',
@@ -46,7 +48,7 @@ export function renderChannelAvailabilityGrid({
 }) {
   const tabsHtml = `
     <div class="admin-channel-tabs-wrap">
-      <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10" role="radiogroup" aria-label="${escAttr(ariaLabel)}">
+      <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10 admin-channel-tabs--avail" role="radiogroup" aria-label="${escAttr(ariaLabel)}">
         ${modes.map(o => `
           <button
             type="button"
@@ -63,7 +65,7 @@ export function renderChannelAvailabilityGrid({
   if (!showOrderFields) {
     return `
       <div class="admin-field-block" id="${escAttr(id)}">
-        ${renderAdminFieldLabel('Доступность')}
+        ${renderAdminFieldLabel(fieldLabel)}
         ${tabsHtml}
       </div>
     `;
@@ -72,7 +74,7 @@ export function renderChannelAvailabilityGrid({
   return `
     <div class="admin-channel-grid" id="${escAttr(id)}">
       <div class="admin-channel-field">
-        ${renderAdminFieldLabel('Доступность')}
+        ${renderAdminFieldLabel(fieldLabel)}
         ${tabsHtml}
       </div>
       <div class="admin-channel-field">

@@ -1,0 +1,43 @@
+.sch-maintenance {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 1.5rem;
+  text-align: center;
+  background: #f8fafc;
+}
+
+.sch-maintenance__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 28rem;
+}
+
+.sch-maintenance__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.sch-maintenance__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #1e293b;
+}
+
+.sch-maintenance__message {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: #64748b;
+}

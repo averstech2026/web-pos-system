@@ -5,11 +5,20 @@ import {
 } from '../services/payments-data.js';
 import { RECEIPT_TYPE, PAYMENT_CURRENCY } from '../../shared/schema.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+import { renderAvrDetailStickyHead, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 const CURRENCY_OPTIONS = [
   { value: PAYMENT_CURRENCY.RUB, label: 'Рубль (₽)' },
 ];
+
+const RECEIPT_TYPE_OPTIONS = [
+  { id: RECEIPT_TYPE.FISCAL, label: 'Фискальный платеж' },
+  { id: RECEIPT_TYPE.NON_FISCAL, label: 'Не фискальный платеж' },
+];
+
+const CHIP_SELECT_ICON = `<svg class="pay-restrictions-chip-btn__icon" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`;
+
+const CHIP_DESELECT_ICON = `<svg class="pay-restrictions-chip-btn__icon" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 9 6 6M15 9l-6 6"/></svg>`;
 
 /**
  * @param {HTMLElement} host
@@ -73,7 +82,7 @@ export function createPaymentsEditor(host, {
       .map(el => el.dataset.category);
     const allowedUserGroups = [...panel.querySelectorAll('[data-user-group]:checked')]
       .map(el => el.dataset.userGroup);
-    const receiptType = panel.querySelector('[data-field="receipt-type"]:checked')?.value
+    const receiptType = panel.querySelector('[data-receipt-type].period-tab--active')?.dataset.receiptType
       || RECEIPT_TYPE.FISCAL;
 
     methods = methods.map(m => (
@@ -88,6 +97,20 @@ export function createPaymentsEditor(host, {
         }
         : m
     ));
+    updateListRowMeta(selectedId);
+  }
+
+  function updateListRowMeta(id) {
+    if (!id) return;
+    const row = host.querySelector(`.avr-row[data-id="${CSS.escape(id)}"]`);
+    const method = methods.find(m => m.id === id);
+    if (!row || !method) return;
+
+    const nameEl = row.querySelector('.avr-row-name');
+    if (nameEl) nameEl.textContent = method.name;
+
+    const metaEl = row.querySelector('.avr-row-meta');
+    if (metaEl) metaEl.textContent = paymentMethodMeta(method);
   }
 
   function slugify(name) {
@@ -129,13 +152,60 @@ export function createPaymentsEditor(host, {
     `;
   }
 
+  function renderRestrictionsBox(title, selectAction, deselectAction, contentHtml) {
+    return `
+      <div class="pay-restrictions-box">
+        <span class="pay-restrictions-box__title">${esc(title)}</span>
+        <div class="pay-restrictions-box__toolbar">
+          <button type="button" class="pay-restrictions-chip-btn pay-restrictions-chip-btn--select btn-press" data-action="${escAttr(selectAction)}">
+            ${CHIP_SELECT_ICON}
+            <span>Выбрать все</span>
+          </button>
+          <button type="button" class="pay-restrictions-chip-btn pay-restrictions-chip-btn--deselect btn-press" data-action="${escAttr(deselectAction)}">
+            ${CHIP_DESELECT_ICON}
+            <span>Снять все</span>
+          </button>
+        </div>
+        ${contentHtml}
+      </div>
+    `;
+  }
+
+  function setCategorySelection(ids) {
+    if (!selectedId) return;
+    syncPanel();
+    const idSet = new Set(ids);
+    methods = methods.map(m => (
+      m.id === selectedId ? { ...m, allowedCategories: [...ids] } : m
+    ));
+    host.querySelectorAll('#pay-detail-panel [data-category]').forEach(cb => {
+      cb.checked = idSet.has(cb.dataset.category);
+    });
+    updateListRowMeta(selectedId);
+  }
+
+  function setUserGroupSelection(ids) {
+    if (!selectedId) return;
+    syncPanel();
+    const idSet = new Set(ids);
+    methods = methods.map(m => (
+      m.id === selectedId ? { ...m, allowedUserGroups: [...ids] } : m
+    ));
+    host.querySelectorAll('#pay-detail-panel [data-user-group]').forEach(cb => {
+      cb.checked = idSet.has(cb.dataset.userGroup);
+    });
+    updateListRowMeta(selectedId);
+  }
+
   function renderCategoryRestrictions(method) {
     if (!categoryGroups.length) {
       return '<p class="ufm-muted">Справочник категорий товаров пуст.</p>';
     }
-    return `
-      <fieldset class="ifm-fieldset">
-        <legend>Разрешённые категории товаров</legend>
+    return renderRestrictionsBox(
+      'Разрешённые категории товаров',
+      'select-all-categories',
+      'deselect-all-categories',
+      `
         <div class="wallet-restrictions-grid">
           ${categoryGroups.map(cat => `
             <label class="ifm-allergen bulk-allergen-tag">
@@ -148,17 +218,19 @@ export function createPaymentsEditor(host, {
             </label>
           `).join('')}
         </div>
-      </fieldset>
-    `;
+      `,
+    );
   }
 
   function renderUserGroupRestrictions(method) {
     if (!userGroups.length) {
       return '<p class="ufm-muted">Группы клиентов не найдены.</p>';
     }
-    return `
-      <fieldset class="ifm-fieldset">
-        <legend>Доступно для групп клиентов</legend>
+    return renderRestrictionsBox(
+      'Доступно для групп клиентов',
+      'select-all-user-groups',
+      'deselect-all-user-groups',
+      `
         <div class="wallet-restrictions-grid">
           ${userGroups.map(group => `
             <label class="ifm-allergen bulk-allergen-tag">
@@ -171,36 +243,30 @@ export function createPaymentsEditor(host, {
             </label>
           `).join('')}
         </div>
-      </fieldset>
-    `;
+      `,
+    );
   }
 
-  function renderReceiptTypeTabs(method) {
-    const fiscalActive = method.receiptType !== RECEIPT_TYPE.NON_FISCAL;
+  function renderReceiptTypeField(method) {
+    const receiptType = method.receiptType === RECEIPT_TYPE.NON_FISCAL
+      ? RECEIPT_TYPE.NON_FISCAL
+      : RECEIPT_TYPE.FISCAL;
+
     return `
-      <div class="admin-field-block pay-method-field">
+      <div class="admin-field-block" id="pay-receipt-type-section">
         <span class="admin-field-label">Тип чека</span>
-        <div class="pay-method-tabs" role="radiogroup" aria-label="Тип чека">
-          <label class="pay-method-tab ${fiscalActive ? 'pay-method-tab--active' : ''}">
-            <input
-              type="radio"
-              name="pay-receipt-type"
-              value="${RECEIPT_TYPE.FISCAL}"
-              data-field="receipt-type"
-              ${fiscalActive ? 'checked' : ''}
-            />
-            <span>Фискальный платеж</span>
-          </label>
-          <label class="pay-method-tab ${!fiscalActive ? 'pay-method-tab--active' : ''}">
-            <input
-              type="radio"
-              name="pay-receipt-type"
-              value="${RECEIPT_TYPE.NON_FISCAL}"
-              data-field="receipt-type"
-              ${!fiscalActive ? 'checked' : ''}
-            />
-            <span>Не фискальный платеж</span>
-          </label>
+        <div class="admin-channel-tabs-wrap">
+          <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10 admin-channel-tabs--avail" role="radiogroup" aria-label="Тип чека">
+            ${RECEIPT_TYPE_OPTIONS.map(o => `
+              <button
+                type="button"
+                class="period-tab btn-press ${receiptType === o.id ? 'period-tab--active' : ''}"
+                data-receipt-type="${escAttr(o.id)}"
+                role="radio"
+                aria-checked="${receiptType === o.id}"
+              >${esc(o.label)}</button>
+            `).join('')}
+          </div>
         </div>
       </div>
     `;
@@ -209,7 +275,14 @@ export function createPaymentsEditor(host, {
   function renderDetail(method) {
     return `
       <div class="avr-detail-panel" id="pay-detail-panel">
-        <div class="avr-detail-scroll">
+        ${renderAvrDetailStickyHead({
+          title: 'Редактирование способа оплаты',
+          cancelId: 'pay-cancel',
+          saveId: 'pay-save',
+          saveLabel: saving ? 'Сохранение…' : 'Сохранить изменения',
+          saveDisabled: saving,
+        })}
+        <div class="avr-detail-body">
           <div class="admin-form-stack">
             <div class="admin-field-block">
               <label class="admin-field-label" for="pay-name">Название</label>
@@ -233,7 +306,7 @@ export function createPaymentsEditor(host, {
                 `).join('')}
               </select>
             </div>
-            ${renderReceiptTypeTabs(method)}
+            ${renderReceiptTypeField(method)}
             ${renderCategoryRestrictions(method)}
             ${renderUserGroupRestrictions(method)}
             <p class="alr-detail-id">ID: <code>${esc(method.id)}</code></p>
@@ -241,8 +314,8 @@ export function createPaymentsEditor(host, {
           <p class="ifm-error" id="pay-error" hidden></p>
         </div>
         <div class="avr-detail-foot">
-          <div class="avr-detail-foot-row">
-            <div class="cgr-detail-danger">
+          <div class="avr-detail-foot-row avr-detail-foot-row--danger-only">
+            <div class="cgr-detail-danger cgr-detail-danger--wide">
               <label class="cgr-delete-confirm">
                 <input type="checkbox" id="pay-delete-confirm" />
                 <span>Подтверждаю удаление способа оплаты</span>
@@ -254,17 +327,6 @@ export function createPaymentsEditor(host, {
                 disabled
               >
                 Удалить способ
-              </button>
-            </div>
-            <div class="footer-action-bar">
-              ${renderAvrCancelButton('pay-cancel')}
-              <button
-                type="button"
-                class="action-btn action-btn-primary btn-press"
-                id="pay-save"
-                ${saving ? 'disabled' : ''}
-              >
-                ${saving ? 'Сохранение…' : 'Сохранить'}
               </button>
             </div>
           </div>
@@ -310,15 +372,6 @@ export function createPaymentsEditor(host, {
       el.textContent = msg;
       el.hidden = false;
     }
-  }
-
-  function updateReceiptTabs() {
-    const panel = host.querySelector('#pay-detail-panel');
-    if (!panel) return;
-    panel.querySelectorAll('.pay-method-tab').forEach(tab => {
-      const input = tab.querySelector('input[type="radio"]');
-      tab.classList.toggle('pay-method-tab--active', input?.checked ?? false);
-    });
   }
 
   async function persistCurrent() {
@@ -384,13 +437,46 @@ export function createPaymentsEditor(host, {
     });
 
     host.querySelector('#pay-detail-panel')?.addEventListener('input', () => syncPanel());
+    host.querySelector('#pay-detail-panel')?.addEventListener('click', e => {
+      const bulkBtn = e.target.closest('[data-action]');
+      if (bulkBtn && selectedId) {
+        const action = bulkBtn.dataset.action;
+        if (action === 'select-all-categories') {
+          e.preventDefault();
+          setCategorySelection(categoryGroups.map(c => c.id));
+          return;
+        }
+        if (action === 'deselect-all-categories') {
+          e.preventDefault();
+          setCategorySelection([]);
+          return;
+        }
+        if (action === 'select-all-user-groups') {
+          e.preventDefault();
+          setUserGroupSelection(userGroups.map(g => g.id));
+          return;
+        }
+        if (action === 'deselect-all-user-groups') {
+          e.preventDefault();
+          setUserGroupSelection([]);
+          return;
+        }
+      }
+
+      const receiptBtn = e.target.closest('[data-receipt-type]');
+      if (!receiptBtn || !selectedId) return;
+      e.preventDefault();
+      const panel = host.querySelector('#pay-detail-panel');
+      panel?.querySelectorAll('[data-receipt-type]').forEach(btn => {
+        const active = btn === receiptBtn;
+        btn.classList.toggle('period-tab--active', active);
+        btn.setAttribute('aria-checked', active ? 'true' : 'false');
+      });
+      syncPanel();
+    });
     host.querySelector('#pay-detail-panel')?.addEventListener('change', e => {
       if (e.target.matches('[data-category], [data-user-group], [data-field="currency"]')) {
         syncPanel();
-      }
-      if (e.target.matches('[data-field="receipt-type"]')) {
-        syncPanel();
-        updateReceiptTabs();
       }
     });
 

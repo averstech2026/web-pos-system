@@ -1,6 +1,6 @@
 import { saveUserGroup, deleteUserGroup } from '../services/crm-ref-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+import { renderAvrDetailStickyHead, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -88,7 +88,14 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
   function renderDetail(group) {
     return `
       <div class="avr-detail-panel" id="ugg-detail-panel">
-        <div class="avr-detail-scroll">
+        ${renderAvrDetailStickyHead({
+          title: 'Редактирование группы',
+          cancelId: 'ugg-cancel',
+          saveId: 'ugg-save',
+          saveLabel: saving ? 'Сохранение…' : 'Сохранить изменения',
+          saveDisabled: saving,
+        })}
+        <div class="avr-detail-body">
           <div class="admin-form-stack">
             <div class="admin-field-block">
               <label class="admin-field-label" for="ugg-name">Название</label>
@@ -103,19 +110,13 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
           <p class="ifm-error" id="ugg-error" hidden></p>
         </div>
         <div class="avr-detail-foot">
-          <div class="avr-detail-foot-row">
-            <div class="cgr-detail-danger">
+          <div class="avr-detail-foot-row avr-detail-foot-row--danger-only">
+            <div class="cgr-detail-danger cgr-detail-danger--wide">
               <label class="cgr-delete-confirm">
                 <input type="checkbox" id="ugg-delete-confirm" />
                 <span>Подтверждаю удаление группы</span>
               </label>
               <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="ugg-delete" disabled>Удалить группу</button>
-            </div>
-            <div class="footer-action-bar">
-              ${renderAvrCancelButton('ugg-cancel')}
-              <button type="button" class="action-btn action-btn-primary btn-press" id="ugg-save" ${saving ? 'disabled' : ''}>
-                ${saving ? 'Сохранение…' : 'Сохранить'}
-              </button>
             </div>
           </div>
         </div>

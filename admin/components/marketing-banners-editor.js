@@ -434,7 +434,7 @@ export function createMarketingBannersEditor(host, {
       <div class="admin-field-block admin-channel-field">
         <span class="admin-field-label">Доступность</span>
         <div class="admin-channel-tabs-wrap">
-          <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10 mkb-channel-tabs" role="radiogroup" aria-label="Доступность баннера">
+          <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10 admin-channel-tabs--avail mkb-channel-tabs" role="radiogroup" aria-label="Доступность баннера">
             ${MARKETING_CHANNEL_MODES.map(o => `
               <button
                 type="button"
@@ -1036,7 +1036,7 @@ export function createMarketingBannersEditor(host, {
     const audienceGroups = banner.audienceMode === 'groups';
 
     return `
-      <div class="avr-detail-inner mkb-detail-inner" id="mkb-detail-panel">
+      <div class="avr-detail-panel" id="mkb-detail-panel">
         ${renderAvrDetailStickyHead({
           title: isNew ? 'Новый баннер' : 'Редактирование баннера',
           cancelId: 'mkb-detail-cancel',
@@ -1044,84 +1044,86 @@ export function createMarketingBannersEditor(host, {
           saveLabel: 'Сохранить баннер',
         })}
 
-        <div class="avr-detail-body admin-form-stack mkb-detail-body">
-          <section class="mkb-block card">
-            <h3 class="mkb-block-title">Контент карточки</h3>
-            ${renderFormatTabs(banner)}
-            <div class="mkb-form-field" data-field-wrap="title">
-              <label class="mkb-field-label">Заголовок акции${requiredStar()} <span class="mkb-char-hint">(до 40 символов)</span></label>
-              <input type="text" class="avr-name-input mkb-input" data-field="title" maxlength="40"
-                value="${escAttr(banner.title)}" placeholder="Насладитесь новинками меню" />
-            </div>
-            <div class="mkb-form-field" data-field-wrap="short-description">
-              <label class="mkb-field-label">Короткое описание${requiredStar()}</label>
-              <input type="text" class="avr-name-input mkb-input" data-field="short-description"
-                value="${escAttr(banner.shortDescription)}" placeholder="-50% · Новинка!" />
-            </div>
-            <div class="mkb-form-field" data-field-wrap="full-description">
-              <label class="mkb-field-label">Полное описание${requiredStar()}</label>
-              <textarea class="mkb-textarea" data-field="full-description" rows="5"
-                placeholder="Развёрнутый текст акции. Поддерживается простой HTML: &lt;b&gt;, &lt;br&gt;, &lt;ul&gt;…">${esc(banner.fullDescription)}</textarea>
-            </div>
-            <div id="mkb-format-dependent" class="mkb-format-dependent">
-              ${renderFormatDependentFields(banner)}
-            </div>
-          </section>
-
-          <section class="mkb-block card">
-            <h3 class="mkb-block-title">Таргетинг</h3>
-            <label class="mkb-form-field">
-              <span class="mkb-field-label">Локации</span>
-              <select data-field="location-mode" class="avr-select mkb-input">
-                <option value="all" ${!locationSpecific ? 'selected' : ''}>Все точки</option>
-                <option value="specific" ${locationSpecific ? 'selected' : ''}>Конкретные объекты</option>
-              </select>
-            </label>
-            <div class="mkb-reveal ${locationSpecific ? 'mkb-reveal--visible' : ''}" data-location-fields>
-              <div class="mkb-reveal-inner">
-                ${renderLocationCheckboxes(banner.locationIds)}
+        <div class="avr-detail-body">
+          <div class="admin-form-stack">
+            <section class="mkb-section">
+              <h3 class="avr-detail-section-title">Контент карточки</h3>
+              ${renderFormatTabs(banner)}
+              <div class="admin-field-block" data-field-wrap="title">
+                <label class="admin-field-label" for="mkb-title">Заголовок акции${requiredStar()} <span class="mkb-char-hint">(до 40 символов)</span></label>
+                <input id="mkb-title" type="text" class="admin-field-input" data-field="title" maxlength="40"
+                  value="${escAttr(banner.title)}" placeholder="Насладитесь новинками меню" />
               </div>
-            </div>
-            <label class="mkb-form-field">
-              <span class="mkb-field-label">Аудитория</span>
-              <select data-field="audience-mode" class="avr-select mkb-input">
-                <option value="all" ${!audienceGroups ? 'selected' : ''}>Все сотрудники / клиенты</option>
-                <option value="groups" ${audienceGroups ? 'selected' : ''}>Конкретные группы</option>
-              </select>
-            </label>
-            <div class="mkb-reveal ${audienceGroups ? 'mkb-reveal--visible' : ''}" data-audience-fields>
-              <div class="mkb-reveal-inner">
-                ${userGroups.length
-                  ? renderUserGroupCheckboxes(banner.targetUserGroupIds)
-                  : '<p class="mkb-hint">Создайте группы клиентов в разделе CRM.</p>'}
+              <div class="admin-field-block" data-field-wrap="short-description">
+                <label class="admin-field-label" for="mkb-short-description">Короткое описание${requiredStar()}</label>
+                <input id="mkb-short-description" type="text" class="admin-field-input" data-field="short-description"
+                  value="${escAttr(banner.shortDescription)}" placeholder="-50% · Новинка!" />
               </div>
-            </div>
-          </section>
+              <div class="admin-field-block" data-field-wrap="full-description">
+                <label class="admin-field-label" for="mkb-full-description">Полное описание${requiredStar()}</label>
+                <textarea id="mkb-full-description" class="admin-field-input admin-field-textarea" data-field="full-description" rows="5"
+                  placeholder="Развёрнутый текст акции. Поддерживается простой HTML: &lt;b&gt;, &lt;br&gt;, &lt;ul&gt;…">${esc(banner.fullDescription)}</textarea>
+              </div>
+              <div id="mkb-format-dependent" class="mkb-format-dependent">
+                ${renderFormatDependentFields(banner)}
+              </div>
+            </section>
 
-          <section class="mkb-block card">
-            <h3 class="mkb-block-title">Ограничение по времени</h3>
-            <label class="mkb-form-field">
-              <span class="mkb-field-label">Расписание</span>
-              <select data-field="schedule-id" class="avr-select mkb-input">
-                ${renderScheduleOptions(banner.scheduleId)}
-              </select>
-            </label>
-            <div class="mkb-date-row">
-              <label class="mkb-form-field">
-                <span class="mkb-field-label">Дата начала акции</span>
-                <input type="date" class="avr-name-input mkb-input" data-field="date-start"
-                  value="${escAttr(banner.campaignDateStart || '')}" />
-              </label>
-              <label class="mkb-form-field">
-                <span class="mkb-field-label">Дата окончания</span>
-                <input type="date" class="avr-name-input mkb-input" data-field="date-end"
-                  value="${escAttr(banner.campaignDateEnd || '')}" />
-              </label>
-            </div>
-            <div class="mkb-info-box" role="note">
-              💡 Глобальные даты «С» и «По» задают общий период проведения акции. Выбранное расписание определяет точные часы и дни недели внутри этого периода, когда баннер будет виден пользователям.
-            </div>
-          </section>
+            <section class="mkb-section">
+              <h3 class="avr-detail-section-title">Таргетинг</h3>
+              <div class="admin-field-block">
+                <label class="admin-field-label" for="mkb-location-mode">Локации</label>
+                <select id="mkb-location-mode" data-field="location-mode" class="admin-field-input">
+                  <option value="all" ${!locationSpecific ? 'selected' : ''}>Все точки</option>
+                  <option value="specific" ${locationSpecific ? 'selected' : ''}>Конкретные объекты</option>
+                </select>
+              </div>
+              <div class="mkb-reveal ${locationSpecific ? 'mkb-reveal--visible' : ''}" data-location-fields>
+                <div class="mkb-reveal-inner">
+                  ${renderLocationCheckboxes(banner.locationIds)}
+                </div>
+              </div>
+              <div class="admin-field-block">
+                <label class="admin-field-label" for="mkb-audience-mode">Аудитория</label>
+                <select id="mkb-audience-mode" data-field="audience-mode" class="admin-field-input">
+                  <option value="all" ${!audienceGroups ? 'selected' : ''}>Все сотрудники / клиенты</option>
+                  <option value="groups" ${audienceGroups ? 'selected' : ''}>Конкретные группы</option>
+                </select>
+              </div>
+              <div class="mkb-reveal ${audienceGroups ? 'mkb-reveal--visible' : ''}" data-audience-fields>
+                <div class="mkb-reveal-inner">
+                  ${userGroups.length
+                    ? renderUserGroupCheckboxes(banner.targetUserGroupIds)
+                    : '<p class="mkb-hint">Создайте группы клиентов в разделе CRM.</p>'}
+                </div>
+              </div>
+            </section>
+
+            <section class="mkb-section">
+              <h3 class="avr-detail-section-title">Ограничение по времени</h3>
+              <div class="admin-field-block">
+                <label class="admin-field-label" for="mkb-schedule-id">Расписание</label>
+                <select id="mkb-schedule-id" data-field="schedule-id" class="admin-field-input">
+                  ${renderScheduleOptions(banner.scheduleId)}
+                </select>
+              </div>
+              <div class="mkb-date-row">
+                <div class="admin-field-block">
+                  <label class="admin-field-label" for="mkb-date-start">Дата начала акции</label>
+                  <input id="mkb-date-start" type="date" class="admin-field-input" data-field="date-start"
+                    value="${escAttr(banner.campaignDateStart || '')}" />
+                </div>
+                <div class="admin-field-block">
+                  <label class="admin-field-label" for="mkb-date-end">Дата окончания</label>
+                  <input id="mkb-date-end" type="date" class="admin-field-input" data-field="date-end"
+                    value="${escAttr(banner.campaignDateEnd || '')}" />
+                </div>
+              </div>
+              <div class="mkb-info-box" role="note">
+                💡 Глобальные даты «С» и «По» задают общий период проведения акции. Выбранное расписание определяет точные часы и дни недели внутри этого периода, когда баннер будет виден пользователям.
+              </div>
+            </section>
+          </div>
         </div>
 
         ${!isNew ? `

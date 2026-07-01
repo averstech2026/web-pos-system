@@ -112,7 +112,7 @@ export function openItemFormModal({
           <div class="admin-field-block ifm-field ifm-field--wide">
             <span class="admin-field-label">Доступность</span>
             <div class="admin-channel-tabs-wrap">
-              <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10 ifm-channel-tabs" role="radiogroup" aria-label="Доступность">
+              <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10 admin-channel-tabs--avail ifm-channel-tabs" role="radiogroup" aria-label="Доступность">
               ${ITEM_CHANNEL_MODES.map(o => `
                 <button
                   type="button"

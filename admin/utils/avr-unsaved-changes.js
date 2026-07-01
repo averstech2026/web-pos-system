@@ -99,21 +99,23 @@ export function renderAvrCancelButton(id, label = 'Отменить') {
 }
 
 /**
- * Sticky detail header: title + cancel/save (right-aligned).
+ * Detail header: static title + floating sticky save/cancel island.
  * @param {object} p
  * @param {string} p.title
  * @param {string} p.cancelId
  * @param {string} p.saveId
  * @param {string} [p.saveLabel]
  */
-export function renderAvrDetailStickyHead({ title, cancelId, saveId, saveLabel = 'Сохранить изменения' }) {
+export function renderAvrDetailStickyHead({ title, cancelId, saveId, saveLabel = 'Сохранить изменения', saveDisabled = false }) {
   return `
-    <div class="avr-detail-sticky-head">
-      <h2 class="avr-detail-sticky-title">${esc(title)}</h2>
-      <div class="footer-action-bar avr-detail-sticky-actions">
+    <div class="avr-detail-float-bar">
+      <div class="avr-detail-float-island footer-action-bar">
         ${renderAvrCancelButton(cancelId)}
-        <button type="button" class="action-btn action-btn-primary btn-press" id="${escAttr(saveId)}">${esc(saveLabel)}</button>
+        <button type="button" class="action-btn action-btn-primary btn-press" id="${escAttr(saveId)}"${saveDisabled ? ' disabled' : ''}>${esc(saveLabel)}</button>
       </div>
+    </div>
+    <div class="avr-detail-head">
+      <h2 class="avr-detail-title">${esc(title)}</h2>
     </div>
   `;
 }

@@ -317,12 +317,12 @@ export function createPromoRulesEditor(host, {
       : 'item';
 
     return `
-      <section class="prm-block card">
-        <div class="prm-block-head">
+      <section class="prm-section" data-prm-section="condition">
+        <div class="prm-section-head">
           <span class="prm-block-badge">ЕСЛИ</span>
-          <h3 class="prm-block-title">Условие</h3>
+          <h3 class="prm-section-title">Условие</h3>
         </div>
-        <div class="prm-block-body admin-form-stack">
+        <div class="admin-form-stack">
           <label class="form-group">
             <span class="avr-field-label">Тип условия</span>
             <select data-field="trigger-type" class="avr-select">
@@ -411,12 +411,12 @@ export function createPromoRulesEditor(host, {
       : 'points';
 
     return `
-      <section class="prm-block card">
-        <div class="prm-block-head">
+      <section class="prm-section" data-prm-section="action">
+        <div class="prm-section-head">
           <span class="prm-block-badge prm-block-badge--action">ТО</span>
-          <h3 class="prm-block-title">Поощрение</h3>
+          <h3 class="prm-section-title">Поощрение</h3>
         </div>
-        <div class="prm-block-body admin-form-stack">
+        <div class="admin-form-stack">
           <label class="form-group">
             <span class="avr-field-label">Тип выгоды</span>
             <select data-field="action-type" class="avr-select">
@@ -516,30 +516,32 @@ export function createPromoRulesEditor(host, {
           saveLabel: 'Сохранить акцию',
         })}
         <div class="avr-detail-body">
-          <section class="prm-block card">
-            <div class="prm-block-head">
-              <span class="prm-block-badge prm-block-badge--basic">1</span>
-              <h3 class="prm-block-title">Основное</h3>
-            </div>
-            <div class="prm-block-body admin-form-stack">
-              <div class="admin-field-block">
-                <label class="admin-field-label" for="prm-name">Название акции</label>
-                <input id="prm-name" type="text" class="admin-field-input" data-field="name" value="${escAttr(promo.name)}" maxlength="120" />
+          <div class="admin-form-stack">
+            <section class="prm-section" data-prm-section="basic">
+              <div class="prm-section-head">
+                <span class="prm-block-badge prm-block-badge--basic">1</span>
+                <h3 class="prm-section-title">Основное</h3>
               </div>
+              <div class="admin-form-stack">
+                <div class="admin-field-block">
+                  <label class="admin-field-label" for="prm-name">Название акции</label>
+                  <input id="prm-name" type="text" class="admin-field-input" data-field="name" value="${escAttr(promo.name)}" maxlength="120" />
+                </div>
 
-              ${renderVisibilitySection(promo)}
+                ${renderVisibilitySection(promo)}
 
-              <div class="admin-field-block">
-                <label class="admin-field-label" for="prm-schedule">Период действия (Расписание)</label>
-                <select id="prm-schedule" data-field="availability-rule" class="admin-field-input">
-                  ${renderScheduleOptions(promo.availabilityRuleId)}
-                </select>
+                <div class="admin-field-block">
+                  <label class="admin-field-label" for="prm-schedule">Период действия (Расписание)</label>
+                  <select id="prm-schedule" data-field="availability-rule" class="admin-field-input">
+                    ${renderScheduleOptions(promo.availabilityRuleId)}
+                  </select>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
-          ${renderConditionBlock(promo)}
-          ${renderActionBlock(promo)}
+            ${renderConditionBlock(promo)}
+            ${renderActionBlock(promo)}
+          </div>
 
           <p class="ifm-error" id="prm-error" hidden></p>
         </div>
@@ -626,7 +628,7 @@ export function createPromoRulesEditor(host, {
   function refreshConditionBlock() {
     syncPanelToState();
     const promo = selectedPromo();
-    const container = host.querySelector('[data-condition-fields]')?.closest('.prm-block');
+    const container = host.querySelector('[data-prm-section="condition"]');
     if (!promo || !container) return;
     const replacement = document.createElement('div');
     replacement.innerHTML = renderConditionBlock(sanitizePromoRuleFields(promo));
@@ -637,8 +639,7 @@ export function createPromoRulesEditor(host, {
   function refreshActionBlock() {
     syncPanelToState();
     const promo = selectedPromo();
-    const blocks = host.querySelectorAll('.prm-block');
-    const container = blocks[blocks.length - 1];
+    const container = host.querySelector('[data-prm-section="action"]');
     if (!promo || !container) return;
     const replacement = document.createElement('div');
     replacement.innerHTML = renderActionBlock(sanitizePromoRuleFields(promo));

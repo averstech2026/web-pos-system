@@ -31,6 +31,8 @@ import {
   scheduleStatusForGroup,
 } from '../utils/schedule-status.js';
 
+const PRODUCT_REMOVE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
+
 /**
  * @param {HTMLElement} host
  * @param {object} p
@@ -111,7 +113,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     }
     previewObjectUrls = {};
     if (selectedId && !groups.some(g => g.id === selectedId)) {
-      selectedId = groups[0]?.id || null;
+      selectedId = firstListGroupId();
     }
   }
 
@@ -147,6 +149,11 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     const active = sorted.filter(g => !isGroupDeprioritized(g));
     const inactive = sorted.filter(g => isGroupDeprioritized(g));
     return { active, inactive };
+  }
+
+  function firstListGroupId() {
+    const { active, inactive } = partitionGroupsForList();
+    return active[0]?.id || inactive[0]?.id || null;
   }
 
   function renderHiddenGroupsDivider(count) {
@@ -335,25 +342,25 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     }
 
     return inGroup.map(item => `
-      <div class="cgr-product-row">
-        <label class="catm-product-option catm-product-option--row" title="В продаже">
+      <div class="cgr-product-capsule">
+        <label class="cgr-product-capsule__main" title="В продаже">
           <input
             type="checkbox"
             data-availability-toggle
             data-product-id="${escAttr(item.id)}"
             ${item.isAvailable !== false ? 'checked' : ''}
           />
-          <span class="catm-product-name">${esc(item.name || '—')}</span>
-          ${item.isAvailable === false ? '<span class="cgr-product-badge">Скрыт</span>' : ''}
+          <span class="cgr-product-capsule__name">${esc(item.name || '—')}</span>
+          ${item.isAvailable === false ? '<span class="cgr-product-capsule__badge">Скрыт</span>' : ''}
         </label>
         <button
           type="button"
-          class="cgr-product-remove btn-press"
+          class="cgr-product-capsule__remove btn-press"
           data-action="remove-from-group"
           data-product-id="${escAttr(item.id)}"
           title="Исключить из группы"
           aria-label="Исключить «${escAttr(item.name || 'товар')}» из группы"
-        >✕</button>
+        >${PRODUCT_REMOVE_ICON}</button>
       </div>
     `).join('');
   }
@@ -760,7 +767,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     const prevGroups = groups;
     const prevSelectedId = selectedId;
     groups = groups.filter(g => g.id !== idToDelete);
-    selectedId = groups[0]?.id || null;
+    selectedId = firstListGroupId();
 
     const ok = await save();
     if (!ok) {
@@ -893,6 +900,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     host.innerHTML = '';
   }
 
+  selectedId = firstListGroupId();
   render();
 
   return { save, destroy, isDirty };

@@ -1,9 +1,11 @@
 import '../shared/styles.css';
 import '../shared/global.css';
+import '../shared/sales-channel-maintenance.css';
 import './style.css';
 
 import { auth } from '../shared/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
+import { renderWebChannelMaintenanceIfNeeded } from './services/sales-channel-guard.js';
 
 // ── Dev helpers ───────────────────────────────────────────
 // In the browser console run: await seed()  or  await updateItemImages()
@@ -54,6 +56,17 @@ async function renderRoute(path, params) {
   if (user && path === '/auth') {
     navigate('/home');
     return;
+  }
+
+  if (user && path !== '/auth') {
+    try {
+      if (await renderWebChannelMaintenanceIfNeeded(app)) {
+        currentPage = null;
+        return;
+      }
+    } catch (err) {
+      console.warn('[lk] sales channel guard failed', err);
+    }
   }
 
   // Lazy-load page modules to keep initial bundle small
