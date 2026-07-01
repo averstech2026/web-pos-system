@@ -1,0 +1,68 @@
+---
+description: Canonical B2B form layout for admin right panels, drawers, and modals
+globs: admin/**/*.{js,css}
+alwaysApply: false
+---
+
+# Admin form pattern (эталон)
+
+Reference implementation: `admin/components/category-groups-editor.js` + `admin/utils/admin-form.js`.
+
+## Stack
+
+```html
+<div class="admin-form-stack">
+  <div class="admin-field-block">…</div>
+</div>
+```
+
+- `admin-form-stack`: `flex flex-col`, `gap: 20px` (`space-y-5`), `width: 100%` — **no max-width**
+- No ad-hoc `margin-y` / `padding-y` between blocks inside the stack
+
+## Labels
+
+Always `admin-field-label` (11px, bold, uppercase, muted, `margin-bottom: 6px`):
+
+```html
+<label class="admin-field-label" for="…">Название</label>
+```
+
+Aliases in CSS: `avr-field-label`, `cgr-field-label`, `mkb-field-label`.
+
+## Inputs / selects
+
+- Primary fields: `admin-field-input` — **h-10 (40px)**, `w-full`, `rounded-lg` (`--radius-sm`)
+- Textareas: `admin-field-textarea` — `w-full`, min-height ~80px
+- Footer right edge must align with field right edge → same horizontal padding on `.avr-detail-scroll` and `.avr-detail-foot` (`var(--space-lg)`)
+
+## Channel + order (when entity has web/kiosk)
+
+Use `renderChannelAvailabilityGrid()` from `admin/utils/admin-form.js`:
+
+```html
+<div class="admin-channel-grid"> <!-- grid: 1fr 140px 140px, items-end, w-full -->
+```
+
+Left: segmented control `admin-channel-tabs admin-channel-tabs--h10`. Right: two order inputs (groups only — pass `showOrderFields: false` for promos/banners).
+
+**Left sidebar list cards** (master list): see **Admin sidebar list card** in `.cursor/rules/design-system.mdc` — same row markup, W/K badges, schedule status, deprioritized divider for all entity editors.
+
+## Media upload row
+
+```html
+<div class="admin-media-row">
+  <!-- preview -->
+  <!-- button h-9 -->
+  <p class="admin-media-path">/path</p> <!-- text-xs, muted, ml-4 from button -->
+</div>
+```
+
+## Toolbar buttons inside blocks
+
+Use `products-create-btn` (h-9 compact), not full-width outline giants.
+
+## Footers
+
+`avr-detail-foot` → `avr-detail-foot-row` + `footer-action-bar`. Match scroll horizontal padding.
+
+**Отменить:** `bindAvrDetailCancel(root, buttonId, { isDirty, discard, save?, onClose })` — `onClose` сбрасывает `selectedId` в `null` и показывает empty-state. Не использовать `if (!isDirty()) return` без закрытия панели.

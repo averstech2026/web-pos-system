@@ -208,6 +208,7 @@ function buildBonusGrant(action, promoRuleId, cartTotal) {
  * @param {import('./menu-catalog.js').CategoryGroup[]} [options.categoryGroups]
  * @param {{ date?: string, time?: string }} [options.slot]
  * @param {import('./promo-rules.js').ClientGroupId} [options.clientSegment]
+ * @param {'web'|'kiosk'} [options.channel]
  * @returns {{ items: CartLine[], appliedPromoIds: string[], discountTotal: number, bonusGrants: BonusGrant[] }}
  */
 export function applyPromoRules(cart, activePromos, allAvailabilityRules, options = {}) {
@@ -216,6 +217,7 @@ export function applyPromoRules(cart, activePromos, allAvailabilityRules, option
     categoryGroups = [],
     slot = {},
     clientSegment = 'all',
+    channel = 'web',
   } = options;
 
   const itemsById = new Map(catalogItems.map(i => [i.id, i]));
@@ -232,6 +234,8 @@ export function applyPromoRules(cart, activePromos, allAvailabilityRules, option
 
   const eligiblePromos = (activePromos || []).filter(p => {
     if (!p?.isActive) return false;
+    if (channel === 'kiosk') return p.visibleInKiosk === true;
+    if (channel === 'web') return p.visibleInWeb !== false;
     if (!p.availabilityRuleId) return true;
     return isItemAvailable(p.availabilityRuleId, null, allAvailabilityRules, slot);
   });

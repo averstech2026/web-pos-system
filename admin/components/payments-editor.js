@@ -5,7 +5,7 @@ import {
 } from '../services/payments-data.js';
 import { RECEIPT_TYPE, PAYMENT_CURRENCY } from '../../shared/schema.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
+import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 const CURRENCY_OPTIONS = [
   { value: PAYMENT_CURRENCY.RUB, label: 'Рубль (₽)' },
@@ -178,8 +178,8 @@ export function createPaymentsEditor(host, {
   function renderReceiptTypeTabs(method) {
     const fiscalActive = method.receiptType !== RECEIPT_TYPE.NON_FISCAL;
     return `
-      <div class="pay-method-field">
-        <span class="cgr-detail-label">Тип чека</span>
+      <div class="admin-field-block pay-method-field">
+        <span class="admin-field-label">Тип чека</span>
         <div class="pay-method-tabs" role="radiogroup" aria-label="Тип чека">
           <label class="pay-method-tab ${fiscalActive ? 'pay-method-tab--active' : ''}">
             <input
@@ -210,33 +210,34 @@ export function createPaymentsEditor(host, {
     return `
       <div class="avr-detail-panel" id="pay-detail-panel">
         <div class="avr-detail-scroll">
-          <section class="cgr-detail-card">
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Название</span>
+          <div class="admin-form-stack">
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="pay-name">Название</label>
               <input
+                id="pay-name"
                 type="text"
-                class="cgr-detail-name-input"
+                class="admin-field-input"
                 data-field="name"
                 value="${escAttr(method.name)}"
                 maxlength="80"
                 placeholder="Наличные"
               />
-            </label>
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Размерность</span>
-              <select class="avr-select" data-field="currency">
+            </div>
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="pay-currency">Размерность</label>
+              <select id="pay-currency" class="admin-field-input" data-field="currency">
                 ${CURRENCY_OPTIONS.map(opt => `
                   <option value="${escAttr(opt.value)}" ${method.currency === opt.value ? 'selected' : ''}>
                     ${esc(opt.label)}
                   </option>
                 `).join('')}
               </select>
-            </label>
+            </div>
             ${renderReceiptTypeTabs(method)}
             ${renderCategoryRestrictions(method)}
             ${renderUserGroupRestrictions(method)}
             <p class="alr-detail-id">ID: <code>${esc(method.id)}</code></p>
-          </section>
+          </div>
           <p class="ifm-error" id="pay-error" hidden></p>
         </div>
         <div class="avr-detail-foot">
@@ -270,6 +271,11 @@ export function createPaymentsEditor(host, {
         </div>
       </div>
     `;
+  }
+
+  function closeDetailPanel() {
+    selectedId = null;
+    render();
   }
 
   function render() {
@@ -394,10 +400,11 @@ export function createPaymentsEditor(host, {
     });
 
     host.querySelector('#pay-save')?.addEventListener('click', persistCurrent);
-    host.querySelector('#pay-cancel')?.addEventListener('click', () => {
-      if (!isDirty()) return;
-      discardChanges();
-      render();
+    bindAvrDetailCancel(host, 'pay-cancel', {
+      isDirty,
+      discard: discardChanges,
+      save: persistCurrent,
+      onClose: closeDetailPanel,
     });
 
     host.querySelector('#pay-delete')?.addEventListener('click', async () => {

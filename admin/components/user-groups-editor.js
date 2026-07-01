@@ -1,6 +1,6 @@
 import { saveUserGroup, deleteUserGroup } from '../services/crm-ref-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
+import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -89,17 +89,17 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
     return `
       <div class="avr-detail-panel" id="ugg-detail-panel">
         <div class="avr-detail-scroll">
-          <section class="cgr-detail-card">
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Название</span>
-              <input type="text" class="cgr-detail-name-input" data-field="name" value="${escAttr(group.name)}" maxlength="80" placeholder="Завод Аскона" />
-            </label>
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Описание</span>
-              <textarea class="cgr-detail-name-input ufm-textarea" data-field="description" rows="3" placeholder="Краткое описание группы">${esc(group.description || '')}</textarea>
-            </label>
+          <div class="admin-form-stack">
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="ugg-name">Название</label>
+              <input id="ugg-name" type="text" class="admin-field-input" data-field="name" value="${escAttr(group.name)}" maxlength="80" placeholder="Завод Аскона" />
+            </div>
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="ugg-description">Описание</label>
+              <textarea id="ugg-description" class="admin-field-input admin-field-textarea" data-field="description" rows="3" placeholder="Краткое описание группы">${esc(group.description || '')}</textarea>
+            </div>
             <p class="alr-detail-id">ID: <code>${esc(group.id)}</code></p>
-          </section>
+          </div>
           <p class="ifm-error" id="ugg-error" hidden></p>
         </div>
         <div class="avr-detail-foot">
@@ -121,6 +121,11 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
         </div>
       </div>
     `;
+  }
+
+  function closeDetailPanel() {
+    selectedId = null;
+    render();
   }
 
   function render() {
@@ -214,10 +219,11 @@ export function createUserGroupsEditor(host, { groups: initialGroups, onSaved })
     host.querySelector('#ugg-detail-panel')?.addEventListener('input', () => syncPanel());
 
     host.querySelector('#ugg-save')?.addEventListener('click', persistCurrent);
-    host.querySelector('#ugg-cancel')?.addEventListener('click', () => {
-      if (!isDirty()) return;
-      discardChanges();
-      render();
+    bindAvrDetailCancel(host, 'ugg-cancel', {
+      isDirty,
+      discard: discardChanges,
+      save: persistCurrent,
+      onClose: closeDetailPanel,
     });
 
     host.querySelector('#ugg-delete-confirm')?.addEventListener('change', e => {

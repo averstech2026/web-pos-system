@@ -117,8 +117,9 @@ export const cart = {
       {
         catalogItems: this._promoContext.catalogItems || [],
         categoryGroups: this._promoContext.categoryGroups || [],
-        slot: {},
+        slot: { date: this._dateSlot, time: this._timeSlot },
         clientSegment: this._promoContext.clientSegment || 'all',
+        channel: 'web',
       },
     );
   },

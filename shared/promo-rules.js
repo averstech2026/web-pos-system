@@ -3,6 +3,8 @@
  * Flexible promotion constructor for food service.
  */
 
+import { normalizeGroupOrderIndex } from './menu-catalog.js';
+
 /** @typedef {'cart_amount'|'item_quantity'|'happy_hour'|'client_segment'} PromoTriggerType */
 
 /** @typedef {'all'|'new'|'vip'|'staff'} ClientGroupId */
@@ -48,7 +50,11 @@
  * @typedef {object} PromoRuleDoc
  * @property {string} id
  * @property {string} name
- * @property {boolean} isActive
+ * @property {boolean} isActive - derived: visible in web or kiosk
+ * @property {boolean} [visibleInWeb] - show in personal account (web portal)
+ * @property {boolean} [visibleInKiosk] - show on self-service kiosk
+ * @property {number} [webOrder] - sort index for web promos
+ * @property {number} [kioskOrder] - sort index for kiosk promos
  * @property {string|null} availabilityRuleId
  * @property {PromoTriggerType} triggerType
  * @property {PromoConditions} conditions
@@ -81,12 +87,47 @@ const TRIGGER_TYPES = PROMO_TRIGGER_OPTIONS.map(o => o.id);
 const ACTION_TYPES = PROMO_ACTION_OPTIONS.map(o => o.id);
 const CLIENT_GROUP_IDS = CLIENT_GROUP_OPTIONS.map(o => o.id);
 
+/** @param {Partial<PromoRuleDoc>|null|undefined} raw */
+function resolvePromoChannelFields(raw) {
+  if (raw?.visibleInWeb !== undefined || raw?.visibleInKiosk !== undefined) {
+    return {
+      visibleInWeb: raw.visibleInWeb !== false,
+      visibleInKiosk: raw.visibleInKiosk === true,
+    };
+  }
+  if (raw?.isActive === true) {
+    return { visibleInWeb: true, visibleInKiosk: true };
+  }
+  return { visibleInWeb: false, visibleInKiosk: false };
+}
+
+/** @param {PromoRuleDoc|Partial<PromoRuleDoc>} promo */
+export function isPromoHidden(promo) {
+  const { visibleInWeb, visibleInKiosk } = resolvePromoChannelFields(promo);
+  return !visibleInWeb && !visibleInKiosk;
+}
+
+/** @param {PromoRuleDoc[]} promos @param {'web'|'kiosk'} [channel] */
+export function sortPromoRulesByChannel(promos, channel = 'web') {
+  const key = channel === 'kiosk' ? 'kioskOrder' : 'webOrder';
+  return [...promos].sort((a, b) => {
+    const ao = normalizeGroupOrderIndex(a[key], 0);
+    const bo = normalizeGroupOrderIndex(b[key], 0);
+    if (ao !== bo) return ao - bo;
+    return a.name.localeCompare(b.name, 'ru');
+  });
+}
+
 /** @returns {PromoRuleDoc} */
 export function createDefaultPromoRule(id = '') {
   return {
     id: id || `promo-${Date.now()}`,
     name: 'Новая акция',
     isActive: false,
+    visibleInWeb: false,
+    visibleInKiosk: false,
+    webOrder: 0,
+    kioskOrder: 0,
     availabilityRuleId: null,
     triggerType: 'happy_hour',
     conditions: {},
@@ -182,11 +223,16 @@ export function sanitizePromoRuleFields(rule) {
 export function normalizePromoRuleDoc(raw, docId = '') {
   const id = String(raw?.id || docId || '').trim();
   const triggerType = TRIGGER_TYPES.includes(raw?.triggerType) ? raw.triggerType : 'happy_hour';
+  const { visibleInWeb, visibleInKiosk } = resolvePromoChannelFields(raw);
 
   const draft = {
     id,
     name: String(raw?.name || '').trim() || 'Без названия',
-    isActive: raw?.isActive === true,
+    isActive: visibleInWeb || visibleInKiosk,
+    visibleInWeb,
+    visibleInKiosk,
+    webOrder: normalizeGroupOrderIndex(raw?.webOrder, 0),
+    kioskOrder: normalizeGroupOrderIndex(raw?.kioskOrder, 0),
     availabilityRuleId: raw?.availabilityRuleId || null,
     triggerType,
     conditions: normalizePromoConditions(raw?.conditions),
@@ -309,6 +355,10 @@ export function buildPromoRulePayload(rule) {
   const payload = {
     name: normalized.name,
     isActive: normalized.isActive,
+    visibleInWeb: normalized.visibleInWeb,
+    visibleInKiosk: normalized.visibleInKiosk,
+    webOrder: normalized.webOrder,
+    kioskOrder: normalized.kioskOrder,
     availabilityRuleId: normalized.availabilityRuleId || null,
     triggerType: normalized.triggerType,
     conditions: normalized.conditions,

@@ -106,7 +106,7 @@ export class MenuPage {
 
     this.promoRules = promosSnap.docs
       .map(d => normalizePromoRuleDoc({ id: d.id, ...d.data() }, d.id))
-      .filter(p => p.isActive);
+      .filter(p => p.visibleInWeb !== false);
 
     const menuData = menuSnap.exists() ? menuSnap.data() : {};
     const groups = sortCategoryGroupsByChannel(

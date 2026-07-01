@@ -23,13 +23,13 @@ import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.j
 import {
   renderAvrCancelButton,
   runWithUnsavedGuard,
+  bindAvrDetailCancel,
 } from '../utils/avr-unsaved-changes.js';
-
-const CGR_PLUS_ICON = `
-  <svg class="cgr-btn-icon" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-    <path fill="currentColor" d="M8 3a1 1 0 0 1 1 1v3h3a1 1 0 1 1 0 2H9v3a1 1 0 1 1-2 0V9H4a1 1 0 1 1 0-2h3V4a1 1 0 0 1 1-1z"/>
-  </svg>
-`;
+import { renderChannelAvailabilityGrid } from '../utils/admin-form.js';
+import {
+  renderListMetaWithSchedule,
+  scheduleStatusForGroup,
+} from '../utils/schedule-status.js';
 
 /**
  * @param {HTMLElement} host
@@ -142,20 +142,75 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     return groups.find(g => g.id === selectedId) || null;
   }
 
-  function sortedGroupsForList() {
-    return sortCategoryGroupsByChannel(groups, listSortChannel);
+  function partitionGroupsForList() {
+    const sorted = sortCategoryGroupsByChannel(groups, listSortChannel);
+    const active = sorted.filter(g => !isGroupDeprioritized(g));
+    const inactive = sorted.filter(g => isGroupDeprioritized(g));
+    return { active, inactive };
   }
 
-  function orderIndicatorsHtml(group) {
-    const w = Number(group.webOrder) || 0;
-    const k = Number(group.kioskOrder) || 0;
-    const wClass = listSortChannel === 'web' ? 'cgr-row-order cgr-row-order--active' : 'cgr-row-order';
-    const kClass = listSortChannel === 'kiosk' ? 'cgr-row-order cgr-row-order--active' : 'cgr-row-order';
-    return `<span class="${wClass}">W: ${w}</span> | <span class="${kClass}">K: ${k}</span>`;
+  function renderHiddenGroupsDivider(count) {
+    if (count <= 0) return '';
+    return `
+      <li class="cgr-list-divider" aria-hidden="true">
+        <span class="cgr-list-divider-text">— Скрытые группы (${count}) —</span>
+      </li>
+    `;
+  }
+
+  function renderListItemsHtml() {
+    const { active, inactive } = partitionGroupsForList();
+    return [
+      ...active.map(g => renderListRow(g)),
+      renderHiddenGroupsDivider(inactive.length),
+      ...inactive.map(g => renderListRow(g)),
+    ].join('');
+  }
+
+  function isGroupHidden(group) {
+    return resolveChannelMode(group.visibleInWeb, group.visibleInKiosk) === 'hidden';
+  }
+
+  function groupScheduleStatus(group) {
+    const rule = group.availabilityRuleId ? rulesMap.get(group.availabilityRuleId) : null;
+    return scheduleStatusForGroup(group, rule);
+  }
+
+  function isGroupDeprioritized(group) {
+    return isGroupHidden(group) || groupScheduleStatus(group).isExpired === true;
+  }
+
+  function channelBadgeHtml(channel, group) {
+    const isWeb = channel === 'web';
+    const active = isWeb
+      ? group.visibleInWeb !== false
+      : group.visibleInKiosk === true;
+    const order = isWeb ? Number(group.webOrder) || 0 : Number(group.kioskOrder) || 0;
+    const letter = isWeb ? 'W' : 'K';
+    const channelLabel = isWeb ? 'Веб' : 'Киоск';
+    const classes = [
+      'cgr-channel-badge',
+      isWeb ? 'cgr-channel-badge--web' : 'cgr-channel-badge--kiosk',
+      active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
+    ].join(' ');
+    const indexPart = active && order > 0
+      ? `<span class="cgr-channel-badge-num">${order}</span>`
+      : '';
+    const ariaLabel = active && order > 0
+      ? `${channelLabel}, порядок ${order}`
+      : active
+        ? `${channelLabel}, активен`
+        : `${channelLabel}, неактивен`;
+
+    return `<span class="${classes}" aria-label="${escAttr(ariaLabel)}">${letter}${indexPart}</span>`;
+  }
+
+  function channelIndicatorsHtml(group) {
+    return `${channelBadgeHtml('web', group)}${channelBadgeHtml('kiosk', group)}`;
   }
 
   function listRowMetaHtml(group) {
-    return `${memberCount(group.id)} шт. · ${esc(scheduleSummaryForGroup(group))} · ${orderIndicatorsHtml(group)}`;
+    return renderListMetaWithSchedule(`${memberCount(group.id)} шт.`, groupScheduleStatus(group));
   }
 
   function readOrderField(panel, field) {
@@ -194,46 +249,17 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
 
   function renderVisibilitySection(group) {
     const mode = resolveChannelMode(group.visibleInWeb, group.visibleInKiosk);
-    return `
-      <div class="cgr-detail-subsection" id="cgr-visibility-section">
-        <h4 class="cgr-detail-section-title">Видимость</h4>
-        <div class="period-tabs cgr-channel-tabs" role="radiogroup" aria-label="Видимость группы">
-          ${ITEM_CHANNEL_MODES.map(o => `
-            <button
-              type="button"
-              class="period-tab btn-press ${mode === o.id ? 'period-tab--active' : ''}"
-              data-group-channel-mode="${o.id}"
-              role="radio"
-              aria-checked="${mode === o.id}"
-            >${esc(o.label)}</button>
-          `).join('')}
-        </div>
-        <div class="cgr-order-fields">
-          <label class="cgr-order-field">
-            <span class="cgr-detail-label">Порядок в Вебе (index)</span>
-            <input
-              type="number"
-              class="avr-name-input cgr-order-input"
-              data-field="web-order"
-              min="0"
-              step="1"
-              value="${escAttr(String(group.webOrder ?? 0))}"
-            />
-          </label>
-          <label class="cgr-order-field">
-            <span class="cgr-detail-label">Порядок на Киоске (index)</span>
-            <input
-              type="number"
-              class="avr-name-input cgr-order-input"
-              data-field="kiosk-order"
-              min="0"
-              step="1"
-              value="${escAttr(String(group.kioskOrder ?? 0))}"
-            />
-          </label>
-        </div>
-      </div>
-    `;
+    return renderChannelAvailabilityGrid({
+      id: 'cgr-visibility-section',
+      mode,
+      modes: ITEM_CHANNEL_MODES,
+      webOrder: group.webOrder,
+      kioskOrder: group.kioskOrder,
+      modeDataAttr: 'data-group-channel-mode',
+      ariaLabel: 'Доступность группы',
+      webOrderId: 'cgr-web-order',
+      kioskOrderId: 'cgr-kiosk-order',
+    });
   }
 
   function syncGroupChannelTabs() {
@@ -258,14 +284,12 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     `).join('');
 
     return `
-      <div class="cgr-detail-subsection" id="cgr-availability-section">
-        <h4 class="cgr-detail-section-title">Время доступности</h4>
-        <label class="cgr-avail-select-field">
-          <select class="cgr-avail-select" data-field="availability-rule-id">
-            <option value="" ${!selectedRuleId ? 'selected' : ''}>Доступно всегда (Без ограничений)</option>
-            ${options}
-          </select>
-        </label>
+      <div class="admin-field-block" id="cgr-availability-section">
+        <label class="admin-field-label" for="cgr-avail-select">Время доступности</label>
+        <select class="admin-field-input cgr-avail-select" id="cgr-avail-select" data-field="availability-rule-id">
+          <option value="" ${!selectedRuleId ? 'selected' : ''}>Доступно всегда (Без ограничений)</option>
+          ${options}
+        </select>
         <p class="cgr-avail-rule-summary" id="cgr-avail-rule-summary" ${summary ? '' : 'hidden'}>${esc(summary)}</p>
       </div>
     `;
@@ -299,7 +323,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     host.querySelector('[data-field="availability-rule-id"]')?.addEventListener('change', e => {
       syncSidebarToState();
       refreshAvailabilitySummary();
-      updateListRowMeta(selectedId);
+      updateListRowMeta(selectedId, { resort: true });
     });
   }
 
@@ -346,17 +370,26 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
 
   function renderListRow(group) {
     const active = group.id === selectedId;
+    const deprioritized = isGroupDeprioritized(group);
     return `
-      <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''}" data-id="${escAttr(group.id)}">
-        <button type="button" class="avr-row-main btn-press" data-action="select" aria-pressed="${active}">
-          <span class="avr-row-thumb">${productThumbHtml({ name: group.name, imageUrl: group.imageUrl })}</span>
-          <span class="avr-row-info">
-            <span class="avr-row-name">${esc(group.name)}</span>
-            <span class="avr-row-meta">${listRowMetaHtml(group)}</span>
+      <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''} ${deprioritized ? 'cgr-row--hidden' : ''}" data-id="${escAttr(group.id)}">
+        <button type="button" class="avr-row-main btn-press cgr-row-main" data-action="select" aria-pressed="${active}">
+          <span class="cgr-row-left">
+            <span class="avr-row-thumb">${productThumbHtml({ name: group.name, imageUrl: group.imageUrl })}</span>
+            <span class="avr-row-info">
+              <span class="avr-row-name">${esc(group.name)}</span>
+              <span class="avr-row-meta">${listRowMetaHtml(group)}</span>
+            </span>
           </span>
+          <span class="cgr-row-indicators">${channelIndicatorsHtml(group)}</span>
         </button>
       </li>
     `;
+  }
+
+  function closeDetailPanel() {
+    selectedId = null;
+    render();
   }
 
   function renderDetailEmpty() {
@@ -376,41 +409,46 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     return `
       <div class="avr-detail-panel" id="cgr-detail-panel">
         <div class="avr-detail-scroll cgr-detail-scroll">
-          <section class="cgr-detail-card">
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Название группы</span>
-              <input type="text" class="cgr-detail-name-input" data-field="name" value="${escAttr(group.name)}" maxlength="80" />
-            </label>
+          <div class="admin-form-stack">
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="cgr-group-name">Название группы</label>
+              <input
+                id="cgr-group-name"
+                type="text"
+                class="admin-field-input"
+                data-field="name"
+                value="${escAttr(group.name)}"
+                maxlength="80"
+              />
+            </div>
 
-            <div class="cgr-detail-subsection cgr-detail-subsection--products">
-              <div class="cgr-detail-section-head">
-                <h3 class="cgr-detail-section-title">Товары в группе</h3>
-                <span class="cgr-detail-count" id="cgr-detail-count">${productCountLabel(group)}</span>
+            <div class="admin-field-block">
+              <div class="cgr-products-head">
+                <span class="admin-field-label">Товары в группе</span>
+                <span class="cgr-products-count" id="cgr-detail-count">${productCountLabel(group)}</span>
               </div>
-              <div class="cgr-group-products-toolbar">
-                <button type="button" class="btn btn-outline btn-press cgr-toolbar-btn" id="cgr-add-product-btn">
-                  <span class="cgr-btn-inner">${CGR_PLUS_ICON}<span>Создать и добавить товар</span></span>
-                </button>
-                <button type="button" class="btn btn-outline btn-press cgr-toolbar-btn" id="cgr-pick-products-btn">
-                  <span class="cgr-btn-inner">${CGR_PLUS_ICON}<span>Добавить из базы</span></span>
-                </button>
-              </div>
-              <div class="catm-products-list cgr-products-list" id="cgr-products-list">
-                ${renderProductList(group)}
+              <div class="cgr-products-panel">
+                <div class="cgr-group-products-toolbar">
+                  <button type="button" class="btn btn-primary btn-press products-create-btn" id="cgr-add-product-btn">
+                    + Создать и добавить товар
+                  </button>
+                  <button type="button" class="btn btn-outline btn-press products-create-btn" id="cgr-pick-products-btn">
+                    + Добавить из базы
+                  </button>
+                </div>
+                <div class="catm-products-list cgr-products-list" id="cgr-products-list">
+                  ${renderProductList(group)}
+                </div>
               </div>
             </div>
-          </section>
-
-          <section class="cgr-detail-card cgr-detail-card--muted">
-            <h3 class="cgr-detail-card-title">Дополнительные настройки</h3>
 
             ${renderVisibilitySection(group)}
 
             ${renderAvailabilitySection(group)}
 
-            <div class="cgr-detail-subsection">
-              <h4 class="cgr-detail-section-title">Изображение в меню</h4>
-              <div class="cgr-detail-photo-row">
+            <div class="admin-field-block" id="cgr-image-section">
+              <span class="admin-field-label">Изображение в меню</span>
+              <div class="admin-media-row cgr-detail-photo-row">
                 <div class="cgr-detail-photo-preview" id="cgr-photo-preview">
                   ${productThumbHtml({ name: group.name, imageUrl: previewUrl })}
                 </div>
@@ -419,12 +457,12 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
                     Выбрать файл
                     <input type="file" data-photo-file accept="image/jpeg,image/png,image/webp" hidden />
                   </label>
-                  <p class="cgr-detail-photo-path" id="cgr-photo-path-text">${esc(imagePath || 'Файл не выбран')}</p>
+                  <p class="admin-media-path cgr-detail-photo-path" id="cgr-photo-path-text">${esc(imagePath || 'Файл не выбран')}</p>
                   <input type="hidden" data-field="image-url" value="${escAttr(group.imageUrl || '')}" />
                 </div>
               </div>
             </div>
-          </section>
+          </div>
 
           <p class="ifm-error" id="cgr-error" hidden></p>
         </div>
@@ -481,7 +519,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   function refreshListOrder() {
     const list = host.querySelector('#cgr-list');
     if (!list) return;
-    list.innerHTML = sortedGroupsForList().map(g => renderListRow(g)).join('');
+    list.innerHTML = renderListItemsHtml();
   }
 
   function syncListSortTabs() {
@@ -504,7 +542,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
             </button>
           </div>
           ${renderListSortBar()}
-          <ul class="avr-list" id="cgr-list">${sortedGroupsForList().map(g => renderListRow(g)).join('')}</ul>
+          <ul class="avr-list" id="cgr-list">${renderListItemsHtml()}</ul>
           ${!groups.length ? '<p class="avr-list-empty">Нет групп. Создайте первую.</p>' : ''}
           <p class="ifm-error" id="cgr-list-error" hidden></p>
         </div>
@@ -516,13 +554,21 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     bindEvents();
   }
 
-  function updateListRowMeta(id) {
+  function updateListRowMeta(id, { resort = false } = {}) {
+    if (resort) {
+      refreshListOrder();
+      return;
+    }
+
     const row = host.querySelector(`.avr-row[data-id="${id}"]`);
     const group = groups.find(g => g.id === id);
     if (!row || !group) return;
     row.querySelector('.avr-row-name')?.replaceChildren(document.createTextNode(group.name));
     const metaEl = row.querySelector('.avr-row-meta');
     if (metaEl) metaEl.innerHTML = listRowMetaHtml(group);
+    row.classList.toggle('cgr-row--hidden', isGroupDeprioritized(group));
+    const indicatorsEl = row.querySelector('.cgr-row-indicators');
+    if (indicatorsEl) indicatorsEl.innerHTML = channelIndicatorsHtml(group);
     row.querySelector('.avr-row-thumb')?.replaceChildren();
     row.querySelector('.avr-row-thumb')?.insertAdjacentHTML(
       'afterbegin',
@@ -573,10 +619,11 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     });
 
     host.querySelector('#cgr-detail-save')?.addEventListener('click', () => save());
-    host.querySelector('#cgr-detail-cancel')?.addEventListener('click', () => {
-      if (!isDirty()) return;
-      discardChanges();
-      render();
+    bindAvrDetailCancel(host, 'cgr-detail-cancel', {
+      isDirty,
+      discard: discardChanges,
+      save: () => save(),
+      onClose: closeDetailPanel,
     });
     host.querySelector('#cgr-delete-confirm')?.addEventListener('change', e => {
       const btn = host.querySelector('#cgr-detail-delete');
@@ -597,7 +644,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
           g.id === selectedId ? { ...g, visibleInWeb, visibleInKiosk } : g
         ));
         syncGroupChannelTabs();
-        updateListRowMeta(selectedId);
+        refreshListOrder();
         return;
       }
 

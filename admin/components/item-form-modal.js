@@ -108,10 +108,11 @@ export function openItemFormModal({
       </div>
 
       <div class="admin-modal-body">
-        <div class="ifm-form">
-          <div class="ifm-field ifm-field--wide">
-            <span>Доступность</span>
-            <div class="period-tabs ifm-channel-tabs" role="radiogroup" aria-label="Доступность">
+        <div class="ifm-form admin-form-stack">
+          <div class="admin-field-block ifm-field ifm-field--wide">
+            <span class="admin-field-label">Доступность</span>
+            <div class="admin-channel-tabs-wrap">
+              <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10 ifm-channel-tabs" role="radiogroup" aria-label="Доступность">
               ${ITEM_CHANNEL_MODES.map(o => `
                 <button
                   type="button"
@@ -121,6 +122,7 @@ export function openItemFormModal({
                   aria-checked="${state.channelMode === o.id}"
                 >${o.label}</button>
               `).join('')}
+              </div>
             </div>
           </div>
 
@@ -130,12 +132,12 @@ export function openItemFormModal({
             </div>
 
             <label class="ifm-field ifm-field--name">
-              <span>Название</span>
+              <span class="admin-field-label">Название</span>
               <input type="text" id="ifm-name" value="${escAttr(state.name)}" placeholder="Борщ с мясом" maxlength="120" />
             </label>
 
             <label class="ifm-field ifm-field--price">
-              <span>Цена, ₽</span>
+              <span class="admin-field-label">Цена, ₽</span>
               <input type="number" id="ifm-price" min="0" step="1" value="${state.price}" />
             </label>
 
@@ -150,7 +152,7 @@ export function openItemFormModal({
                 </button>
               </div>
               <label class="ifm-field ifm-field--wide ifm-field--compact">
-                <span>Путь к фото</span>
+                <span class="admin-field-label">Путь к фото</span>
                 <input type="text" id="ifm-image-url" value="${escAttr(state.imageUrl)}" placeholder="/products/dish.jpg" />
               </label>
               <p class="ifm-hint ifm-hint--inline">Файлы в папке <code>products/</code></p>
@@ -158,12 +160,12 @@ export function openItemFormModal({
           </div>
 
           <label class="ifm-field ifm-field--wide">
-            <span>Описание</span>
+            <span class="admin-field-label">Описание</span>
             <textarea id="ifm-description" rows="3" placeholder="Состав, особенности…">${esc(state.description)}</textarea>
           </label>
 
           <label class="ifm-field ifm-field--wide">
-            <span>Группа (категория)</span>
+            <span class="admin-field-label">Группа (категория)</span>
             ${lockedCategory ? `
               <input
                 type="text"

@@ -1,6 +1,6 @@
 import { saveLoyaltyCategory, deleteLoyaltyCategory } from '../services/crm-ref-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
+import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -95,23 +95,23 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
     return `
       <div class="avr-detail-panel" id="lyc-detail-panel">
         <div class="avr-detail-scroll">
-          <section class="cgr-detail-card">
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Название</span>
-              <input type="text" class="cgr-detail-name-input" data-field="name" value="${escAttr(cat.name)}" maxlength="80" placeholder="Золото" />
-            </label>
+          <div class="admin-form-stack">
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="lyc-name">Название</label>
+              <input id="lyc-name" type="text" class="admin-field-input" data-field="name" value="${escAttr(cat.name)}" maxlength="80" placeholder="Золото" />
+            </div>
             <div class="ufm-grid-2">
-              <label class="cgr-detail-name-field">
-                <span class="cgr-detail-label">Скидка, %</span>
-                <input type="number" class="cgr-detail-name-input" data-field="discountPercent" min="0" max="100" step="1" value="${cat.discountPercent ?? 0}" />
-              </label>
-              <label class="cgr-detail-name-field">
-                <span class="cgr-detail-label">Кэшбэк, %</span>
-                <input type="number" class="cgr-detail-name-input" data-field="cashbackPercent" min="0" max="100" step="1" value="${cat.cashbackPercent ?? 0}" />
-              </label>
+              <div class="admin-field-block">
+                <label class="admin-field-label" for="lyc-discount">Скидка, %</label>
+                <input id="lyc-discount" type="number" class="admin-field-input" data-field="discountPercent" min="0" max="100" step="1" value="${cat.discountPercent ?? 0}" />
+              </div>
+              <div class="admin-field-block">
+                <label class="admin-field-label" for="lyc-cashback">Кэшбэк, %</label>
+                <input id="lyc-cashback" type="number" class="admin-field-input" data-field="cashbackPercent" min="0" max="100" step="1" value="${cat.cashbackPercent ?? 0}" />
+              </div>
             </div>
             <p class="alr-detail-id">ID: <code>${esc(cat.id)}</code></p>
-          </section>
+          </div>
           <p class="ifm-error" id="lyc-error" hidden></p>
         </div>
         <div class="avr-detail-foot">
@@ -133,6 +133,11 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
         </div>
       </div>
     `;
+  }
+
+  function closeDetailPanel() {
+    selectedId = null;
+    render();
   }
 
   function render() {
@@ -226,10 +231,11 @@ export function createLoyaltyCategoriesEditor(host, { categories: initialCategor
     host.querySelector('#lyc-detail-panel')?.addEventListener('input', () => syncPanel());
 
     host.querySelector('#lyc-save')?.addEventListener('click', persistCurrent);
-    host.querySelector('#lyc-cancel')?.addEventListener('click', () => {
-      if (!isDirty()) return;
-      discardChanges();
-      render();
+    bindAvrDetailCancel(host, 'lyc-cancel', {
+      isDirty,
+      discard: discardChanges,
+      save: persistCurrent,
+      onClose: closeDetailPanel,
     });
 
     host.querySelector('#lyc-delete-confirm')?.addEventListener('change', e => {

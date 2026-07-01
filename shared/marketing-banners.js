@@ -292,6 +292,9 @@ export function normalizeMarketingBanner(raw, docId = '') {
     visibleInKiosk = flags.visibleInKiosk;
   }
   const targetDevices = targetDevicesFromChannelFlags(visibleInWeb, visibleInKiosk);
+  const isActive = (raw?.visibleInWeb !== undefined || raw?.visibleInKiosk !== undefined)
+    ? (visibleInWeb || visibleInKiosk)
+    : raw?.isActive === true;
 
   return sanitizeBannerForFormat({
     id,
@@ -301,7 +304,7 @@ export function normalizeMarketingBanner(raw, docId = '') {
     fullDescription: String(raw?.fullDescription || '').trim(),
     thumbnailUrl: sanitizePersistedImageUrl(raw?.thumbnailUrl),
     bannerUrl: sanitizePersistedImageUrl(raw?.bannerUrl),
-    isActive: raw?.isActive === true,
+    isActive,
     placement,
     targetDevices,
     visibleInWeb,
@@ -417,6 +420,13 @@ export function filterMarketingBannersForUser(banners, ctx = {}) {
 }
 
 /** @param {Partial<MarketingBanner>} banner */
+export function isMarketingBannerHidden(banner) {
+  const n = normalizeMarketingBanner(banner, banner?.id);
+  if (!n.isActive) return true;
+  return resolveMarketingChannelMode(n.visibleInWeb, n.visibleInKiosk) === 'hidden';
+}
+
+/** @param {Partial<MarketingBanner>} banner */
 export function formatMarketingBannerSummary(banner) {
   const parts = [];
   if (banner.bannerFormat === 'square' || banner.placement === 'story') {
@@ -433,16 +443,7 @@ export function formatMarketingBannerSummary(banner) {
   } else {
     parts.push('Истории + баннер');
   }
-  const mode = resolveMarketingChannelMode(banner.visibleInWeb, banner.visibleInKiosk);
-  const channelLabels = {
-    everywhere: 'везде',
-    web_only: 'веб',
-    kiosk_only: 'киоск',
-    hidden: 'скрыт',
-  };
-  if (channelLabels[mode]) parts.push(channelLabels[mode]);
-  if (!banner.isActive) parts.push('выкл.');
-  return parts.join(' · ');
+  return parts.join(' · ') || 'Баннер';
 }
 
 /** @param {Partial<MarketingBanner>} banner */

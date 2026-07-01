@@ -98,6 +98,27 @@ export function renderAvrCancelButton(id, label = 'Отменить') {
   return `<button type="button" class="action-btn action-btn-danger btn-press" id="${id}">${esc(label)}</button>`;
 }
 
+/**
+ * Cancel in avr-layout detail foot: unsaved guard + close panel (deselect entity).
+ * @param {ParentNode} root
+ * @param {string} buttonId
+ * @param {object} handlers
+ * @param {() => boolean} handlers.isDirty
+ * @param {() => void} handlers.discard
+ * @param {() => boolean|Promise<boolean>} [handlers.save]
+ * @param {() => void} handlers.onClose
+ */
+export function bindAvrDetailCancel(root, buttonId, { isDirty, discard, save, onClose }) {
+  root.querySelector(`#${buttonId}`)?.addEventListener('click', () => {
+    runWithUnsavedGuard({
+      isDirty,
+      discard,
+      save,
+      proceed: onClose,
+    });
+  });
+}
+
 /** @param {string} s */
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

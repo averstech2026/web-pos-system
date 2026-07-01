@@ -1,6 +1,6 @@
 import { saveAllergens } from '../services/menu-settings-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
+import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -103,6 +103,11 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
     `;
   }
 
+  function closeDetailPanel() {
+    selectedId = null;
+    render();
+  }
+
   function renderDetailEmpty() {
     return `
       <div class="avr-detail-empty">
@@ -118,24 +123,25 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
     return `
       <div class="avr-detail-panel" id="alr-detail-panel">
         <div class="avr-detail-scroll alr-detail-scroll">
-          <section class="cgr-detail-card">
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Название</span>
+          <div class="admin-form-stack">
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="alr-name">Название</label>
               <input
+                id="alr-name"
                 type="text"
-                class="cgr-detail-name-input"
+                class="admin-field-input"
                 data-field="name"
                 value="${escAttr(allergen.name)}"
                 maxlength="80"
                 placeholder="Например: Глютен"
               />
-            </label>
+            </div>
             <p class="alr-detail-id">ID: <code>${esc(allergen.id)}</code></p>
             <p class="cgr-detail-hint">
               Отметьте аллергены в карточке товара — клиент увидит их при заказе.
               ${count ? `Сейчас указан в ${productCountLabel(allergen.id)}.` : 'Пока не указан ни в одном товаре.'}
             </p>
-          </section>
+          </div>
           <p class="ifm-error" id="alr-error" hidden></p>
         </div>
 
@@ -316,10 +322,17 @@ export function createAllergensEditor(host, { allergens: initialAllergens, items
       if (ok) render();
     });
 
-    host.querySelector('#alr-detail-cancel')?.addEventListener('click', () => {
-      if (!isDirty()) return;
-      discardChanges();
-      render();
+    bindAvrDetailCancel(host, 'alr-detail-cancel', {
+      isDirty,
+      discard: discardChanges,
+      save: async () => {
+        syncPanelToState();
+        const next = allergens
+          .map(a => ({ id: a.id, name: a.name.trim() }))
+          .filter(a => a.id && a.name);
+        return persistAll(next);
+      },
+      onClose: closeDetailPanel,
     });
   }
 

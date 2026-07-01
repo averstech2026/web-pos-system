@@ -19,7 +19,7 @@ import {
   saveAvailabilityRule,
 } from '../services/availability-rules-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
+import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -227,12 +227,13 @@ export function createAvailabilityRulesEditor(host, {
     return `
       <div class="avr-detail-panel" id="avr-detail-panel">
         <div class="avr-detail-scroll">
-          <label class="avr-name-field">
-            <span class="avr-field-label">Название шаблона</span>
-            <input type="text" class="avr-name-input" data-field="name" value="${escAttr(rule.name)}" maxlength="120" />
-          </label>
+          <div class="admin-form-stack">
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="avr-rule-name">Название шаблона</label>
+              <input id="avr-rule-name" type="text" class="admin-field-input" data-field="name" value="${escAttr(rule.name)}" maxlength="120" />
+            </div>
 
-          <div class="avr-conditions-section">
+            <div class="avr-conditions-section">
             <div class="avr-section-head">
               <div class="avr-section-head-text">
                 <h3 class="avr-section-title">Условия</h3>
@@ -251,6 +252,7 @@ export function createAvailabilityRulesEditor(host, {
           </div>
 
           ${!isNew ? renderUsageBlock(rule.id) : ''}
+          </div>
 
           <p class="ifm-error" id="avr-error" hidden></p>
         </div>
@@ -277,6 +279,12 @@ export function createAvailabilityRulesEditor(host, {
         </div>
       </div>
     `;
+  }
+
+  function closeDetailPanel() {
+    selectedId = null;
+    isNew = false;
+    render();
   }
 
   function renderDetailEmpty() {
@@ -419,10 +427,11 @@ export function createAvailabilityRulesEditor(host, {
     });
 
     host.querySelector('#avr-save-btn')?.addEventListener('click', () => save());
-    host.querySelector('#avr-detail-cancel')?.addEventListener('click', () => {
-      if (!isDirty()) return;
-      discardChanges();
-      render();
+    bindAvrDetailCancel(host, 'avr-detail-cancel', {
+      isDirty,
+      discard: discardChanges,
+      save: () => save(),
+      onClose: closeDetailPanel,
     });
     host.querySelector('#avr-archive-btn')?.addEventListener('click', () => archiveRule());
     host.querySelector('#avr-delete-confirm')?.addEventListener('change', e => {

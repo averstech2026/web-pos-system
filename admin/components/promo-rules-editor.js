@@ -2,6 +2,7 @@ import {
   CLIENT_GROUP_OPTIONS,
   createDefaultPromoRule,
   formatPromoRuleSummary,
+  isPromoHidden,
   normalizePromoRuleDoc,
   PROMO_ACTION_OPTIONS,
   PROMO_TRIGGER_OPTIONS,
@@ -11,8 +12,19 @@ import {
 import { formatAvailabilityRuleShort } from '../../shared/availability-rules.js';
 import { bindProductPickerFields, renderProductPickerField } from './product-picker-field.js';
 import { deletePromoRule, savePromoRule } from '../services/promo-rules-data.js';
+import { promoThumbHtml } from '../utils/product-image.js';
+import {
+  channelFlagsFromMode,
+  ITEM_CHANNEL_MODES,
+  resolveChannelMode,
+} from '../services/products-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
+import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+import { renderChannelAvailabilityGrid } from '../utils/admin-form.js';
+import {
+  renderListMetaWithSchedule,
+  scheduleStatusForPromo,
+} from '../utils/schedule-status.js';
 
 /**
  * @param {HTMLElement} host
@@ -83,6 +95,11 @@ export function createPromoRulesEditor(host, {
       .filter(Boolean);
   }
 
+  function readChannelModeFromPanel(panel) {
+    const active = panel.querySelector('[data-promo-channel-mode].period-tab--active');
+    return active?.dataset.promoChannelMode || 'everywhere';
+  }
+
   function syncPanelToState() {
     const panel = host.querySelector('#prm-detail-panel');
     if (!selectedId || !panel) return;
@@ -139,10 +156,16 @@ export function createPromoRulesEditor(host, {
       };
     }
 
+    const { visibleInWeb, visibleInKiosk } = channelFlagsFromMode(readChannelModeFromPanel(panel));
+    const current = promos.find(p => p.id === selectedId);
+
     const draft = normalizePromoRuleDoc({
       id: selectedId,
       name: panel.querySelector('[data-field="name"]')?.value.trim() || '',
-      isActive: panel.querySelector('[data-field="is-active"]')?.checked === true,
+      visibleInWeb,
+      visibleInKiosk,
+      webOrder: current?.webOrder,
+      kioskOrder: current?.kioskOrder,
       availabilityRuleId: panel.querySelector('[data-field="availability-rule"]')?.value || null,
       triggerType,
       conditions,
@@ -193,6 +216,100 @@ export function createPromoRulesEditor(host, {
     `;
   }
 
+  function renderVisibilitySection(promo) {
+    const mode = resolveChannelMode(promo.visibleInWeb, promo.visibleInKiosk);
+    return renderChannelAvailabilityGrid({
+      id: 'prm-visibility-section',
+      mode,
+      modes: ITEM_CHANNEL_MODES,
+      modeDataAttr: 'data-promo-channel-mode',
+      ariaLabel: 'Доступность акции',
+      showOrderFields: false,
+    });
+  }
+
+  function syncPromoChannelTabs() {
+    const promo = selectedPromo();
+    const panel = host.querySelector('#prm-detail-panel');
+    if (!promo || !panel) return;
+    const mode = resolveChannelMode(promo.visibleInWeb, promo.visibleInKiosk);
+    panel.querySelectorAll('[data-promo-channel-mode]').forEach(btn => {
+      const active = btn.dataset.promoChannelMode === mode;
+      btn.classList.toggle('period-tab--active', active);
+      btn.setAttribute('aria-checked', active ? 'true' : 'false');
+    });
+  }
+
+  function channelBadgeHtml(channel, promo) {
+    const isWeb = channel === 'web';
+    const active = isWeb
+      ? promo.visibleInWeb !== false
+      : promo.visibleInKiosk === true;
+    const letter = isWeb ? 'W' : 'K';
+    const channelLabel = isWeb ? 'Веб' : 'Киоск';
+    const classes = [
+      'cgr-channel-badge',
+      isWeb ? 'cgr-channel-badge--web' : 'cgr-channel-badge--kiosk',
+      active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
+    ].join(' ');
+    const ariaLabel = active ? `${channelLabel}, активен` : `${channelLabel}, неактивен`;
+
+    return `<span class="${classes}" aria-label="${escAttr(ariaLabel)}">${letter}</span>`;
+  }
+
+  function channelIndicatorsHtml(promo) {
+    return `${channelBadgeHtml('web', promo)}${channelBadgeHtml('kiosk', promo)}`;
+  }
+
+  function promoScheduleStatus(promo) {
+    const rule = promo.availabilityRuleId
+      ? activeRules.find(r => r.id === promo.availabilityRuleId)
+      : null;
+    return scheduleStatusForPromo(promo, rule);
+  }
+
+  function isPromoDeprioritized(promo) {
+    return isPromoHidden(promo) || promoScheduleStatus(promo).isExpired === true;
+  }
+
+  function listRowMetaHtml(promo) {
+    return renderListMetaWithSchedule(
+      formatPromoRuleSummary(promo, categoryGroups, items),
+      promoScheduleStatus(promo),
+    );
+  }
+
+  function partitionPromosForList() {
+    const sorted = [...promos].sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    const active = sorted.filter(p => !isPromoDeprioritized(p));
+    const inactive = sorted.filter(p => isPromoDeprioritized(p));
+    return { active, inactive };
+  }
+
+  function renderHiddenPromosDivider(count) {
+    if (count <= 0) return '';
+    return `
+      <li class="cgr-list-divider" aria-hidden="true">
+        <span class="cgr-list-divider-text">— Скрытые акции (${count}) —</span>
+      </li>
+    `;
+  }
+
+  function renderListItemsHtml() {
+    const { active, inactive } = partitionPromosForList();
+    return [
+      ...active.map(p => renderListRow(p)),
+      renderHiddenPromosDivider(inactive.length),
+      ...inactive.map(p => renderListRow(p)),
+    ].join('');
+  }
+
+  function refreshListOrder() {
+    const list = host.querySelector('#prm-list');
+    if (!list) return;
+    list.innerHTML = renderListItemsHtml();
+  }
+
   function renderConditionBlock(promo) {
     const trigger = promo.triggerType;
     const qtyTarget = promo.conditions.requiredGroupId && !promo.conditions.requiredItemId
@@ -205,7 +322,7 @@ export function createPromoRulesEditor(host, {
           <span class="prm-block-badge">ЕСЛИ</span>
           <h3 class="prm-block-title">Условие</h3>
         </div>
-        <div class="prm-block-body form-stack">
+        <div class="prm-block-body admin-form-stack">
           <label class="form-group">
             <span class="avr-field-label">Тип условия</span>
             <select data-field="trigger-type" class="avr-select">
@@ -227,7 +344,7 @@ export function createPromoRulesEditor(host, {
             </div>
 
             <div class="${revealClass(trigger === 'item_quantity')}">
-              <div class="prm-reveal-inner form-stack">
+              <div class="prm-reveal-inner admin-form-stack">
                 <label class="form-group">
                   <span class="avr-field-label">Товар или группа</span>
                   <select data-field="qty-target-type" class="avr-select">
@@ -271,7 +388,7 @@ export function createPromoRulesEditor(host, {
             </div>
 
             <div class="${revealClass(trigger === 'client_segment')}">
-              <div class="prm-reveal-inner form-stack">
+              <div class="prm-reveal-inner admin-form-stack">
                 <div class="form-group">
                   <span class="avr-field-label">Выберите категорию клиентов</span>
                   ${renderClientGroupChips(promo.targetClientGroups || [])}
@@ -299,7 +416,7 @@ export function createPromoRulesEditor(host, {
           <span class="prm-block-badge prm-block-badge--action">ТО</span>
           <h3 class="prm-block-title">Поощрение</h3>
         </div>
-        <div class="prm-block-body form-stack">
+        <div class="prm-block-body admin-form-stack">
           <label class="form-group">
             <span class="avr-field-label">Тип выгоды</span>
             <select data-field="action-type" class="avr-select">
@@ -311,7 +428,7 @@ export function createPromoRulesEditor(host, {
 
           <div class="prm-conditional-fields" data-action-fields>
             <div class="${revealClass(actionType === 'discount_percent')}">
-              <div class="prm-reveal-inner form-stack">
+              <div class="prm-reveal-inner admin-form-stack">
                 <label class="form-group">
                   <span class="avr-field-label">Процент скидки</span>
                   <input type="number" class="avr-name-input" data-field="discount-value" min="1" max="100" step="1"
@@ -364,7 +481,7 @@ export function createPromoRulesEditor(host, {
             </div>
 
             <div class="${revealClass(actionType === 'bonus_points')}">
-              <div class="prm-reveal-inner form-stack">
+              <div class="prm-reveal-inner admin-form-stack">
                 <label class="form-group">
                   <span class="avr-field-label">Тип начисления</span>
                   <select data-field="bonus-mode" class="avr-select">
@@ -398,26 +515,20 @@ export function createPromoRulesEditor(host, {
               <span class="prm-block-badge prm-block-badge--basic">1</span>
               <h3 class="prm-block-title">Основное</h3>
             </div>
-            <div class="prm-block-body form-stack">
-              <label class="form-group">
-                <span class="avr-field-label">Название акции</span>
-                <input type="text" class="avr-name-input" data-field="name" value="${escAttr(promo.name)}" maxlength="120" />
-              </label>
-
-              <div class="prm-active-row">
-                <label class="avr-active-toggle" title="${promo.isActive ? 'Выключить акцию' : 'Включить акцию'}">
-                  <input type="checkbox" data-field="is-active" ${promo.isActive ? 'checked' : ''} />
-                  <span class="avr-switch" aria-hidden="true"></span>
-                  <span class="avr-active-label">${promo.isActive ? 'Активна' : 'Выключена'}</span>
-                </label>
+            <div class="prm-block-body admin-form-stack">
+              <div class="admin-field-block">
+                <label class="admin-field-label" for="prm-name">Название акции</label>
+                <input id="prm-name" type="text" class="admin-field-input" data-field="name" value="${escAttr(promo.name)}" maxlength="120" />
               </div>
 
-              <label class="form-group">
-                <span class="avr-field-label">Период действия (Расписание)</span>
-                <select data-field="availability-rule" class="avr-select">
+              ${renderVisibilitySection(promo)}
+
+              <div class="admin-field-block">
+                <label class="admin-field-label" for="prm-schedule">Период действия (Расписание)</label>
+                <select id="prm-schedule" data-field="availability-rule" class="admin-field-input">
                   ${renderScheduleOptions(promo.availabilityRuleId)}
                 </select>
-              </label>
+              </div>
             </div>
           </section>
 
@@ -450,6 +561,12 @@ export function createPromoRulesEditor(host, {
     `;
   }
 
+  function closeDetailPanel() {
+    selectedId = null;
+    isNew = false;
+    render();
+  }
+
   function renderDetailEmpty() {
     return `
       <div class="avr-detail-empty">
@@ -462,17 +579,18 @@ export function createPromoRulesEditor(host, {
 
   function renderListRow(promo) {
     const active = promo.id === selectedId;
-    const statusClass = promo.isActive ? 'prm-row-status--on' : 'prm-row-status--off';
+    const deprioritized = isPromoDeprioritized(promo);
     return `
-      <li class="avr-row ${active ? 'avr-row--active' : ''}" data-id="${escAttr(promo.id)}">
-        <button type="button" class="avr-row-main btn-press" data-action="select" aria-pressed="${active}">
-          <span class="avr-row-info">
-            <span class="avr-row-name">
-              <span class="prm-row-status ${statusClass}" aria-hidden="true"></span>
-              ${esc(promo.name)}
+      <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''} ${deprioritized ? 'cgr-row--hidden' : ''}" data-id="${escAttr(promo.id)}">
+        <button type="button" class="avr-row-main btn-press cgr-row-main" data-action="select" aria-pressed="${active}">
+          <span class="cgr-row-left">
+            <span class="avr-row-thumb">${promoThumbHtml()}</span>
+            <span class="avr-row-info">
+              <span class="avr-row-name">${esc(promo.name)}</span>
+              <span class="avr-row-meta">${listRowMetaHtml(promo)}</span>
             </span>
-            <span class="avr-row-meta">${esc(formatPromoRuleSummary(promo, categoryGroups, items))}</span>
           </span>
+          <span class="cgr-row-indicators">${channelIndicatorsHtml(promo)}</span>
         </button>
       </li>
     `;
@@ -487,7 +605,7 @@ export function createPromoRulesEditor(host, {
             <h2 class="avr-master-title">Акции (${promos.length})</h2>
             <button type="button" class="btn btn-primary btn-press products-create-btn" id="prm-create-btn">+ Новая акция</button>
           </div>
-          <ul class="avr-list" id="prm-list">${promos.map(p => renderListRow(p)).join('')}</ul>
+          <ul class="avr-list" id="prm-list">${renderListItemsHtml()}</ul>
           ${!promos.length ? '<p class="avr-list-empty">Нет акций. Создайте первую.</p>' : ''}
         </div>
         <aside class="avr-detail" aria-label="Редактор акции">
@@ -558,23 +676,27 @@ export function createPromoRulesEditor(host, {
     }
   }
 
-  function updateListRow(id) {
+  function updateListRow(id, { resort = false } = {}) {
+    if (resort) {
+      refreshListOrder();
+      return;
+    }
+
     const row = host.querySelector(`.avr-row[data-id="${id}"]`);
     const promo = promos.find(p => p.id === id);
     if (!row || !promo) return;
 
     const nameEl = row.querySelector('.avr-row-name');
-    if (nameEl) {
-      const statusClass = promo.isActive ? 'prm-row-status--on' : 'prm-row-status--off';
-      nameEl.innerHTML = `
-        <span class="prm-row-status ${statusClass}" aria-hidden="true"></span>
-        ${esc(promo.name)}
-      `;
-    }
+    if (nameEl) nameEl.textContent = promo.name;
 
-    row.querySelector('.avr-row-meta')?.replaceChildren(
-      document.createTextNode(formatPromoRuleSummary(promo, categoryGroups, items)),
-    );
+    row.querySelector('.avr-row-meta')?.replaceChildren();
+    const metaEl = row.querySelector('.avr-row-meta');
+    if (metaEl) metaEl.innerHTML = listRowMetaHtml(promo);
+
+    const indicators = row.querySelector('.cgr-row-indicators');
+    if (indicators) indicators.innerHTML = channelIndicatorsHtml(promo);
+
+    row.classList.toggle('cgr-row--hidden', isPromoDeprioritized(promo));
   }
 
   function bindPanelEvents() {
@@ -583,10 +705,17 @@ export function createPromoRulesEditor(host, {
 
     bindProductPickerFields(panel, items, panelChange);
 
-    panel.querySelector('[data-field="is-active"]')?.addEventListener('change', e => {
-      const label = panel.querySelector('.avr-active-label');
-      if (label) label.textContent = e.target.checked ? 'Активна' : 'Выключена';
-      panelChange();
+    panel.querySelectorAll('[data-promo-channel-mode]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.preventDefault();
+        if (!selectedId) return;
+        const { visibleInWeb, visibleInKiosk } = channelFlagsFromMode(btn.dataset.promoChannelMode);
+        promos = promos.map(p => (
+          p.id === selectedId ? { ...p, visibleInWeb, visibleInKiosk } : p
+        ));
+        syncPromoChannelTabs();
+        updateListRow(selectedId, { resort: true });
+      });
     });
 
     panel.querySelector('[data-field="trigger-type"]')?.addEventListener('change', () => {
@@ -632,10 +761,16 @@ export function createPromoRulesEditor(host, {
       });
     });
 
+    panel.querySelector('[data-field="availability-rule"]')?.addEventListener('change', () => {
+      syncPanelToState();
+      updateListRow(selectedId, { resort: true });
+    });
+
     panel.querySelectorAll('input:not([type="hidden"]), select').forEach(el => {
       if (el.matches(
         '[data-field="trigger-type"], [data-field="action-type"], [data-field="qty-target-type"], '
-        + '[data-field="discount-target"], [data-field="is-active"], [data-field="bonus-mode"], [data-client-group]',
+        + '[data-field="discount-target"], [data-field="bonus-mode"], [data-client-group], '
+        + '[data-field="availability-rule"]',
       )) {
         return;
       }
@@ -684,10 +819,11 @@ export function createPromoRulesEditor(host, {
     });
 
     host.querySelector('#prm-save-btn')?.addEventListener('click', () => save());
-    host.querySelector('#prm-detail-cancel')?.addEventListener('click', () => {
-      if (!isDirty()) return;
-      discardChanges();
-      render();
+    bindAvrDetailCancel(host, 'prm-detail-cancel', {
+      isDirty,
+      discard: discardChanges,
+      save: () => save(),
+      onClose: closeDetailPanel,
     });
     host.querySelector('#prm-delete-confirm')?.addEventListener('change', e => {
       const btn = host.querySelector('#prm-detail-delete');

@@ -1,7 +1,7 @@
 import {
   createDefaultMarketingBanner,
-  formatMarketingBannerScheduleHint,
   formatMarketingBannerSummary,
+  isMarketingBannerHidden,
   isPromoHorizontalPlacement,
   MARKETING_ACCENT_COLORS,
   MARKETING_BACKGROUND_COLORS,
@@ -29,7 +29,11 @@ import { uploadProductImage } from '../../shared/product-image-upload.js';
 import { productThumbHtml } from '../utils/product-image.js';
 import { deleteMarketingBanner, saveMarketingBanner } from '../services/marketing-banners-data.js';
 import { showToast } from '../utils/toast.js';
-import { promptUnsavedChanges, renderAvrCancelButton } from '../utils/avr-unsaved-changes.js';
+import { promptUnsavedChanges, renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+import {
+  renderListMetaWithSchedule,
+  scheduleStatusForBanner,
+} from '../utils/schedule-status.js';
 
 /**
  * @param {HTMLElement} host
@@ -205,6 +209,17 @@ export function createMarketingBannersEditor(host, {
     }
 
     finishSelectBanner(targetId);
+  }
+
+  function closeBannerEditor() {
+    const currentId = selectedId;
+    if (currentId && (isNew || currentId === draftBannerId)) {
+      discardCurrentBannerChanges();
+    }
+    selectedId = null;
+    isNew = false;
+    pristineBanner = null;
+    render();
   }
 
   function createNewDraft() {
@@ -383,7 +398,7 @@ export function createMarketingBannersEditor(host, {
       fullDescription: panel.querySelector('[data-field="full-description"]')?.value.trim() || '',
       thumbnailUrl: sanitizePersistedImageUrl(panel.querySelector('[data-field="thumbnail-url"]')?.value.trim() || null),
       bannerUrl: sanitizePersistedImageUrl(panel.querySelector('[data-field="banner-url"]')?.value.trim() || null),
-      isActive: panel.querySelector('[data-field="is-active"]')?.checked === true,
+      isActive: visibleInWeb || visibleInKiosk,
       placement,
       clickAction: panel.querySelector('[data-field="click-action"]')?.value || 'fullscreen_image',
       clickUrl: panel.querySelector('[data-field="click-url"]')?.value.trim() || null,
@@ -416,18 +431,20 @@ export function createMarketingBannersEditor(host, {
   function renderChannelVisibilitySection(banner) {
     const mode = resolveMarketingChannelMode(banner.visibleInWeb, banner.visibleInKiosk);
     return `
-      <div class="mkb-form-field mkb-channel-field">
-        <span class="mkb-field-label">Доступность</span>
-        <div class="period-tabs cgr-channel-tabs mkb-channel-tabs" role="radiogroup" aria-label="Доступность баннера">
-          ${MARKETING_CHANNEL_MODES.map(o => `
-            <button
-              type="button"
-              class="period-tab btn-press ${mode === o.id ? 'period-tab--active' : ''}"
-              data-mkb-channel-mode="${o.id}"
-              role="radio"
-              aria-checked="${mode === o.id}"
-            >${esc(o.label)}</button>
-          `).join('')}
+      <div class="admin-field-block admin-channel-field">
+        <span class="admin-field-label">Доступность</span>
+        <div class="admin-channel-tabs-wrap">
+          <div class="period-tabs admin-channel-tabs admin-channel-tabs--h10 mkb-channel-tabs" role="radiogroup" aria-label="Доступность баннера">
+            ${MARKETING_CHANNEL_MODES.map(o => `
+              <button
+                type="button"
+                class="period-tab btn-press ${mode === o.id ? 'period-tab--active' : ''}"
+                data-mkb-channel-mode="${o.id}"
+                role="radio"
+                aria-checked="${mode === o.id}"
+              >${esc(o.label)}</button>
+            `).join('')}
+          </div>
         </div>
       </div>
     `;
@@ -443,6 +460,93 @@ export function createMarketingBannersEditor(host, {
       btn.classList.toggle('period-tab--active', active);
       btn.setAttribute('aria-checked', active ? 'true' : 'false');
     });
+  }
+
+  function channelBadgeHtml(channel, banner) {
+    const isWeb = channel === 'web';
+    const active = isWeb
+      ? banner.visibleInWeb !== false
+      : banner.visibleInKiosk === true;
+    const order = Number(banner.sortOrder) || 0;
+    const letter = isWeb ? 'W' : 'K';
+    const channelLabel = isWeb ? 'Веб' : 'Киоск';
+    const classes = [
+      'cgr-channel-badge',
+      isWeb ? 'cgr-channel-badge--web' : 'cgr-channel-badge--kiosk',
+      active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
+    ].join(' ');
+    const indexPart = active && order >= 1
+      ? `<span class="cgr-channel-badge-num">${order}</span>`
+      : '';
+    const ariaLabel = active && order >= 1
+      ? `${channelLabel}, порядок ${order}`
+      : active
+        ? `${channelLabel}, активен`
+        : `${channelLabel}, неактивен`;
+
+    return `<span class="${classes}" aria-label="${escAttr(ariaLabel)}">${letter}${indexPart}</span>`;
+  }
+
+  function channelIndicatorsHtml(banner) {
+    return `${channelBadgeHtml('web', banner)}${channelBadgeHtml('kiosk', banner)}`;
+  }
+
+  function sortBannersForList(items) {
+    return [...items].sort((a, b) => {
+      const ao = Number(a.sortOrder) || 0;
+      const bo = Number(b.sortOrder) || 0;
+      if (ao !== bo) return ao - bo;
+      return a.title.localeCompare(b.title, 'ru');
+    });
+  }
+
+  function bannerScheduleStatus(banner) {
+    const rule = banner.scheduleId
+      ? activeRules.find(r => r.id === banner.scheduleId)
+      : null;
+    return scheduleStatusForBanner(banner, rule);
+  }
+
+  function isBannerDeprioritized(banner) {
+    return isMarketingBannerHidden(banner) || bannerScheduleStatus(banner).isExpired === true;
+  }
+
+  function listRowMetaHtml(banner) {
+    return renderListMetaWithSchedule(
+      formatMarketingBannerSummary(banner),
+      bannerScheduleStatus(banner),
+    );
+  }
+
+  function partitionBannersForList() {
+    const sorted = sortBannersForList(banners);
+    const active = sorted.filter(b => !isBannerDeprioritized(b));
+    const inactive = sorted.filter(b => isBannerDeprioritized(b));
+    return { active, inactive };
+  }
+
+  function renderHiddenBannersDivider(count) {
+    if (count <= 0) return '';
+    return `
+      <li class="cgr-list-divider" aria-hidden="true">
+        <span class="cgr-list-divider-text">— Скрытые баннеры (${count}) —</span>
+      </li>
+    `;
+  }
+
+  function renderListItemsHtml() {
+    const { active, inactive } = partitionBannersForList();
+    return [
+      ...active.map(b => renderListRow(b)),
+      renderHiddenBannersDivider(inactive.length),
+      ...inactive.map(b => renderListRow(b)),
+    ].join('');
+  }
+
+  function refreshListOrder() {
+    const list = host.querySelector('#mkb-list');
+    if (!list) return;
+    list.innerHTML = renderListItemsHtml();
   }
 
   function renderScheduleOptions(selected) {
@@ -636,7 +740,7 @@ export function createMarketingBannersEditor(host, {
       ${renderPlacementField(banner)}
       ${visibility}
       <div class="mkb-reveal ${isPromoHorizontal ? 'mkb-reveal--visible' : ''}" data-promo-horizontal-fields>
-        <div class="mkb-reveal-inner form-stack">
+        <div class="mkb-reveal-inner admin-form-stack">
           <div class="mkb-form-field">
             <span class="mkb-field-label">Цвет фона баннера</span>
             ${renderBackgroundColorOptions(banner.backgroundColor)}
@@ -752,12 +856,12 @@ export function createMarketingBannersEditor(host, {
       el.addEventListener('input', () => {
         clearFieldError(el);
         syncPanelToState();
-        updateListRow(selectedId);
+        updateListRow(selectedId, { resort: el.matches('[data-field="sort-order"]') });
       });
       el.addEventListener('change', () => {
         clearFieldError(el);
         syncPanelToState();
-        updateListRow(selectedId);
+        updateListRow(selectedId, { resort: el.matches('[data-field="sort-order"]') });
       });
     });
 
@@ -780,11 +884,12 @@ export function createMarketingBannersEditor(host, {
       e.preventDefault();
       const { visibleInWeb, visibleInKiosk } = marketingChannelFlagsFromMode(modeBtn.dataset.mkbChannelMode);
       banners = banners.map(b => (
-        b.id === selectedId ? { ...b, visibleInWeb, visibleInKiosk } : b
+        b.id === selectedId
+          ? { ...b, visibleInWeb, visibleInKiosk, isActive: visibleInWeb || visibleInKiosk }
+          : b
       ));
       syncChannelTabs();
-      syncPanelToState();
-      updateListRow(selectedId);
+      updateListRow(selectedId, { resort: true });
     });
 
     section.querySelectorAll('[data-field="background-color"]').forEach(radio => {
@@ -914,10 +1019,10 @@ export function createMarketingBannersEditor(host, {
           ${productThumbHtml({ name, imageUrl: previewUrl }, 'mkb-thumb')}
         </div>
         <input type="hidden" data-field="${escAttr(field)}" value="${escAttr(url || '')}" />
-        <div class="mkb-image-actions">
+        <div class="admin-media-row mkb-image-actions">
           <input type="file" accept="image/jpeg,image/png" data-image-input="${escAttr(field)}" hidden />
-          <button type="button" class="action-btn btn-press" data-image-pick="${escAttr(field)}">Выбрать файл</button>
-          <input type="text" class="avr-name-input mkb-url-input" data-image-url="${escAttr(field)}"
+          <button type="button" class="action-btn btn-press products-create-btn" data-image-pick="${escAttr(field)}">Выбрать файл</button>
+          <input type="text" class="admin-field-input mkb-url-input" data-image-url="${escAttr(field)}"
             value="${escAttr(url || '')}" placeholder="/products/dish.jpg или URL" />
         </div>
         <p class="mkb-image-spec">${esc(specHint)}</p>
@@ -934,14 +1039,9 @@ export function createMarketingBannersEditor(host, {
       <div class="avr-detail-inner mkb-detail-inner" id="mkb-detail-panel">
         <div class="mkb-detail-head">
           <h2 class="mkb-detail-title">${isNew ? 'Новый баннер' : 'Редактирование баннера'}</h2>
-          <label class="avr-active-toggle mkb-status-toggle" title="${banner.isActive ? 'Деактивировать баннер' : 'Активировать баннер'}">
-            <input type="checkbox" data-field="is-active" ${banner.isActive ? 'checked' : ''} />
-            <span class="avr-switch" aria-hidden="true"></span>
-            <span class="avr-active-label mkb-status-label">${banner.isActive ? 'Активен' : 'Неактивен'}</span>
-          </label>
         </div>
 
-        <div class="avr-detail-body form-stack mkb-detail-body">
+        <div class="avr-detail-body admin-form-stack mkb-detail-body">
           <section class="mkb-block card">
             <h3 class="mkb-block-title">Контент карточки</h3>
             ${renderFormatTabs(banner)}
@@ -1056,22 +1156,19 @@ export function createMarketingBannersEditor(host, {
 
   function renderListRow(banner) {
     const active = banner.id === selectedId;
-    const statusClass = banner.isActive ? 'prm-row-status--on' : 'prm-row-status--off';
+    const deprioritized = isBannerDeprioritized(banner);
     const thumbUrl = resolveListThumbUrl(banner);
     return `
-      <li class="avr-row avr-row--thumb mkb-list-row ${active ? 'avr-row--active' : ''}" data-id="${escAttr(banner.id)}">
-        <button type="button" class="avr-row-main btn-press mkb-list-row-btn" data-action="select" aria-pressed="${active}">
-          <span class="avr-row-thumb mkb-list-row-thumb">${productThumbHtml({ name: banner.title, imageUrl: thumbUrl })}</span>
-          <span class="avr-row-info mkb-row-info">
-            <span class="mkb-row-line1">
-              <span class="avr-row-name mkb-row-name">
-                <span class="prm-row-status ${statusClass}" aria-hidden="true"></span>
-                ${esc(banner.title)}
-              </span>
-              <span class="mkb-row-schedule">${esc(formatMarketingBannerScheduleHint(banner))}</span>
+      <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''} ${deprioritized ? 'cgr-row--hidden' : ''}" data-id="${escAttr(banner.id)}">
+        <button type="button" class="avr-row-main btn-press cgr-row-main" data-action="select" aria-pressed="${active}">
+          <span class="cgr-row-left">
+            <span class="avr-row-thumb">${productThumbHtml({ name: banner.title, imageUrl: thumbUrl })}</span>
+            <span class="avr-row-info">
+              <span class="avr-row-name">${esc(banner.title)}</span>
+              <span class="avr-row-meta">${listRowMetaHtml(banner)}</span>
             </span>
-            <span class="avr-row-meta mkb-row-meta">${esc(formatMarketingBannerSummary(banner))}</span>
           </span>
+          <span class="cgr-row-indicators">${channelIndicatorsHtml(banner)}</span>
         </button>
       </li>
     `;
@@ -1086,7 +1183,7 @@ export function createMarketingBannersEditor(host, {
             <h2 class="avr-master-title">Баннеры (${banners.length})</h2>
             <button type="button" class="btn btn-primary btn-press products-create-btn" id="mkb-create-btn">+ Новый баннер</button>
           </div>
-          <ul class="avr-list" id="mkb-list">${banners.map(b => renderListRow(b)).join('')}</ul>
+          <ul class="avr-list" id="mkb-list">${renderListItemsHtml()}</ul>
           ${!banners.length ? '<p class="avr-list-empty">Нет баннеров. Создайте первый.</p>' : ''}
         </div>
         <aside class="avr-detail" aria-label="Редактор баннера">
@@ -1139,12 +1236,12 @@ export function createMarketingBannersEditor(host, {
 
     panel.querySelector('[data-field="schedule-id"]')?.addEventListener('change', () => {
       syncPanelToState();
-      updateListRow(selectedId);
+      updateListRow(selectedId, { resort: true });
     });
     panel.querySelectorAll('[data-field="date-start"], [data-field="date-end"]').forEach(el => {
       el.addEventListener('change', () => {
         syncPanelToState();
-        updateListRow(selectedId);
+        updateListRow(selectedId, { resort: true });
       });
     });
 
@@ -1165,18 +1262,6 @@ export function createMarketingBannersEditor(host, {
         cb.closest('.mkb-chip')?.classList.toggle('mkb-chip--active', cb.checked);
         syncPanelToState();
       });
-    });
-
-    panel.querySelector('[data-field="is-active"]')?.addEventListener('change', e => {
-      const checked = e.target.checked;
-      const label = panel.querySelector('.mkb-status-label');
-      const toggle = panel.querySelector('.mkb-status-toggle');
-      if (label) label.textContent = checked ? 'Активен' : 'Неактивен';
-      if (toggle) {
-        toggle.title = checked ? 'Деактивировать баннер' : 'Активировать баннер';
-      }
-      syncPanelToState();
-      updateListRow(selectedId);
     });
 
     bindFormatDependentEvents();
@@ -1204,40 +1289,36 @@ export function createMarketingBannersEditor(host, {
 
     panel.querySelector('#mkb-save-btn')?.addEventListener('click', () => saveCurrentBanner());
 
-    panel.querySelector('#mkb-detail-cancel')?.addEventListener('click', () => {
-      if (!isFormDirty()) return;
-      discardCurrentBannerChanges();
-      if (!selectedBanner()) {
-        selectedId = banners[0]?.id || null;
-        isNew = selectedId != null && selectedId === draftBannerId;
-        const next = selectedBanner();
-        if (next) setPristineSnapshot(next);
-      }
-      render();
+    bindAvrDetailCancel(panel, 'mkb-detail-cancel', {
+      isDirty: isFormDirty,
+      discard: discardCurrentBannerChanges,
+      save: () => saveCurrentBanner(),
+      onClose: closeBannerEditor,
     });
   }
 
-  function updateListRow(id) {
+  function updateListRow(id, { resort = false } = {}) {
+    if (resort) {
+      refreshListOrder();
+      return;
+    }
+
     const row = host.querySelector(`.avr-row[data-id="${id}"]`);
     const banner = banners.find(b => b.id === id);
     if (!row || !banner) return;
 
     const nameEl = row.querySelector('.avr-row-name');
-    if (nameEl) {
-      const statusClass = banner.isActive ? 'prm-row-status--on' : 'prm-row-status--off';
-      nameEl.innerHTML = `
-        <span class="prm-row-status ${statusClass}" aria-hidden="true"></span>
-        ${esc(banner.title)}
-      `;
-    }
-    const metaEl = row.querySelector('.mkb-row-meta') || row.querySelector('.avr-row-meta');
-    if (metaEl) {
-      metaEl.textContent = formatMarketingBannerSummary(banner);
-    }
-    row.querySelector('.mkb-row-schedule')?.replaceChildren(
-      document.createTextNode(formatMarketingBannerScheduleHint(banner)),
-    );
-    const thumbEl = row.querySelector('.mkb-list-row-thumb') || row.querySelector('.avr-row-thumb');
+    if (nameEl) nameEl.textContent = banner.title;
+
+    const metaEl = row.querySelector('.avr-row-meta');
+    if (metaEl) metaEl.innerHTML = listRowMetaHtml(banner);
+
+    const indicators = row.querySelector('.cgr-row-indicators');
+    if (indicators) indicators.innerHTML = channelIndicatorsHtml(banner);
+
+    row.classList.toggle('cgr-row--hidden', isBannerDeprioritized(banner));
+
+    const thumbEl = row.querySelector('.avr-row-thumb');
     if (thumbEl) {
       thumbEl.innerHTML = productThumbHtml({
         name: banner.title,

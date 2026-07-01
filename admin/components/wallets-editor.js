@@ -1,6 +1,6 @@
 import { saveWallet, deleteWallet } from '../services/wallets-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard } from '../utils/avr-unsaved-changes.js';
+import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 
 /**
  * @param {HTMLElement} host
@@ -134,23 +134,23 @@ export function createWalletsEditor(host, {
     return `
       <div class="avr-detail-panel" id="wal-detail-panel">
         <div class="avr-detail-scroll">
-          <section class="cgr-detail-card">
-            <div class="cgr-detail-name-row wallet-detail-name-row">
-              <label class="cgr-detail-name-field">
-                <span class="cgr-detail-label">Название</span>
-                <input type="text" class="cgr-detail-name-input" data-field="name" value="${escAttr(wallet.name)}" maxlength="80" placeholder="Дотация" />
-              </label>
-              <button type="button" class="action-btn action-btn-secondary btn-press wallet-detail-distribute-btn" id="wal-distribute-detail" ${saving ? 'disabled' : ''}>
-                Распределить средства
-              </button>
+          <div class="admin-form-stack">
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="wal-name">Название</label>
+              <div class="cgr-detail-name-row wallet-detail-name-row">
+                <input id="wal-name" type="text" class="admin-field-input" data-field="name" value="${escAttr(wallet.name)}" maxlength="80" placeholder="Дотация" />
+                <button type="button" class="action-btn action-btn-secondary btn-press wallet-detail-distribute-btn" id="wal-distribute-detail" ${saving ? 'disabled' : ''}>
+                  Распределить средства
+                </button>
+              </div>
             </div>
-            <label class="cgr-detail-name-field cgr-detail-name-field--solo">
-              <span class="cgr-detail-label">Описание</span>
-              <textarea class="cgr-detail-name-input ufm-textarea" data-field="description" rows="3" placeholder="Назначение кошелька">${esc(wallet.description || '')}</textarea>
-            </label>
+            <div class="admin-field-block">
+              <label class="admin-field-label" for="wal-description">Описание</label>
+              <textarea id="wal-description" class="admin-field-input admin-field-textarea" data-field="description" rows="3" placeholder="Назначение кошелька">${esc(wallet.description || '')}</textarea>
+            </div>
             ${renderRestrictions(wallet)}
             <p class="alr-detail-id">ID: <code>${esc(wallet.id)}</code></p>
-          </section>
+          </div>
           <p class="ifm-error" id="wal-error" hidden></p>
         </div>
         <div class="avr-detail-foot">
@@ -172,6 +172,11 @@ export function createWalletsEditor(host, {
         </div>
       </div>
     `;
+  }
+
+  function closeDetailPanel() {
+    selectedId = null;
+    render();
   }
 
   function render() {
@@ -274,10 +279,11 @@ export function createWalletsEditor(host, {
     });
 
     host.querySelector('#wal-save')?.addEventListener('click', persistCurrent);
-    host.querySelector('#wal-cancel')?.addEventListener('click', () => {
-      if (!isDirty()) return;
-      discardChanges();
-      render();
+    bindAvrDetailCancel(host, 'wal-cancel', {
+      isDirty,
+      discard: discardChanges,
+      save: persistCurrent,
+      onClose: closeDetailPanel,
     });
 
     host.querySelector('#wal-delete')?.addEventListener('click', async () => {
