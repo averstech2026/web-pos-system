@@ -2,7 +2,7 @@ import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
-/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'allergens' | 'data-import' | 'schedules' | 'calendar' | 'marketing' | 'marketing-banners' | 'payments' | 'sales-channels' | 'users' | 'crm-groups' | 'crm-loyalty' | 'crm-wallets' | 'reports'} AdminSection */
+/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'modifiers' | 'lunches' | 'allergens' | 'data-import' | 'schedules' | 'calendar' | 'marketing' | 'marketing-banners' | 'payments' | 'sales-channels' | 'users' | 'crm-groups' | 'crm-loyalty' | 'crm-wallets' | 'reports'} AdminSection */
 
 /** @type {Record<string, string>} */
 const NAV_ICONS = {
@@ -32,6 +32,8 @@ const NAV_GROUPS = [
     items: [
       { id: 'products', path: '/products', label: 'Товары' },
       { id: 'groups', path: '/groups', label: 'Группы товаров' },
+      { id: 'modifiers', path: '/modifiers', label: 'Модификаторы товаров' },
+      { id: 'lunches', path: '/lunches', label: 'Конструктор ланчей' },
       { id: 'allergens', path: '/allergens', label: 'Аллергены' },
     ],
   },

@@ -1,6 +1,7 @@
 import '../shared/styles.css';
 import '../shared/global.css';
 import '../shared/sales-channel-maintenance.css';
+import '../shared/composite-lunch.css';
 import './style.css';
 
 import { auth } from '../shared/firebase.js';

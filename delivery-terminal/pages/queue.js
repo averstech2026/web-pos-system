@@ -17,6 +17,7 @@ import {
   fmtOrderCreatedShort,
   clientDisplayName,
 } from '../utils/format.js';
+import { renderTerminalLineNameHtml } from '../../shared/composite-order-display.js';
 
 export class QueuePage {
   constructor(container, navigate) {
@@ -91,7 +92,7 @@ export class QueuePage {
         <span class="dt-check dt-check--readonly ${issuedLine ? 'dt-check--done' : ''}" aria-hidden="true">
           ${issuedLine ? '✓' : ''}
         </span>
-        <span class="dt-line-name">${line.name}</span>
+        <span class="dt-line-name">${renderTerminalLineNameHtml(line)}</span>
         <span class="dt-line-qty">1</span>
         <button class="dt-issue-btn btn-press ${issuedLine ? 'dt-issue-btn--done' : ''}"
                 type="button" data-action="toggle-issue" data-orderid="${order.id}"

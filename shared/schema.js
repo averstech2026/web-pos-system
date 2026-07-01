@@ -361,6 +361,7 @@ export function createWalletHistoryDoc({
 /** Default visibility for new/existing items without explicit flags. */
 export const DEFAULT_ITEM_VISIBLE_IN_WEB = true;
 export const DEFAULT_ITEM_VISIBLE_IN_KIOSK = false;
+export const DEFAULT_ITEM_IS_COMPOSITE = false;
 
 /**
  * items/{id}
@@ -374,8 +375,12 @@ export const DEFAULT_ITEM_VISIBLE_IN_KIOSK = false;
  * @property {string|null} [imageUrl]
  * @property {{ protein?: number, fat?: number, carbs?: number, kcal?: number }|null} [nutrition]
  * @property {string[]} [allergens]
+ * @property {string[]} [modifierGroupIds]
  * @property {boolean} [visibleInWeb] - show in personal account (web portal)
  * @property {boolean} [visibleInKiosk] - show on self-service kiosk
+ * @property {boolean} [isComposite] - composite lunch / combo meal
+ * @property {Array<{ id: string, name: string, itemIds: string[] }>} [lunchSteps]
+ * @property {string[]} [allowedPaymentMethods]
  */
 
 /**
@@ -389,14 +394,17 @@ export const DEFAULT_ITEM_VISIBLE_IN_KIOSK = false;
  * @param {string|null} [p.imageUrl=null]
  * @param {{ protein?: number, fat?: number, carbs?: number, kcal?: number }|null} [p.nutrition=null]
  * @param {string[]} [p.allergens=[]]
+ * @param {string[]} [p.modifierGroupIds=[]]
  * @param {boolean} [p.visibleInWeb=true]
  * @param {boolean} [p.visibleInKiosk=false]
+ * @param {boolean} [p.isComposite=false]
  */
 export function createItemDoc({
   name, description, price, category, isAvailable = true, availabilityRuleId = null,
-  imageUrl = null, nutrition = null, allergens = [],
+  imageUrl = null, nutrition = null, allergens = [], modifierGroupIds = [],
   visibleInWeb = DEFAULT_ITEM_VISIBLE_IN_WEB,
   visibleInKiosk = DEFAULT_ITEM_VISIBLE_IN_KIOSK,
+  isComposite = DEFAULT_ITEM_IS_COMPOSITE,
 }) {
   const doc = {
     name,
@@ -404,6 +412,7 @@ export function createItemDoc({
     price,
     category,
     isAvailable,
+    isComposite: isComposite === true,
     visibleInWeb: visibleInWeb !== false,
     visibleInKiosk: visibleInKiosk === true,
   };
@@ -411,6 +420,8 @@ export function createItemDoc({
   if (imageUrl) doc.imageUrl = imageUrl;
   if (nutrition) doc.nutrition = nutrition;
   if (allergens?.length) doc.allergens = allergens;
+  const mods = modifierGroupIds?.filter(Boolean);
+  if (mods?.length) doc.modifierGroupIds = [...new Set(mods)];
   return doc;
 }
 

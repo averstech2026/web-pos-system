@@ -23,6 +23,7 @@ export const DEFAULT_GROUP_VISIBLE_IN_KIOSK = false;
  * @property {boolean} [visibleInKiosk] - show on self-service kiosk
  * @property {number} [webOrder] - sort index in web menu
  * @property {number} [kioskOrder] - sort index on kiosk menu
+ * @property {string[]} [modifierGroupIds] - modifier groups offered for items in this category
  */
 
 /** @param {unknown} value @param {number} [fallback] */
@@ -86,6 +87,7 @@ export function normalizeCategoryGroup(raw, fallbackName = '') {
     visibleInKiosk: raw?.visibleInKiosk === true,
     webOrder: normalizeGroupOrderIndex(raw?.webOrder, 0),
     kioskOrder: normalizeGroupOrderIndex(raw?.kioskOrder, 0),
+    modifierGroupIds: normalizeModifierGroupIds(raw?.modifierGroupIds),
   };
 }
 
@@ -185,3 +187,136 @@ export function mergeAllergens(stored) {
   }
   return [...byId.values()];
 }
+
+/**
+ * @typedef {{ id: string, name: string, priceDelta?: number }} ModifierOption
+ * @typedef {{
+ *   id: string,
+ *   name: string,
+ *   required?: boolean,
+ *   minOptions?: number,
+ *   maxOptions?: number,
+ *   options?: ModifierOption[],
+ * }} ModifierGroup
+ */
+
+/** @type {ModifierGroup[]} */
+export const DEFAULT_MODIFIER_GROUPS = [
+  {
+    id: 'doneness',
+    name: 'Степень прожарки',
+    required: true,
+    minOptions: 1,
+    maxOptions: 1,
+    options: [
+      { id: 'rare', name: 'С кровью', priceDelta: 0 },
+      { id: 'medium', name: 'Средняя', priceDelta: 0 },
+      { id: 'well', name: 'Полная', priceDelta: 0 },
+    ],
+  },
+  {
+    id: 'sauce',
+    name: 'Выбор соуса',
+    required: false,
+    minOptions: 0,
+    maxOptions: 2,
+    options: [
+      { id: 'cheese', name: 'Сырный соус', priceDelta: 50 },
+      { id: 'garlic', name: 'Чесночный', priceDelta: 30 },
+      { id: 'none', name: 'Без соуса', priceDelta: 0 },
+    ],
+  },
+  {
+    id: 'salt',
+    name: 'Соль',
+    required: false,
+    minOptions: 0,
+    maxOptions: 1,
+    options: [
+      { id: 'with_salt', name: 'С солью', priceDelta: 0 },
+      { id: 'no_salt', name: 'Без соли', priceDelta: 0 },
+    ],
+  },
+];
+
+/** @param {unknown} value */
+function parsePriceDelta(value) {
+  const raw = String(value ?? '').trim().replace(/руб\.?/gi, '').replace(/\s+/g, '');
+  if (!raw || raw === '0' || raw === '+0' || raw === '-0') return 0;
+  const match = raw.match(/^([+-]?)(\d+(?:[.,]\d+)?)/);
+  if (!match) return 0;
+  const sign = match[1] === '-' ? -1 : 1;
+  const num = Number(match[2].replace(',', '.'));
+  return Number.isFinite(num) ? sign * num : 0;
+}
+
+/** @param {number} delta */
+export function formatModifierPriceDelta(delta) {
+  const n = Number(delta) || 0;
+  if (n === 0) return '0';
+  return n > 0 ? `+${n} руб` : `${n} руб`;
+}
+
+/** @param {unknown} ids */
+export function normalizeModifierGroupIds(ids) {
+  return [...new Set((ids || []).map(id => String(id).trim()).filter(Boolean))];
+}
+
+/**
+ * Объединяет модификаторы группы и товара (сначала группа, затем товар).
+ * @param {{ modifierGroupIds?: string[] }|null|undefined} item
+ * @param {{ modifierGroupIds?: string[] }|null|undefined} group
+ */
+export function resolveItemModifierGroupIds(item, group) {
+  return normalizeModifierGroupIds([
+    ...(group?.modifierGroupIds || []),
+    ...(item?.modifierGroupIds || []),
+  ]);
+}
+
+/** @param {ModifierGroup[]} allGroups @param {string[]} ids */
+export function resolveModifierGroupsByIds(allGroups, ids) {
+  const byId = new Map(allGroups.map(g => [g.id, g]));
+  return normalizeModifierGroupIds(ids)
+    .map(id => byId.get(id))
+    .filter(Boolean);
+}
+
+/** @param {ModifierOption} option */
+function normalizeModifierOption(option) {
+  return {
+    id: String(option?.id || '').trim(),
+    name: String(option?.name || '').trim(),
+    priceDelta: Number(option?.priceDelta) || 0,
+  };
+}
+
+/** @param {ModifierGroup} group */
+export function normalizeModifierGroup(group) {
+  const options = (group?.options || [])
+    .map(normalizeModifierOption)
+    .filter(o => o.id && o.name);
+  const minOptions = Math.max(0, Number(group?.minOptions) || 0);
+  let maxOptions = Math.max(minOptions, Number(group?.maxOptions) || 1);
+  if (group?.required && minOptions < 1) {
+    maxOptions = Math.max(maxOptions, 1);
+  }
+  return {
+    id: String(group?.id || '').trim(),
+    name: String(group?.name || '').trim(),
+    required: group?.required === true,
+    minOptions: group?.required ? Math.max(1, minOptions) : minOptions,
+    maxOptions,
+    options,
+  };
+}
+
+/** @param {ModifierGroup[]} [stored] */
+export function mergeModifierGroups(stored) {
+  if (!stored?.length) return DEFAULT_MODIFIER_GROUPS.map(g => normalizeModifierGroup(g));
+  return stored
+    .map(normalizeModifierGroup)
+    .filter(g => g.id && g.name);
+}
+
+export { parsePriceDelta };

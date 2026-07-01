@@ -1,6 +1,7 @@
 import { fmtDate, fmtMoney, orderStatusIcon, orderStatusLabel, orderTotal } from '../utils/format.js';
 import { canCancelOrder } from '../../shared/orders.js';
 import { renderNutritionGrid, sumNutrition } from '../../shared/nutrition.js';
+import { renderCartItemCompositionHtml } from '../../shared/composite-order-display.js';
 
 /**
  * Render order detail modal HTML (caller must bind close + overlay click).
@@ -42,7 +43,10 @@ export function renderOrderDetailModal(order) {
           <div class="pay-items-list">
             ${items.map(i => `
               <div class="pay-item-row">
-                <span>${i.name} <span class="qty">× ${i.quantity}</span></span>
+                <div class="pay-item-main">
+                  <span>${i.name} <span class="qty">× ${i.quantity}</span></span>
+                  ${renderCartItemCompositionHtml(i, { className: 'order-line-composition pay-item-composition' })}
+                </div>
                 <span>${fmtMoney(i.price * i.quantity)}</span>
               </div>
             `).join('')}

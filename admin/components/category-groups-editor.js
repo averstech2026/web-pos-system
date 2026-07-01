@@ -30,6 +30,7 @@ import {
   renderListMetaWithSchedule,
   scheduleStatusForGroup,
 } from '../utils/schedule-status.js';
+import { readModifierGroupIds, renderModifierGroupsField } from './modifier-groups-field.js';
 
 const PRODUCT_REMOVE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
@@ -40,9 +41,10 @@ const PRODUCT_REMOVE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="12" 
  * @param {Array<{ id: string, name?: string, category?: string, isAvailable?: boolean }>} p.items
  * @param {Array<{ id: string, name: string }>} [p.allergens]
  * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} p.availabilityRules
+ * @param {import('../../shared/menu-catalog.js').ModifierGroup[]} [p.modifierGroups]
  * @param {() => void|Promise<void>} [p.onSaved]
  */
-export function createCategoryGroupsEditor(host, { categoryGroups, items: initialItems, allergens = [], availabilityRules = [], onSaved }) {
+export function createCategoryGroupsEditor(host, { categoryGroups, items: initialItems, allergens = [], availabilityRules = [], modifierGroups = [], onSaved }) {
   /** @type {import('../../shared/menu-catalog.js').CategoryGroup[]} */
   let groups = categoryGroups.map(g => ({ ...normalizeCategoryGroup(g) }));
   /** @type {Array<{ id: string, name?: string, category?: string, isAvailable?: boolean }>} */
@@ -249,6 +251,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
       visibleInKiosk,
       webOrder: readOrderField(panel, 'web-order'),
       kioskOrder: readOrderField(panel, 'kiosk-order'),
+      modifierGroupIds: readModifierGroupIds(panel),
     });
 
     groups = groups.map(g => (g.id === selectedId ? updated : g));
@@ -456,6 +459,12 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
             </div>
 
             ${renderVisibilitySection(group)}
+
+            ${renderModifierGroupsField({
+              selectedIds: group.modifierGroupIds,
+              modifierGroups,
+              hint: 'Будут предлагаться гостю для всех товаров этой группы.',
+            })}
 
             ${renderAvailabilitySection(group)}
 
@@ -702,7 +711,11 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
         return;
       }
 
-      if (!e.target.matches('[data-availability-toggle]')) return;
+      if (!e.target.matches('[data-availability-toggle], [data-modifier-group-id]')) return;
+      if (e.target.matches('[data-modifier-group-id]')) {
+        syncSidebarToState();
+        return;
+      }
       const itemId = e.target.dataset.productId;
       const item = items.find(i => i.id === itemId);
       if (!item) return;
@@ -744,6 +757,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     openItemFormModal({
       categories: groups.map(g => g.name),
       allergens,
+      modifierGroups,
       availabilityRules: rules,
       lockedCategory: group.name,
       onSaved: saved => {

@@ -10,12 +10,14 @@ import { productThumbHtml } from '../utils/product-image.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.js';
+import { readModifierGroupIds, renderModifierGroupsField } from './modifier-groups-field.js';
 
 /**
  * @param {object} p
  * @param {object|null} [p.item]
  * @param {string[]} [p.categories]
  * @param {Array<{ id: string, name: string }>} [p.allergens]
+ * @param {import('../../shared/menu-catalog.js').ModifierGroup[]} [p.modifierGroups]
  * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} [p.availabilityRules]
  * @param {string|null} [p.lockedCategory]
  * @param {(saved: object) => void|Promise<void>} [p.onSaved]
@@ -25,6 +27,7 @@ export function openItemFormModal({
   item = null,
   categories = [],
   allergens = [],
+  modifierGroups = [],
   availabilityRules = [],
   lockedCategory = null,
   onSaved,
@@ -53,6 +56,7 @@ export function openItemFormModal({
     carbs: nutrition?.carbs ?? '',
     kcal: nutrition?.kcal ?? '',
     allergens: [...(item?.allergens || [])],
+    modifierGroupIds: [...(item?.modifierGroupIds || [])],
     imageUrl: item?.imageUrl || getItemImageUrl(item?.name || '') || '',
     previewObjectUrl: null,
     availabilityRuleId: selectedRuleId,
@@ -226,6 +230,12 @@ export function openItemFormModal({
             <p class="ifm-hint">Справочник аллергенов пуст — добавьте записи в разделе «Аллергены» в меню.</p>
           `}
 
+          ${renderModifierGroupsField({
+            selectedIds: state.modifierGroupIds,
+            modifierGroups,
+            hint: 'Дополнительно к модификаторам группы товара.',
+          })}
+
           <fieldset class="ifm-fieldset ifm-availability">
             <legend>Время доступности</legend>
             <label class="ifm-field">
@@ -357,6 +367,7 @@ export function openItemFormModal({
       visibleInWeb: channelFlags.visibleInWeb,
       visibleInKiosk: channelFlags.visibleInKiosk,
       allergens: [...overlay.querySelectorAll('.ifm-allergens input:checked')].map(el => el.value),
+      modifierGroupIds: readModifierGroupIds(overlay),
       imageUrl: overlay.querySelector('#ifm-image-url')?.value.trim() || getItemImageUrl(overlay.querySelector('#ifm-name')?.value.trim()),
       availabilityRuleId: overlay.querySelector('#ifm-availability-rule-id')?.value || null,
     };

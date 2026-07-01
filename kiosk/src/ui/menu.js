@@ -35,6 +35,7 @@ function productCard(p) {
         <button data-action="open-product" data-product="${p.id}" class="block w-full">
           <img src="${p.image}" alt="${p.name}" class="w-full h-[160px] object-cover" loading="lazy" />
         </button>
+        ${p.isComposite ? '<span class="composite-badge kiosk-composite-badge">Комплекс</span>' : ''}
         <button type="button" tabindex="-1" class="absolute top-3 right-3 w-10 h-10 bg-white/80 rounded-full flex items-center justify-center text-gray-500 text-xl pointer-events-none">⋯</button>
       </div>
       <div class="p-4 flex flex-col flex-1">

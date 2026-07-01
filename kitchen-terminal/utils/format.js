@@ -73,20 +73,7 @@ export function orderIssueSeconds(order) {
 }
 
 /** Expand order items into individual prep lines */
-export function expandItemLines(items = []) {
-  const lines = [];
-  items.forEach(item => {
-    for (let i = 0; i < item.quantity; i += 1) {
-      lines.push({
-        key: `${item.dishId}:${i}`,
-        dishId: item.dishId,
-        name: item.name,
-        price: item.price,
-      });
-    }
-  });
-  return lines;
-}
+export { expandOrderItemLines as expandItemLines } from '../../shared/composite-order-display.js';
 
 export function isLinePrepared(preparedLines, key) {
   return Array.isArray(preparedLines) && preparedLines.includes(key);

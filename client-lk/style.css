@@ -1329,12 +1329,19 @@ button.order-status-pill {
 }
 
 .pay-item-name {
-  flex: 1;
   min-width: 0;
   font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--color-text);
   line-height: 1.35;
+}
+
+.pay-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   padding-right: var(--space-xs);
 }
 

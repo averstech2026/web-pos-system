@@ -10,7 +10,8 @@ import {
 import { db } from '../../shared/firebase.js';
 import { COL, createItemDoc } from '../../shared/schema.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
-import { mergeCategories } from '../../shared/menu-catalog.js';
+import { mergeCategories, normalizeModifierGroupIds } from '../../shared/menu-catalog.js';
+import { normalizeCatalogItem } from '../../shared/composite-meals.js';
 
 export { DEFAULT_CATEGORIES } from '../../shared/menu-catalog.js';
 export { fetchWebMenuItems } from '../../shared/menu-items-data.js';
@@ -18,7 +19,7 @@ export { fetchWebMenuItems } from '../../shared/menu-items-data.js';
 export async function fetchAllItems() {
   const snap = await getDocs(collection(db, COL.ITEMS));
   return snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
+    .map(d => normalizeCatalogItem({ id: d.id, ...d.data() }))
     .sort((a, b) => {
       const cat = (a.category || '').localeCompare(b.category || '', 'ru');
       if (cat !== 0) return cat;
@@ -151,6 +152,7 @@ export function buildItemPayload(data) {
   const price = Number(data.price);
   const isAvailable = data.isAvailable !== false;
   const allergens = Array.isArray(data.allergens) ? data.allergens.filter(Boolean) : [];
+  const modifierGroupIds = normalizeModifierGroupIds(data.modifierGroupIds);
   const nutrition = parseNutrition(data);
   const availabilityRuleId = data.availabilityRuleId || null;
 
@@ -166,7 +168,10 @@ export function buildItemPayload(data) {
     allergens,
     visibleInWeb: data.visibleInWeb,
     visibleInKiosk: data.visibleInKiosk,
+    isComposite: false,
   });
+
+  if (modifierGroupIds.length) payload.modifierGroupIds = modifierGroupIds;
 
   return payload;
 }
@@ -197,11 +202,21 @@ export async function updateItem(id, data, existing = {}) {
     update.allergens = deleteField();
   }
 
+  if (!normalizeModifierGroupIds(merged.modifierGroupIds).length) {
+    update.modifierGroupIds = deleteField();
+  }
+
   if (!merged.availabilityRuleId) {
     update.availabilityRuleId = deleteField();
     update.availability = deleteField();
   } else {
     update.availability = deleteField();
+  }
+
+  update.isComposite = false;
+  if (existing.isComposite || existing.lunchSteps?.length) {
+    update.lunchSteps = deleteField();
+    update.allowedPaymentMethods = deleteField();
   }
 
   await updateDoc(doc(db, COL.ITEMS, id), update);

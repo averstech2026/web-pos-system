@@ -33,6 +33,7 @@ export class CategoryGroupsPage {
       this.items = items;
       this.categoryGroups = settings.categoryGroups;
       this.allergens = settings.allergens;
+      this.modifierGroups = settings.modifierGroups;
       this.availabilityRules = availabilityRules;
       this.loading = false;
       this.renderShell();
@@ -74,6 +75,7 @@ export class CategoryGroupsPage {
       categoryGroups: this.categoryGroups,
       items: this.items,
       allergens: this.allergens,
+      modifierGroups: this.modifierGroups,
       availabilityRules: this.availabilityRules,
       onSaved: () => this.loadData(),
     });

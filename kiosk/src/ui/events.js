@@ -28,6 +28,7 @@ import {
   scrollToCategory,
 } from './menu.js';
 import { openProduct } from './product.js';
+import { tryAddProductToCart, tryOpenProduct } from './composite-lunch.js';
 import {
   tryPay,
   proceedToPayment,
@@ -132,10 +133,10 @@ export function bindKioskEvents() {
       scrollMenuRow(btn.dataset.row, parseInt(btn.dataset.dir, 10) || 1);
       break;
     case 'open-product':
-      openProduct(productId);
+      if (!tryOpenProduct(productId)) openProduct(productId);
       break;
     case 'add-to-cart':
-      addToCart(productId);
+      tryAddProductToCart(productId);
       break;
     case 'inc-cart':
       setCartQty(productId, (state.cart[productId] || 0) + 1);

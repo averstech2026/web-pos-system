@@ -53,6 +53,9 @@ function buildOrderItems() {
       name: p.name,
       price: p.price,
       quantity: qty,
+      ...(state.compositeSelections?.[id]?.length
+        ? { lunchSelections: state.compositeSelections[id] }
+        : {}),
     });
   }
   if (state.upsellAdded) {

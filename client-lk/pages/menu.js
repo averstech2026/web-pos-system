@@ -7,6 +7,7 @@ import { COL, ORDER_STATUS, PAYMENT_STATUS, ORDER_SOURCE } from '../../shared/sc
 import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-images.js';
 import { cart } from '../store.js';
 import { openItemDetailModal } from '../components/item-detail.js';
+import { openCompositeLunchModal } from '../../shared/composite-lunch-flow.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { filterActiveRules, isMenuItemAvailableAt, normalizeAvailabilityRuleDoc } from '../../shared/availability-rules.js';
 import { normalizePromoRuleDoc } from '../../shared/promo-rules.js';
@@ -248,7 +249,11 @@ export class MenuPage {
       const { action, id, name, price } = btn.dataset;
       if (action === 'add') {
         const item = this.items.find(i => i.id === id);
-        cart.add(id, name, Number(price), item?.nutrition || null);
+        if (item?.isComposite && item.lunchSteps?.length) {
+          this.openCompositeLunch(item);
+        } else {
+          cart.add(id, name, Number(price), item?.nutrition || null);
+        }
       }
       if (action === 'dec') { cart.decrement(id); }
       this.renderItems();
@@ -256,6 +261,10 @@ export class MenuPage {
   }
 
   openItemDetail(item) {
+    if (item.isComposite && item.lunchSteps?.length) {
+      this.openCompositeLunch(item);
+      return;
+    }
     const emoji = CAT_EMOJI[item.category] || '🍴';
     openItemDetailModal(item, {
       imageUrl: resolveImageUrl(item),
@@ -268,6 +277,19 @@ export class MenuPage {
       },
       onDec: () => {
         cart.decrement(item.id);
+        this.renderItems();
+        this.updateCartBar();
+      },
+    });
+  }
+
+  openCompositeLunch(item) {
+    openCompositeLunchModal({
+      lunch: item,
+      catalogItems: this.items,
+      resolveImageUrl: i => resolveImageUrl(i),
+      onConfirm: selections => {
+        cart.add(item.id, item.name, item.price, item.nutrition || null, { lunchSelections: selections });
         this.renderItems();
         this.updateCartBar();
       },
@@ -300,6 +322,7 @@ export class MenuPage {
           ${media}
           <div class="item-price">${item.price} Р</div>
           <div class="item-name">${item.name}</div>
+          ${item.isComposite ? '<span class="item-composite-badge">Комплекс</span>' : ''}
           ${item.description ? `<div class="item-desc">${item.description}</div>` : '<div class="item-desc item-desc--empty"></div>'}
 
           <div class="item-action">

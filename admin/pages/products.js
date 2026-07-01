@@ -45,6 +45,7 @@ export class ProductsPage {
     this.categories = [];
     this.categoryGroups = [];
     this.allergens = [];
+    this.modifierGroups = [];
     this.availabilityRules = [];
     this.rulesMap = new Map();
     this.selectedIds = new Set();
@@ -87,6 +88,7 @@ export class ProductsPage {
       this.categories = collectCategories(settings.categories, items);
       this.categoryGroups = settings.categoryGroups;
       this.allergens = settings.allergens;
+      this.modifierGroups = settings.modifierGroups;
       this.availabilityRules = availabilityRules;
       this.rulesMap = new Map(availabilityRules.map(r => [r.id, r]));
       this.groupsByName = buildGroupsByName(this.categoryGroups);
@@ -611,6 +613,7 @@ export class ProductsPage {
         <td class="products-td-photo">${productThumbHtml(item)}</td>
         <td class="products-td-name">
           <span class="orders-client">${esc(item.name || '—')}</span>
+          ${item.isComposite ? '<span class="products-composite-badge">Составной</span>' : ''}
           ${item.description ? `<span class="products-desc">${esc(item.description)}</span>` : ''}
           ${scheduleText ? `<span class="products-avail-schedule">🕐 ${esc(scheduleText)}</span>` : ''}
           ${allergenText ? `<span class="products-allergens">⚠ ${esc(allergenText)}</span>` : ''}
@@ -727,6 +730,7 @@ export class ProductsPage {
       this.openItemModal({
         categories: this.categories,
         allergens: this.allergens,
+        modifierGroups: this.modifierGroups,
         onSaved: () => this.loadData(),
       });
       return;
@@ -799,11 +803,17 @@ export class ProductsPage {
       if (e.target.closest('[data-stop-row]')) return;
       const item = this.items.find(i => i.id === row.dataset.itemId);
       if (item) {
-        this.openItemModal({
-          item,
-          categories: this.categories,
-          allergens: this.allergens,
-          onSaved: () => this.loadData(),
+        if (item.isComposite) {
+          showToast('Составные комбо редактируются в разделе «Конструктор ланчей»');
+          this.navigate('/lunches');
+          return;
+        }
+      this.openItemModal({
+        item,
+        categories: this.categories,
+        allergens: this.allergens,
+        modifierGroups: this.modifierGroups,
+        onSaved: () => this.loadData(),
           onArchived: id => {
             this.items = this.items.filter(i => i.id !== id);
             this.selectedIds.delete(id);

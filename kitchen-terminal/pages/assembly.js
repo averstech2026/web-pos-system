@@ -7,6 +7,7 @@ import {
   renderKitchenShell, startClock, stopClock, bindKitchenNav,
 } from '../components/layout.js';
 import { openKitchenOrderSearch } from '../components/search.js';
+import { hasLunchSelections } from '../../shared/composite-order-display.js';
 
 const CATEGORY_ORDER = [
   'Салаты',
@@ -88,21 +89,36 @@ export class AssemblyPage {
       if (this.filters.timeSlot && order.timeSlot !== this.filters.timeSlot) return;
 
       (order.items || []).forEach(item => {
-        const category = this.getCategory(item);
-        if (this.filters.category && category !== this.filters.category) return;
+        const addRow = (name, category, qty = 1) => {
+          if (this.filters.category && category !== this.filters.category) return;
+          const key = `${category}::${name}`;
+          if (!map.has(key)) {
+            map.set(key, {
+              name,
+              category,
+              count: 0,
+              orderNumbers: new Set(),
+            });
+          }
+          const row = map.get(key);
+          row.count += qty;
+          row.orderNumbers.add(order.orderNumber);
+        };
 
-        const key = `${category}::${item.name}`;
-        if (!map.has(key)) {
-          map.set(key, {
-            name: item.name,
-            category,
-            count: 0,
-            orderNumbers: new Set(),
+        if (hasLunchSelections(item)) {
+          const qty = Math.max(1, Number(item.quantity) || 1);
+          item.lunchSelections.forEach(sel => {
+            const name = sel.itemName || '—';
+            const category = this.itemCategories.get(sel.itemId)
+              || this.itemCategories.get(name)
+              || 'Прочее';
+            addRow(name, category, qty);
           });
+          return;
         }
-        const row = map.get(key);
-        row.count += item.quantity;
-        row.orderNumbers.add(order.orderNumber);
+
+        const category = this.getCategory(item);
+        addRow(item.name, category, item.quantity);
       });
     });
 

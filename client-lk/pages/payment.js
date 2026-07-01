@@ -8,6 +8,7 @@ import { hasNutrition, renderNutritionGrid, sumNutrition } from '../../shared/nu
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { cart } from '../store.js';
 import { bindScrollFade } from '../utils/scroll-fade.js';
+import { renderCartItemCompositionHtml } from '../../shared/composite-order-display.js';
 
 function resolveItemImage(item) {
   return resolveProductImageUrl(item.imageUrl) || getItemImageUrl(item.name);
@@ -127,7 +128,10 @@ export class PaymentPage {
     return `
       <div class="pay-item-row" data-dish-id="${item.dishId}">
         <div class="pay-item-thumb">${thumb}</div>
-        <div class="pay-item-name">${item.name}</div>
+        <div class="pay-item-main">
+          <div class="pay-item-name">${item.name}</div>
+          ${renderCartItemCompositionHtml(item, { className: 'order-line-composition pay-item-composition' })}
+        </div>
         <div class="pay-qty-stepper">
           <button class="pay-qty-btn btn-press" type="button" data-action="dec" data-dish-id="${item.dishId}" aria-label="Уменьшить">−</button>
           <span class="pay-qty-val">${item.quantity}</span>

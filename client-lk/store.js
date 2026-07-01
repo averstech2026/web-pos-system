@@ -54,13 +54,15 @@ export const cart = {
     this._recomputePromos();
   },
 
-  add(dishId, name, price, nutrition = null) {
+  add(dishId, name, price, nutrition = null, meta = null) {
     const ex = this._baseItems.find(i => i.dishId === dishId);
     if (ex) {
       ex.quantity += 1;
+      if (meta?.lunchSelections) ex.lunchSelections = meta.lunchSelections;
     } else {
       const line = { dishId, name, price, quantity: 1 };
       if (nutrition) line.nutrition = nutrition;
+      if (meta?.lunchSelections) line.lunchSelections = meta.lunchSelections;
       this._baseItems.push(line);
     }
     this._recomputePromos();

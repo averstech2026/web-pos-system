@@ -1,4 +1,5 @@
 import { fmtMoney } from '../utils/format.js';
+import { renderCartItemCompositionHtml } from '../../shared/composite-order-display.js';
 import {
   fmtOrderDateTime,
   fmtPickupSlot,
@@ -57,7 +58,10 @@ export function openOrderDetailModal({ order, user = null, onClose, zIndex = 100
         <div class="orders-detail-items">
           ${items.map(i => `
             <div class="orders-detail-line">
-              <span>${esc(i.name)} × ${i.quantity}</span>
+              <div class="orders-detail-line-main">
+                <span>${esc(i.name)} × ${i.quantity}</span>
+                ${renderCartItemCompositionHtml(i, { className: 'order-line-composition orders-detail-composition' })}
+              </div>
               <span>${fmtMoney(i.price * i.quantity)}</span>
             </div>
           `).join('')}

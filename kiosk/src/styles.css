@@ -1,3 +1,5 @@
+@import '../../shared/composite-lunch.css';
+
     * { -webkit-tap-highlight-color: transparent; }
     .kiosk-scroll::-webkit-scrollbar { width: 6px; }
     .kiosk-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }

@@ -1,5 +1,6 @@
 import '../shared/styles.css';
 import '../shared/global.css';
+import '../shared/composite-lunch.css';
 import './style.css';
 
 import { auth, db } from '../shared/firebase.js';
@@ -72,6 +73,8 @@ async function renderRoute(path) {
     '/orders': () => import('./pages/orders.js').then(m => m.OrdersPage),
     '/products': () => import('./pages/products.js').then(m => m.ProductsPage),
     '/groups': () => import('./pages/category-groups.js').then(m => m.CategoryGroupsPage),
+    '/modifiers': () => import('./pages/modifiers.js').then(m => m.ModifiersPage),
+    '/lunches': () => import('./pages/lunches.js').then(m => m.LunchesPage),
     '/allergens': () => import('./pages/allergens.js').then(m => m.AllergensPage),
     '/data-import': () => import('./pages/data-import.js').then(m => m.DataImportPage),
     '/schedules': () => import('./pages/availability-schedules.js').then(m => m.AvailabilitySchedulesPage),

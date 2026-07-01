@@ -1,5 +1,6 @@
 import '../shared/styles.css';
 import '../shared/global.css';
+import '../shared/composite-lunch.css';
 import './style.css';
 
 import { auth, db } from '../shared/firebase.js';

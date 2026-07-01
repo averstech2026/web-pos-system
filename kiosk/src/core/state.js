@@ -18,7 +18,6 @@ const state = {
   voiceListOrder: [],
   voiceChoice: null,
   voiceListening: false,
-  voiceStatus: 'idle', // idle | listening | processing | error
-};
+  compositeSelections: {},
 
 export { state };

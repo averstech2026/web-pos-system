@@ -1,6 +1,7 @@
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase.js';
 import { COL } from './schema.js';
+import { normalizeCatalogItem } from './composite-meals.js';
 
 /**
  * Menu items visible in the web portal (personal account).
@@ -12,7 +13,7 @@ export async function fetchWebMenuItems() {
     where('visibleInWeb', '==', true),
     where('isAvailable', '==', true),
   ));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => normalizeCatalogItem({ id: d.id, ...d.data() }));
 }
 
 /**
@@ -25,5 +26,5 @@ export async function fetchKioskMenuItems() {
     where('visibleInKiosk', '==', true),
     where('isAvailable', '==', true),
   ));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs.map(d => normalizeCatalogItem({ id: d.id, ...d.data() }));
 }

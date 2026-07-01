@@ -12,6 +12,7 @@ import {
   expandItemLines, isLinePrepared, allLinesPrepared,
   formatElapsed, orderPrepSeconds, fmtOrderCreatedShort, clientDisplayName,
 } from '../utils/format.js';
+import { renderTerminalLineNameHtml } from '../../shared/composite-order-display.js';
 
 export class OrdersPage {
   constructor(container, navigate) {
@@ -84,7 +85,7 @@ export class OrdersPage {
         <span class="kt-check kt-check--readonly ${done ? 'kt-check--done' : ''}" aria-hidden="true">
           ${done ? '✓' : ''}
         </span>
-        <span class="kt-line-name">${line.name}</span>
+        <span class="kt-line-name">${renderTerminalLineNameHtml(line)}</span>
         <span class="kt-line-qty">1</span>
         <button class="kt-issue-btn btn-press ${done ? 'kt-issue-btn--done' : ''}"
                 type="button" data-action="mark-line" data-orderid="${order.id}"

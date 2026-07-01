@@ -13,6 +13,7 @@ import {
   normalizeAvailabilityRuleDoc,
 } from '@shared/availability-rules.js';
 import { getItemImageUrl, resolveProductImageUrl } from '@shared/item-images.js';
+import { isCompositeItem } from '@shared/composite-meals.js';
 import { loadKioskMarketingBanners } from './marketing-banners.js';
 
 /** @typedef {{ id: string, label: string, icon: string, sortOrder: number }} KioskCategory */
@@ -22,6 +23,8 @@ import { loadKioskMarketingBanners } from './marketing-banners.js';
 export let CATEGORIES = [];
 /** @type {KioskProduct[]} */
 export let PRODUCTS = [];
+/** @type {Map<string, object>} */
+export let CATALOG_LOOKUP = new Map();
 
 let loadError = null;
 
@@ -68,6 +71,8 @@ export async function loadKioskCatalog() {
     isMenuItemAvailableAt(item, groupsByName, rules, { date: slot.date, time: slot.time }),
   );
 
+  CATALOG_LOOKUP = new Map(availableItems.map(i => [i.id, i]));
+
   CATEGORIES = kioskGroups.map((g, index) => ({
     id: g.id,
     label: g.name,
@@ -78,7 +83,7 @@ export async function loadKioskCatalog() {
   const categoryIds = new Set(CATEGORIES.map(c => c.id));
   const categoryNames = new Map(CATEGORIES.map(c => [c.label, c.id]));
 
-  PRODUCTS = availableItems
+      PRODUCTS = availableItems
     .map(item => {
       const categoryId = item.categoryId
         || categoryNames.get(item.category)
@@ -91,9 +96,11 @@ export async function loadKioskCatalog() {
         image: resolveImage(item.imageUrl, item.name),
         composition: item.description || '',
         sortOrder: Number(item.sortOrder) || 0,
+        isComposite: isCompositeItem(item),
+        lunchSteps: item.lunchSteps || [],
       };
     })
-    .filter(p => categoryIds.has(p.category) || CATEGORIES.length === 0)
+    .filter(p => categoryIds.has(p.category) || isCompositeItem(p) || CATEGORIES.length === 0)
     .sort((a, b) => {
       const catOrder = (CATEGORIES.find(c => c.id === a.category)?.sortOrder ?? 0)
         - (CATEGORIES.find(c => c.id === b.category)?.sortOrder ?? 0);

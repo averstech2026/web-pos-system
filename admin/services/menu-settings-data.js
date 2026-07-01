@@ -12,8 +12,10 @@ import {
   DEFAULT_ALLERGENS,
   categoryGroupsToNames,
   mergeAllergens,
+  mergeModifierGroups,
   mergeCategoryGroups,
   normalizeCategoryGroup,
+  normalizeModifierGroup,
 } from '../../shared/menu-catalog.js';
 
 const MENU_SETTINGS_ID = 'menu';
@@ -33,7 +35,8 @@ function resolveCategoryGroups(data, itemCategories) {
  * @returns {Promise<{
  *   categories: string[],
  *   categoryGroups: import('../../shared/menu-catalog.js').CategoryGroup[],
- *   allergens: Array<{ id: string, name: string }>
+ *   allergens: Array<{ id: string, name: string }>,
+ *   modifierGroups: import('../../shared/menu-catalog.js').ModifierGroup[],
  * }>}
  */
 export async function fetchMenuSettings(itemCategories = []) {
@@ -45,6 +48,7 @@ export async function fetchMenuSettings(itemCategories = []) {
     categoryGroups,
     categories: categoryGroupsToNames(categoryGroups),
     allergens: mergeAllergens(data.allergens),
+    modifierGroups: mergeModifierGroups(data.modifierGroups),
   };
 }
 
@@ -71,6 +75,16 @@ export async function saveAllergens(allergens) {
   await setDoc(
     doc(db, COL.SETTINGS, MENU_SETTINGS_ID),
     { allergens },
+    { merge: true },
+  );
+}
+
+/** @param {import('../../shared/menu-catalog.js').ModifierGroup[]} modifierGroups */
+export async function saveModifierGroups(modifierGroups) {
+  const groups = modifierGroups.map(g => normalizeModifierGroup(g)).filter(g => g.id && g.name);
+  await setDoc(
+    doc(db, COL.SETTINGS, MENU_SETTINGS_ID),
+    { modifierGroups: groups },
     { merge: true },
   );
 }

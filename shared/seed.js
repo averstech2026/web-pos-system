@@ -22,6 +22,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from './firebase.js';
 import { COL, ROLES, createItemDoc, createUserDoc, USER_STATUS, DEFAULT_ITEM_VISIBLE_IN_WEB, DEFAULT_ITEM_VISIBLE_IN_KIOSK } from './schema.js';
+import { isCompositeItem } from './composite-meals.js';
 import { DEFAULT_GROUP_VISIBLE_IN_WEB, DEFAULT_GROUP_VISIBLE_IN_KIOSK, normalizeCategoryGroup } from './menu-catalog.js';
 import { getItemImageUrl } from './item-images.js';
 import { DEMO_NUTRITION_BY_NAME } from './demo-nutrition.js';
@@ -439,4 +440,24 @@ export async function seedStaffAuth(password = STAFF_DEMO_PASSWORD) {
       window.dispatchEvent(new Event('seed-staff-auth-done'));
     }
   }
+}
+
+/**
+ * Проставляет isComposite: false всем товарам без явного признака составного.
+ * Запуск в консоли: await patchItemCompositeDefaults()
+ */
+export async function patchItemCompositeDefaults() {
+  const snap = await getDocs(collection(db, COL.ITEMS));
+  let updated = 0;
+
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (isCompositeItem(data)) continue;
+    if (data.isComposite === false) continue;
+    await updateDoc(d.ref, { isComposite: false });
+    updated += 1;
+  }
+
+  console.log(`[seed] patchItemCompositeDefaults: обновлено ${updated} товаров`);
+  return updated;
 }
