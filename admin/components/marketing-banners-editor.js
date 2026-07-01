@@ -29,7 +29,7 @@ import { uploadProductImage } from '../../shared/product-image-upload.js';
 import { productThumbHtml } from '../utils/product-image.js';
 import { deleteMarketingBanner, saveMarketingBanner } from '../services/marketing-banners-data.js';
 import { showToast } from '../utils/toast.js';
-import { promptUnsavedChanges, renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+import { promptUnsavedChanges, runWithUnsavedGuard, bindAvrDetailCancel, renderAvrDetailStickyHead } from '../utils/avr-unsaved-changes.js';
 import {
   renderListMetaWithSchedule,
   scheduleStatusForBanner,
@@ -280,18 +280,18 @@ export function createMarketingBannersEditor(host, {
     if (previewObjectUrls[key]) return previewObjectUrls[key];
     const raw = String(url || '').trim();
     if (!raw) return null;
-    if (raw.startsWith('blob:') || raw.startsWith('data:')) return null;
-    return raw;
+    if (raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
+    return resolveProductImageUrl(raw);
   }
 
-  function resolveListThumbUrl(banner) {
+  /** Raw persisted path or in-memory blob — resolved once in productThumbHtml. */
+  function listBannerThumbUrl(banner) {
     const thumbKey = `${banner.id}-thumbnail-url`;
     if (previewObjectUrls[thumbKey]) return previewObjectUrls[thumbKey];
-    const fromThumb = resolveProductImageUrl(banner.thumbnailUrl);
-    if (fromThumb) return fromThumb;
+    if (banner.thumbnailUrl) return banner.thumbnailUrl;
     const bannerKey = `${banner.id}-banner-url`;
     if (previewObjectUrls[bannerKey]) return previewObjectUrls[bannerKey];
-    return resolveProductImageUrl(banner.bannerUrl);
+    return banner.bannerUrl || null;
   }
 
   function refreshAllImagePreviews() {
@@ -1037,9 +1037,12 @@ export function createMarketingBannersEditor(host, {
 
     return `
       <div class="avr-detail-inner mkb-detail-inner" id="mkb-detail-panel">
-        <div class="mkb-detail-head">
-          <h2 class="mkb-detail-title">${isNew ? 'Новый баннер' : 'Редактирование баннера'}</h2>
-        </div>
+        ${renderAvrDetailStickyHead({
+          title: isNew ? 'Новый баннер' : 'Редактирование баннера',
+          cancelId: 'mkb-detail-cancel',
+          saveId: 'mkb-save-btn',
+          saveLabel: 'Сохранить баннер',
+        })}
 
         <div class="avr-detail-body admin-form-stack mkb-detail-body">
           <section class="mkb-block card">
@@ -1121,25 +1124,21 @@ export function createMarketingBannersEditor(host, {
           </section>
         </div>
 
+        ${!isNew ? `
         <div class="avr-detail-foot">
-          <div class="avr-detail-foot-row${isNew ? ' avr-detail-foot-row--actions-only' : ''}">
-            ${!isNew ? `
-              <div class="cgr-detail-danger avr-detail-danger">
-                <label class="cgr-delete-confirm">
-                  <input type="checkbox" id="mkb-delete-confirm" />
-                  <span>Я подтверждаю удаление этого баннера</span>
-                </label>
-                <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="mkb-detail-delete" disabled>
-                  Удалить баннер
-                </button>
-              </div>
-            ` : ''}
-            <div class="footer-action-bar">
-              ${renderAvrCancelButton('mkb-detail-cancel')}
-              <button type="button" class="action-btn action-btn-primary btn-press" id="mkb-save-btn">Сохранить баннер</button>
+          <div class="avr-detail-foot-row avr-detail-foot-row--danger-only">
+            <div class="cgr-detail-danger avr-detail-danger">
+              <label class="cgr-delete-confirm">
+                <input type="checkbox" id="mkb-delete-confirm" />
+                <span>Я подтверждаю удаление этого баннера</span>
+              </label>
+              <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="mkb-detail-delete" disabled>
+                Удалить баннер
+              </button>
             </div>
           </div>
         </div>
+        ` : ''}
       </div>
     `;
   }
@@ -1157,7 +1156,7 @@ export function createMarketingBannersEditor(host, {
   function renderListRow(banner) {
     const active = banner.id === selectedId;
     const deprioritized = isBannerDeprioritized(banner);
-    const thumbUrl = resolveListThumbUrl(banner);
+    const thumbUrl = listBannerThumbUrl(banner);
     return `
       <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''} ${deprioritized ? 'cgr-row--hidden' : ''}" data-id="${escAttr(banner.id)}">
         <button type="button" class="avr-row-main btn-press cgr-row-main" data-action="select" aria-pressed="${active}">
@@ -1322,7 +1321,7 @@ export function createMarketingBannersEditor(host, {
     if (thumbEl) {
       thumbEl.innerHTML = productThumbHtml({
         name: banner.title,
-        imageUrl: resolveListThumbUrl(banner),
+        imageUrl: listBannerThumbUrl(banner),
       });
     }
   }

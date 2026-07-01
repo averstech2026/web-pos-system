@@ -21,9 +21,9 @@ import {
 } from '../../shared/menu-catalog.js';
 import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.js';
 import {
-  renderAvrCancelButton,
   runWithUnsavedGuard,
   bindAvrDetailCancel,
+  renderAvrDetailStickyHead,
 } from '../utils/avr-unsaved-changes.js';
 import { renderChannelAvailabilityGrid } from '../utils/admin-form.js';
 import {
@@ -408,7 +408,13 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
 
     return `
       <div class="avr-detail-panel" id="cgr-detail-panel">
-        <div class="avr-detail-scroll cgr-detail-scroll">
+        ${renderAvrDetailStickyHead({
+          title: 'Редактирование группы',
+          cancelId: 'cgr-detail-cancel',
+          saveId: 'cgr-detail-save',
+          saveLabel: 'Сохранить изменения',
+        })}
+        <div class="avr-detail-body cgr-detail-body">
           <div class="admin-form-stack">
             <div class="admin-field-block">
               <label class="admin-field-label" for="cgr-group-name">Название группы</label>
@@ -468,7 +474,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
         </div>
 
         <div class="avr-detail-foot">
-          <div class="avr-detail-foot-row">
+          <div class="avr-detail-foot-row avr-detail-foot-row--danger-only">
             <div class="cgr-detail-danger cgr-detail-danger--wide">
               <label class="cgr-delete-confirm">
                 <input type="checkbox" id="cgr-delete-confirm" />
@@ -477,10 +483,6 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
               <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="cgr-detail-delete" disabled>
                 Удалить группу
               </button>
-            </div>
-            <div class="footer-action-bar">
-              ${renderAvrCancelButton('cgr-detail-cancel')}
-              <button type="button" class="action-btn action-btn-primary btn-press" id="cgr-detail-save">Сохранить изменения</button>
             </div>
           </div>
         </div>

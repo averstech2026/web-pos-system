@@ -2838,9 +2838,8 @@ body:has(.admin-shell) {
 }
 
 /* Category groups editor (layout-specific) */
-.cgr-layout .cgr-detail-scroll {
-  padding: var(--space-lg);
-  padding-bottom: var(--space-md);
+.cgr-layout .cgr-detail-body {
+  padding-top: 0;
 }
 
 .cgr-group-products-toolbar {
@@ -5246,6 +5245,49 @@ body:has(.admin-shell) {
   justify-content: flex-end;
 }
 
+.avr-detail-foot-row--danger-only {
+  justify-content: flex-start;
+}
+
+.avr-detail-sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: nowrap;
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.avr-detail-sticky-title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-navy);
+}
+
+.avr-detail-sticky-actions {
+  flex: 0 0 auto;
+  width: auto;
+}
+
+.mkb-layout .avr-detail-body,
+.prm-layout .avr-detail-body,
+.cgr-layout .avr-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
 .cgr-avail-select-field {
   display: flex;
   flex-direction: column;
@@ -5403,7 +5445,7 @@ body:has(.admin-shell) {
 
 /* ── Promo rules (marketing) editor ──────────────────────── */
 
-.prm-layout .avr-detail-scroll {
+.prm-layout .avr-detail-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
@@ -8023,25 +8065,14 @@ body:has(.admin-shell) {
 /* ── Marketing banners editor ─────────────────────────────── */
 .mkb-page.card {
   padding: 0;
-  overflow: hidden;
 }
 
 .mkb-detail-inner {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  height: 100%;
+  display: block;
 }
 
 .mkb-detail-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md);
-  flex-shrink: 0;
-  margin-bottom: 0;
-  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  display: none;
 }
 
 .mkb-detail-title {
@@ -8354,23 +8385,20 @@ body:has(.admin-shell) {
   min-width: 12rem;
 }
 
-.mkb-layout .avr-detail {
-  overflow: hidden;
+.mkb-layout .mkb-detail-inner,
+.prm-layout .avr-detail-panel,
+.cgr-layout .avr-detail-panel {
+  display: block;
 }
 
 .mkb-layout .avr-detail-foot {
-  flex-shrink: 0;
   margin-top: 0;
 }
 
 .mkb-detail-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  padding: 0 var(--space-lg) var(--space-lg);
 }
 
 .mkb-images-grid {

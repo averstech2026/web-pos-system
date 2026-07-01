@@ -4,7 +4,7 @@ import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-image
 export function productImageUrl(item) {
   const raw = item?.imageUrl;
   if (raw?.startsWith('data:')) return raw;
-  if (raw?.startsWith('blob:')) return null;
+  if (raw?.startsWith('blob:')) return raw;
   return resolveProductImageUrl(raw) || getItemImageUrl(item?.name || '') || null;
 }
 

@@ -31,10 +31,11 @@ export function resolveProductImageUrl(url) {
   if (!url) return null;
   const raw = String(url).trim();
   if (!raw) return null;
-  if (raw.startsWith('blob:')) return null;
+  if (raw.startsWith('blob:')) return raw;
   if (raw.startsWith('data:')) return raw;
   if (/^https?:\/\//i.test(raw)) return raw;
   const base = import.meta.env.BASE_URL || '/';
+  if (base !== '/' && raw.startsWith(base)) return raw;
   if (raw.startsWith('/')) {
     return `${base}${raw.replace(/^\//, '')}`;
   }

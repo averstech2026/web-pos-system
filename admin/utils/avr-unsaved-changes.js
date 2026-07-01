@@ -99,6 +99,26 @@ export function renderAvrCancelButton(id, label = 'Отменить') {
 }
 
 /**
+ * Sticky detail header: title + cancel/save (right-aligned).
+ * @param {object} p
+ * @param {string} p.title
+ * @param {string} p.cancelId
+ * @param {string} p.saveId
+ * @param {string} [p.saveLabel]
+ */
+export function renderAvrDetailStickyHead({ title, cancelId, saveId, saveLabel = 'Сохранить изменения' }) {
+  return `
+    <div class="avr-detail-sticky-head">
+      <h2 class="avr-detail-sticky-title">${esc(title)}</h2>
+      <div class="footer-action-bar avr-detail-sticky-actions">
+        ${renderAvrCancelButton(cancelId)}
+        <button type="button" class="action-btn action-btn-primary btn-press" id="${escAttr(saveId)}">${esc(saveLabel)}</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Cancel in avr-layout detail foot: unsaved guard + close panel (deselect entity).
  * @param {ParentNode} root
  * @param {string} buttonId
@@ -122,4 +142,9 @@ export function bindAvrDetailCancel(root, buttonId, { isDirty, discard, save, on
 /** @param {string} s */
 function esc(s) {
   return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** @param {string} s */
+function escAttr(s) {
+  return esc(s).replace(/"/g, '&quot;');
 }

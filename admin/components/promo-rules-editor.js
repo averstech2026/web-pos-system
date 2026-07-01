@@ -19,7 +19,7 @@ import {
   resolveChannelMode,
 } from '../services/products-data.js';
 import { showToast } from '../utils/toast.js';
-import { renderAvrCancelButton, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+import { runWithUnsavedGuard, bindAvrDetailCancel, renderAvrDetailStickyHead } from '../utils/avr-unsaved-changes.js';
 import { renderChannelAvailabilityGrid } from '../utils/admin-form.js';
 import {
   renderListMetaWithSchedule,
@@ -509,7 +509,13 @@ export function createPromoRulesEditor(host, {
   function renderDetailPanel(promo) {
     return `
       <div class="avr-detail-panel" id="prm-detail-panel">
-        <div class="avr-detail-scroll">
+        ${renderAvrDetailStickyHead({
+          title: isNew ? 'Новая акция' : 'Редактирование акции',
+          cancelId: 'prm-detail-cancel',
+          saveId: 'prm-save-btn',
+          saveLabel: 'Сохранить акцию',
+        })}
+        <div class="avr-detail-body">
           <section class="prm-block card">
             <div class="prm-block-head">
               <span class="prm-block-badge prm-block-badge--basic">1</span>
@@ -538,25 +544,21 @@ export function createPromoRulesEditor(host, {
           <p class="ifm-error" id="prm-error" hidden></p>
         </div>
 
+        ${!isNew ? `
         <div class="avr-detail-foot">
-          <div class="avr-detail-foot-row${isNew ? ' avr-detail-foot-row--actions-only' : ''}">
-            ${!isNew ? `
-              <div class="cgr-detail-danger avr-detail-danger">
-                <label class="cgr-delete-confirm">
-                  <input type="checkbox" id="prm-delete-confirm" />
-                  <span>Я подтверждаю удаление этой акции</span>
-                </label>
-                <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="prm-detail-delete" disabled>
-                  Удалить акцию
-                </button>
-              </div>
-            ` : ''}
-            <div class="footer-action-bar">
-              ${renderAvrCancelButton('prm-detail-cancel')}
-              <button type="button" class="action-btn action-btn-primary btn-press" id="prm-save-btn">Сохранить акцию</button>
+          <div class="avr-detail-foot-row avr-detail-foot-row--danger-only">
+            <div class="cgr-detail-danger avr-detail-danger">
+              <label class="cgr-delete-confirm">
+                <input type="checkbox" id="prm-delete-confirm" />
+                <span>Я подтверждаю удаление этой акции</span>
+              </label>
+              <button type="button" class="action-btn action-btn-danger btn-press cgr-detail-delete" id="prm-detail-delete" disabled>
+                Удалить акцию
+              </button>
             </div>
           </div>
         </div>
+        ` : ''}
       </div>
     `;
   }
