@@ -23,6 +23,9 @@ export const COL = {
   AVAILABILITY_RULES: 'availability_rules',
   PROMO_RULES: 'promo_rules',
   MARKETING_BANNERS: 'marketing_banners',
+  VALIDATION_RULES: 'validation_rules',
+  VALIDATION_LOGS: 'validation_logs',
+  WORK_SHIFTS: 'work_shifts',
 };
 
 /** Subcollection under users/{userId} */
@@ -60,6 +63,13 @@ export const PAYMENT_STATUS = {
 export const TX_TYPE = {
   INTERNAL_BALANCE: 'internal_balance',
   BANK_CARD: 'bank_card',
+  VALIDATOR_DEDUCT: 'validator_deduct',
+};
+
+/** @type {Record<string, string>} */
+export const VALIDATION_STATUS = {
+  SUCCESS: 'success',
+  DENIED: 'denied',
 };
 
 /** @type {Record<string, string>} */
@@ -115,33 +125,66 @@ export const PAYMENT_CURRENCY = {
 
 /** Default wallet templates for new CRM users */
 export const DEFAULT_WALLET_DEFS = {
-  personal: { name: 'Личные средства', restrictions: [] },
-  dotation: { name: 'Дотация', restrictions: [] },
+  personal: { name: 'Личные средства', allowedCategories: [] },
+  dotation: { name: 'Дотация', allowedCategories: [] },
 };
+
+/** @param {object} [wallet] */
+export function normalizeWalletAllowedCategories(wallet = {}) {
+  if (Array.isArray(wallet.allowedCategories)) return wallet.allowedCategories;
+  return [];
+}
 
 // ─── Document factory functions ───────────────────────────────────────────────
 
 /**
  * @param {object} [user]
- * @returns {Record<string, { balance: number, name: string, restrictions: string[] }>}
+ * @param {{ strict?: boolean }} [options]
+ * @returns {Record<string, { balance: number, name: string, allowedCategories: string[] }>}
  */
-export function normalizeUserWallets(user = {}) {
-  const legacyBalance = Number(user.balance) || 0;
+export function normalizeUserWallets(user = {}, options = {}) {
+  const { strict = false } = options;
   const wallets = user.wallets && typeof user.wallets === 'object' ? { ...user.wallets } : {};
+
+  if (strict) {
+    /** @type {Record<string, { balance: number, name: string, allowedCategories: string[] }>} */
+    const normalized = {};
+    for (const [id, w] of Object.entries(wallets)) {
+      normalized[id] = {
+        name: w?.name || DEFAULT_WALLET_DEFS[id]?.name || id,
+        balance: Number(w?.balance) || 0,
+        allowedCategories: normalizeWalletAllowedCategories(w),
+      };
+    }
+    return normalized;
+  }
+
+  if (Object.keys(wallets).length > 0) {
+    /** @type {Record<string, { balance: number, name: string, allowedCategories: string[] }>} */
+    const normalized = {};
+    for (const [id, w] of Object.entries(wallets)) {
+      normalized[id] = {
+        name: w?.name || DEFAULT_WALLET_DEFS[id]?.name || id,
+        balance: Number(w?.balance) || 0,
+        allowedCategories: normalizeWalletAllowedCategories(w),
+      };
+    }
+    return normalized;
+  }
+
+  const legacyBalance = Number(user.balance) || 0;
 
   if (!wallets.personal) {
     wallets.personal = {
       balance: legacyBalance,
       name: DEFAULT_WALLET_DEFS.personal.name,
-      restrictions: [...DEFAULT_WALLET_DEFS.personal.restrictions],
+      allowedCategories: [...DEFAULT_WALLET_DEFS.personal.allowedCategories],
     };
   } else {
     wallets.personal = {
       name: wallets.personal.name || DEFAULT_WALLET_DEFS.personal.name,
       balance: Number(wallets.personal.balance) || 0,
-      restrictions: Array.isArray(wallets.personal.restrictions)
-        ? wallets.personal.restrictions
-        : [],
+      allowedCategories: normalizeWalletAllowedCategories(wallets.personal),
     };
   }
 
@@ -149,15 +192,13 @@ export function normalizeUserWallets(user = {}) {
     wallets.dotation = {
       balance: 0,
       name: DEFAULT_WALLET_DEFS.dotation.name,
-      restrictions: [...DEFAULT_WALLET_DEFS.dotation.restrictions],
+      allowedCategories: [...DEFAULT_WALLET_DEFS.dotation.allowedCategories],
     };
   } else {
     wallets.dotation = {
       name: wallets.dotation.name || DEFAULT_WALLET_DEFS.dotation.name,
       balance: Number(wallets.dotation.balance) || 0,
-      restrictions: Array.isArray(wallets.dotation.restrictions)
-        ? wallets.dotation.restrictions
-        : [],
+      allowedCategories: normalizeWalletAllowedCategories(wallets.dotation),
     };
   }
 
@@ -166,7 +207,7 @@ export function normalizeUserWallets(user = {}) {
     wallets[id] = {
       name: w?.name || id,
       balance: Number(w?.balance) || 0,
-      restrictions: Array.isArray(w?.restrictions) ? w.restrictions : [],
+      allowedCategories: normalizeWalletAllowedCategories(w),
     };
   }
 
@@ -194,11 +235,13 @@ export function totalWalletBalance(wallets) {
  * @param {string|null} [p.activeFrom]
  * @param {string|null} [p.activeTo]
  * @param {string|null} [p.userGroupId]
+ * @param {string|null} [p.shiftId]
  * @param {string|null} [p.loyaltyCategoryId]
  * @param {string} [p.qrCode]
  * @param {string[]} [p.allergens]
  * @param {boolean} [p.allowsWebAccess]
  * @param {object} [p.wallets]
+ * @param {boolean} [p.strictWallets=false]
  */
 export function createUserDoc({
   id,
@@ -214,16 +257,18 @@ export function createUserDoc({
   activeFrom = null,
   activeTo = null,
   userGroupId = null,
+  shiftId = null,
   loyaltyCategoryId = null,
   qrCode = '',
   allergens = [],
   allowsWebAccess = true,
   wallets = null,
+  strictWallets = false,
 }) {
   const normalizedWallets = normalizeUserWallets({
     balance: role === ROLES.CLIENT ? balance : 0,
     wallets,
-  });
+  }, { strict: strictWallets && wallets != null });
 
   const doc = {
     id,
@@ -239,6 +284,7 @@ export function createUserDoc({
     activeFrom,
     activeTo,
     userGroupId,
+    shiftId,
     loyaltyCategoryId,
     qrCode,
     allergens,
@@ -255,9 +301,51 @@ export function createUserDoc({
  * @param {string} p.id
  * @param {string} p.name
  * @param {string} [p.description]
+ * @param {string[]} [p.allowedWalletIds] - wallet catalog IDs available to group members
  */
-export function createUserGroupDoc({ id, name, description = '' }) {
-  return { id, name, description };
+export function createUserGroupDoc({ id, name, description = '', allowedWalletIds = [] }) {
+  return {
+    id,
+    name,
+    description,
+    allowedWalletIds: Array.isArray(allowedWalletIds) ? allowedWalletIds : [],
+  };
+}
+
+/**
+ * work_shifts/{id}
+ * @param {object} p
+ */
+export function createWorkShiftDoc(p) {
+  // Re-exported shape — canonical logic in shared/work-shifts.js
+  const {
+    id,
+    name,
+    scheduleType = 'fixed',
+    fixedPattern = '5/2',
+    cycleUnit = 'days',
+    workPeriod = 2,
+    restPeriod = 2,
+    cycleStartDate = null,
+    shiftStart = '09:00',
+    shiftEnd = '18:00',
+    crossesMidnight = false,
+    useProductionCalendar = true,
+  } = p;
+  return {
+    id,
+    name,
+    scheduleType,
+    fixedPattern: scheduleType === 'fixed' ? fixedPattern : null,
+    cycleUnit: scheduleType === 'rotating' ? cycleUnit : 'days',
+    workPeriod: Number(workPeriod) || 2,
+    restPeriod: Number(restPeriod) || 2,
+    cycleStartDate: cycleStartDate || null,
+    shiftStart,
+    shiftEnd,
+    crossesMidnight: crossesMidnight === true,
+    useProductionCalendar: useProductionCalendar !== false,
+  };
 }
 
 /**
@@ -288,14 +376,22 @@ export function createLoyaltyCategoryDoc({
  * @param {string} p.id
  * @param {string} p.name
  * @param {string} [p.description]
- * @param {string[]} [p.restrictions] - category group IDs
+ * @param {string[]} [p.allowedCategories] - category group IDs; empty = all categories allowed
+ * @param {string[]} [p.allowedUserGroups] - user group IDs; empty = all groups allowed
  */
-export function createWalletDoc({ id, name, description = '', restrictions = [] }) {
+export function createWalletDoc({
+  id,
+  name,
+  description = '',
+  allowedCategories = [],
+  allowedUserGroups = [],
+}) {
   return {
     id,
     name,
     description: description || '',
-    restrictions: Array.isArray(restrictions) ? restrictions : [],
+    allowedCategories: Array.isArray(allowedCategories) ? allowedCategories : [],
+    allowedUserGroups: Array.isArray(allowedUserGroups) ? allowedUserGroups : [],
   };
 }
 
@@ -495,13 +591,75 @@ export function createCheckDoc({ orderId, userId, subtotal, total, paymentParts,
  * @param {number} p.amount
  * @param {string} [p.status='success']
  */
-export function createTransactionDoc({ checkId, orderId, type, amount, status = TX_STATUS.SUCCESS }) {
-  return {
+export function createTransactionDoc({
+  checkId = '',
+  orderId = '',
+  type,
+  amount,
+  status = TX_STATUS.SUCCESS,
+  userId = '',
+  userName = '',
+  walletId = '',
+  walletName = '',
+  ruleId = '',
+  ruleName = '',
+  balanceAfter = null,
+  source = '',
+}) {
+  const doc = {
     checkId,
     orderId,
     type,
     amount,
     status,
+    createdAt: serverTimestamp(),
+  };
+  if (userId) doc.userId = userId;
+  if (userName) doc.userName = userName;
+  if (walletId) doc.walletId = walletId;
+  if (walletName) doc.walletName = walletName;
+  if (ruleId) doc.ruleId = ruleId;
+  if (ruleName) doc.ruleName = ruleName;
+  if (balanceAfter != null) doc.balanceAfter = balanceAfter;
+  if (source) doc.source = source;
+  return doc;
+}
+
+/**
+ * validation_logs/{id}
+ * @param {object} p
+ */
+export function createValidationLogDoc({
+  userId,
+  userName,
+  cardNumber,
+  channelPoint,
+  ruleId = '',
+  ruleName = '',
+  status,
+  denyReason = '',
+  deductionType = '',
+  deductionSummary = '',
+  balanceAfter = null,
+  approachesLeft = null,
+  walletId = '',
+  amount = 0,
+}) {
+  return {
+    userId: userId || '',
+    userName: userName || '',
+    cardNumber: cardNumber || '',
+    channelPoint: channelPoint || 'Раздача',
+    ruleId,
+    ruleName,
+    status,
+    denyReason: denyReason || '',
+    deductionType: deductionType || '',
+    deductionSummary: deductionSummary || '',
+    balanceAfter,
+    approachesLeft,
+    walletId,
+    amount: Number(amount) || 0,
     createdAt: serverTimestamp(),
   };
 }

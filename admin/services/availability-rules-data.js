@@ -11,6 +11,7 @@ import { COL } from '../../shared/schema.js';
 import {
   buildAvailabilityRulePayload,
   filterActiveRules,
+  filterEnabledRules,
   normalizeAvailabilityRuleDoc,
   rulesToMap,
 } from '../../shared/availability-rules.js';
@@ -28,7 +29,7 @@ export async function fetchAllAvailabilityRules() {
 /** Active templates only — for selects and kiosk. */
 export async function fetchActiveAvailabilityRules() {
   const all = await fetchAllAvailabilityRules();
-  return filterActiveRules(all);
+  return filterEnabledRules(all);
 }
 
 /**

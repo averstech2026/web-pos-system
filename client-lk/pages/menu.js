@@ -124,21 +124,25 @@ export class MenuPage {
       nutrition: resolveItemNutrition(data),
     }));
 
-    this.items = allItems.filter(item => isMenuItemAvailableAt(item, this.groupsByName, this.allRules, slot));
+    const visibleGroupNames = new Set(groups.map(g => g.name));
+    const isInVisibleGroup = item => !groups.length || visibleGroupNames.has(item.category);
+
+    this.items = allItems.filter(item =>
+      isInVisibleGroup(item)
+      && isMenuItemAvailableAt(item, this.groupsByName, this.allRules, slot),
+    );
 
     cart.setPromoContext({
       activePromos: this.promoRules,
       allAvailabilityRules: this.allRules,
-      catalogItems: allItems,
+      catalogItems: this.items,
       categoryGroups: this.categoryGroups,
     });
 
-    const groupNames = groups.map(g => g.name);
-    const found = [...new Set(this.items.map(i => i.category))];
-    this.categories = [
-      ...groupNames.filter(c => found.includes(c)),
-      ...found.filter(c => !groupNames.includes(c)).sort((a, b) => a.localeCompare(b, 'ru')),
-    ];
+    this.categories = groups.length
+      ? groups.map(g => g.name)
+      : [...new Set(this.items.map(i => i.category).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'ru'));
     this.activeCategory = this.categories[0] || null;
   }
 

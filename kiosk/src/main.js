@@ -21,9 +21,15 @@ if (import.meta.env.DEV) {
   });
 }
 
+function revealKiosk() {
+  document.body.classList.remove('kiosk-booting');
+  document.body.classList.add('kiosk-ready');
+}
+
 function showBootError(message) {
   const wrapper = document.getElementById('kiosk-wrapper');
   if (!wrapper) return;
+  revealKiosk();
   wrapper.innerHTML = `
     <div class="flex items-center justify-center w-full h-full bg-zinc-900 text-white p-12 text-center">
       <div>
@@ -36,6 +42,7 @@ function showBootError(message) {
 function showBootLoading() {
   const wrapper = document.getElementById('kiosk-wrapper');
   if (!wrapper) return;
+  document.body.classList.add('kiosk-booting');
   const overlay = document.createElement('div');
   overlay.id = 'kiosk-boot';
   overlay.className = 'absolute inset-0 z-[9999] flex items-center justify-center bg-zinc-900/90 text-white text-2xl font-semibold';
@@ -53,12 +60,14 @@ async function init() {
 
   const wrapper = document.getElementById('kiosk-wrapper');
   try {
+    await ensureKioskSession();
+
     if (wrapper && await renderKioskMaintenanceIfNeeded(wrapper)) {
       hideBootLoading();
+      revealKiosk();
       return;
     }
 
-    await ensureKioskSession();
     await loadKioskCatalog();
   } catch (err) {
     console.error('[kiosk] boot', err);
@@ -93,9 +102,7 @@ async function init() {
     document.fonts?.ready ?? Promise.resolve(),
   ]).finally(() => {
     requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        document.body.classList.add('kiosk-ready');
-      });
+      requestAnimationFrame(revealKiosk);
     });
   });
 }

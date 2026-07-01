@@ -47,3 +47,14 @@ export function promoThumbHtml() {
     </span>
   `;
 }
+
+const SHIFT_CLOCK_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`;
+
+/** Sidebar list thumb for work shifts reference. */
+export function shiftThumbHtml() {
+  return `
+    <span class="products-thumb-wrap products-thumb-wrap--empty products-thumb-wrap--shift">
+      <span class="products-thumb-fallback wsh-row-thumb-icon" aria-hidden="true">${SHIFT_CLOCK_ICON}</span>
+    </span>
+  `;
+}

@@ -1,18 +1,24 @@
-import { saveWallet, deleteWallet } from '../services/wallets-data.js';
+import { saveWallet, deleteWallet, walletMeta } from '../services/wallets-data.js';
 import { showToast } from '../utils/toast.js';
 import { renderAvrDetailStickyHead, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
+
+const CHIP_SELECT_ICON = `<svg class="pay-restrictions-chip-btn__icon" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`;
+
+const CHIP_DESELECT_ICON = `<svg class="pay-restrictions-chip-btn__icon" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 9 6 6M15 9l-6 6"/></svg>`;
 
 /**
  * @param {HTMLElement} host
  * @param {object} p
  * @param {Array<object>} p.wallets
  * @param {Array<{ id: string, name: string }>} p.categoryGroups
+ * @param {Array<{ id: string, name: string }>} p.userGroups
  * @param {() => void|Promise<void>} [p.onSaved]
  * @param {(walletId: string|null) => void} [p.onDistribute]
  */
 export function createWalletsEditor(host, {
   wallets: initialWallets,
   categoryGroups,
+  userGroups,
   onSaved,
   onDistribute,
 }) {
@@ -25,9 +31,18 @@ export function createWalletsEditor(host, {
   /** @type {string} */
   let baselineJson = '';
 
+  function walletSnapshot(w) {
+    return {
+      id: w.id,
+      name: (w.name || '').trim(),
+      description: (w.description || '').trim(),
+      allowedCategories: [...(w.allowedCategories || [])].sort(),
+      allowedUserGroups: [...(w.allowedUserGroups || [])].sort(),
+    };
+  }
+
   function snapshot() {
-    return JSON.stringify(wallets.map(w => ({ ...w, restrictions: [...(w.restrictions || [])] }))
-      .sort((a, b) => a.id.localeCompare(b.id)));
+    return JSON.stringify(wallets.map(walletSnapshot).sort((a, b) => a.id.localeCompare(b.id)));
   }
 
   function commitBaseline() {
@@ -47,8 +62,6 @@ export function createWalletsEditor(host, {
     }
   }
 
-  commitBaseline();
-
   function selectedWallet() {
     return wallets.find(w => w.id === selectedId) || null;
   }
@@ -57,8 +70,12 @@ export function createWalletsEditor(host, {
     const panel = host.querySelector('#wal-detail-panel');
     if (!selectedId || !panel) return;
 
-    const restrictions = [...panel.querySelectorAll('[data-restriction]:checked')]
-      .map(el => el.dataset.restriction);
+    const allowedCategories = [...panel.querySelectorAll('[data-category]:checked')]
+      .map(el => el.dataset.category)
+      .sort();
+    const allowedUserGroups = [...panel.querySelectorAll('[data-user-group]:checked')]
+      .map(el => el.dataset.userGroup)
+      .sort();
 
     wallets = wallets.map(w => (
       w.id === selectedId
@@ -66,10 +83,25 @@ export function createWalletsEditor(host, {
           ...w,
           name: panel.querySelector('[data-field="name"]')?.value.trim() || '',
           description: panel.querySelector('[data-field="description"]')?.value.trim() || '',
-          restrictions,
+          allowedCategories,
+          allowedUserGroups,
         }
         : w
     ));
+    updateListRowMeta(selectedId);
+  }
+
+  function updateListRowMeta(id) {
+    if (!id) return;
+    const row = host.querySelector(`.avr-row[data-id="${CSS.escape(id)}"]`);
+    const wallet = wallets.find(w => w.id === id);
+    if (!row || !wallet) return;
+
+    const nameEl = row.querySelector('.avr-row-name');
+    if (nameEl) nameEl.textContent = wallet.name;
+
+    const metaEl = row.querySelector('.avr-row-meta');
+    if (metaEl) metaEl.textContent = walletMeta(wallet);
   }
 
   function slugify(name) {
@@ -91,43 +123,112 @@ export function createWalletsEditor(host, {
 
   function renderRow(wallet) {
     const active = wallet.id === selectedId;
-    const restrNote = wallet.restrictions?.length
-      ? `Ограничения: ${wallet.restrictions.length}`
-      : 'Без ограничений';
     return `
       <li class="avr-row ${active ? 'avr-row--active' : ''}" data-id="${escAttr(wallet.id)}">
         <button type="button" class="avr-row-main btn-press" data-action="select" aria-pressed="${active}">
           <span class="alr-row-icon" aria-hidden="true">💳</span>
           <span class="avr-row-info">
             <span class="avr-row-name">${esc(wallet.name)}</span>
-            <span class="avr-row-meta">${esc(restrNote)}</span>
+            <span class="avr-row-meta">${esc(walletMeta(wallet))}</span>
           </span>
         </button>
       </li>
     `;
   }
 
-  function renderRestrictions(wallet) {
+  function renderRestrictionsBox(title, selectAction, deselectAction, contentHtml) {
+    return `
+      <div class="pay-restrictions-box">
+        <span class="pay-restrictions-box__title">${esc(title)}</span>
+        <div class="pay-restrictions-box__toolbar">
+          <button type="button" class="pay-restrictions-chip-btn pay-restrictions-chip-btn--select btn-press" data-action="${escAttr(selectAction)}">
+            ${CHIP_SELECT_ICON}
+            <span>Выбрать все</span>
+          </button>
+          <button type="button" class="pay-restrictions-chip-btn pay-restrictions-chip-btn--deselect btn-press" data-action="${escAttr(deselectAction)}">
+            ${CHIP_DESELECT_ICON}
+            <span>Снять все</span>
+          </button>
+        </div>
+        ${contentHtml}
+      </div>
+    `;
+  }
+
+  function setCategorySelection(ids) {
+    if (!selectedId) return;
+    syncPanel();
+    const idSet = new Set(ids);
+    wallets = wallets.map(w => (
+      w.id === selectedId ? { ...w, allowedCategories: [...ids] } : w
+    ));
+    host.querySelectorAll('#wal-detail-panel [data-category]').forEach(cb => {
+      cb.checked = idSet.has(cb.dataset.category);
+    });
+    updateListRowMeta(selectedId);
+  }
+
+  function setUserGroupSelection(ids) {
+    if (!selectedId) return;
+    syncPanel();
+    const idSet = new Set(ids);
+    wallets = wallets.map(w => (
+      w.id === selectedId ? { ...w, allowedUserGroups: [...ids] } : w
+    ));
+    host.querySelectorAll('#wal-detail-panel [data-user-group]').forEach(cb => {
+      cb.checked = idSet.has(cb.dataset.userGroup);
+    });
+    updateListRowMeta(selectedId);
+  }
+
+  function renderCategoryRestrictions(wallet) {
     if (!categoryGroups.length) {
       return '<p class="ufm-muted">Справочник категорий товаров пуст.</p>';
     }
-    return `
-      <fieldset class="ifm-fieldset">
-        <legend>Ограничения по категориям товаров</legend>
+    return renderRestrictionsBox(
+      'Разрешённые категории товаров',
+      'select-all-categories',
+      'deselect-all-categories',
+      `
         <div class="wallet-restrictions-grid">
           ${categoryGroups.map(cat => `
             <label class="ifm-allergen bulk-allergen-tag">
               <input
                 type="checkbox"
-                data-restriction="${escAttr(cat.id)}"
-                ${wallet.restrictions?.includes(cat.id) ? 'checked' : ''}
+                data-category="${escAttr(cat.id)}"
+                ${wallet.allowedCategories?.includes(cat.id) ? 'checked' : ''}
               />
               <span>${esc(cat.name)}</span>
             </label>
           `).join('')}
         </div>
-      </fieldset>
-    `;
+      `,
+    );
+  }
+
+  function renderUserGroupRestrictions(wallet) {
+    if (!userGroups.length) {
+      return '<p class="ufm-muted">Группы клиентов не найдены.</p>';
+    }
+    return renderRestrictionsBox(
+      'Доступно для групп клиентов',
+      'select-all-user-groups',
+      'deselect-all-user-groups',
+      `
+        <div class="wallet-restrictions-grid">
+          ${userGroups.map(group => `
+            <label class="ifm-allergen bulk-allergen-tag">
+              <input
+                type="checkbox"
+                data-user-group="${escAttr(group.id)}"
+                ${wallet.allowedUserGroups?.includes(group.id) ? 'checked' : ''}
+              />
+              <span>${esc(group.name)}</span>
+            </label>
+          `).join('')}
+        </div>
+      `,
+    );
   }
 
   function renderDetail(wallet) {
@@ -155,7 +256,8 @@ export function createWalletsEditor(host, {
               <label class="admin-field-label" for="wal-description">Описание</label>
               <textarea id="wal-description" class="admin-field-input admin-field-textarea" data-field="description" rows="3" placeholder="Назначение кошелька">${esc(wallet.description || '')}</textarea>
             </div>
-            ${renderRestrictions(wallet)}
+            ${renderCategoryRestrictions(wallet)}
+            ${renderUserGroupRestrictions(wallet)}
             <p class="alr-detail-id">ID: <code>${esc(wallet.id)}</code></p>
           </div>
           <p class="ifm-error" id="wal-error" hidden></p>
@@ -246,7 +348,13 @@ export function createWalletsEditor(host, {
         save: persistCurrent,
         proceed: () => {
           const id = uniqueId('Новый кошелёк');
-          wallets.push({ id, name: 'Новый кошелёк', description: '', restrictions: [] });
+          wallets.push({
+            id,
+            name: 'Новый кошелёк',
+            description: '',
+            allowedCategories: [],
+            allowedUserGroups: [],
+          });
           selectedId = id;
           render();
         },
@@ -270,8 +378,32 @@ export function createWalletsEditor(host, {
     });
 
     host.querySelector('#wal-detail-panel')?.addEventListener('input', () => syncPanel());
+    host.querySelector('#wal-detail-panel')?.addEventListener('click', e => {
+      const bulkBtn = e.target.closest('[data-action]');
+      if (!bulkBtn || !selectedId) return;
+      const action = bulkBtn.dataset.action;
+      if (action === 'select-all-categories') {
+        e.preventDefault();
+        setCategorySelection(categoryGroups.map(c => c.id));
+        return;
+      }
+      if (action === 'deselect-all-categories') {
+        e.preventDefault();
+        setCategorySelection([]);
+        return;
+      }
+      if (action === 'select-all-user-groups') {
+        e.preventDefault();
+        setUserGroupSelection(userGroups.map(g => g.id));
+        return;
+      }
+      if (action === 'deselect-all-user-groups') {
+        e.preventDefault();
+        setUserGroupSelection([]);
+      }
+    });
     host.querySelector('#wal-detail-panel')?.addEventListener('change', e => {
-      if (e.target.matches('[data-restriction]')) syncPanel();
+      if (e.target.matches('[data-category], [data-user-group]')) syncPanel();
     });
 
     host.querySelector('#wal-delete-confirm')?.addEventListener('change', e => {
@@ -309,6 +441,7 @@ export function createWalletsEditor(host, {
   }
 
   render();
+  commitBaseline();
 
   return {
     destroy() {

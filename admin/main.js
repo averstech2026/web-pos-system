@@ -9,11 +9,12 @@ import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../shared/schema.js';
 
 if (import.meta.env.DEV) {
-  import('../shared/seed.js').then(({ seedStaffAuth, patchDemoItemCategories }) => {
+  import('../shared/seed.js').then(({ seedStaffAuth, patchDemoItemCategories, seedValidatorDemo }) => {
     window.seedStaffAuth = seedStaffAuth;
     window.patchDemoItemCategories = patchDemoItemCategories;
+    window.seedValidatorDemo = seedValidatorDemo;
     console.info(
-      '%c[DEV] Staff setup helper loaded.\nRun: await seedStaffAuth()\nRun: await patchDemoItemCategories()',
+      '%c[DEV] Staff setup helper loaded.\nRun: await seedStaffAuth()\nRun: await seedValidatorDemo()\nRun: await patchDemoItemCategories()',
       'color:#1E1B4B;font-weight:bold',
     );
   });
@@ -83,11 +84,13 @@ async function renderRoute(path) {
     '/marketing-banners': () => import('./pages/marketing-banners.js').then(m => m.MarketingBannersPage),
     '/users': () => import('./pages/users.js').then(m => m.UsersPage),
     '/crm-groups': () => import('./pages/crm-user-groups.js').then(m => m.CrmUserGroupsPage),
+    '/work-shifts': () => import('./pages/work-shifts.js').then(m => m.WorkShiftsPage),
     '/crm-loyalty': () => import('./pages/crm-loyalty-categories.js').then(m => m.CrmLoyaltyCategoriesPage),
     '/crm-wallets': () => import('./pages/crm-wallets.js').then(m => m.CrmWalletsPage),
     '/payments': () => import('./pages/payments.js').then(m => m.PaymentsPage),
     '/sales-channels': () => import('./pages/sales-channels.js').then(m => m.SalesChannelsPage),
     '/reports': () => import('./pages/reports.js').then(m => m.ReportsPage),
+    '/validation-rules': () => import('./pages/validation-rules.js').then(m => m.ValidationRulesPage),
   };
 
   const loader = routes[path] || routes['/dashboard'];

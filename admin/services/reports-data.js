@@ -288,3 +288,80 @@ function resolveOrderMenuLabel(order, itemsById, rulesById) {
   if (!names.size) return 'Основное меню';
   return [...names].join(', ');
 }
+
+function logTimestamp(log) {
+  return log.createdAt?.toMillis?.() ?? log.createdAt?.getTime?.() ?? 0;
+}
+
+/**
+ * @param {Array<object>} logs
+ * @param {{ start: Date, end: Date }} period
+ */
+export function filterLogsByPeriod(logs, period) {
+  const start = period.start.getTime();
+  const end = period.end.getTime();
+  return logs.filter(log => {
+    const ts = logTimestamp(log);
+    return ts >= start && ts <= end;
+  });
+}
+
+/**
+ * @param {Array<object>} logs
+ * @param {{ start: Date, end: Date }} period
+ */
+export function buildValidationLogsReport(logs, period) {
+  return filterLogsByPeriod(logs, period)
+    .sort((a, b) => logTimestamp(b) - logTimestamp(a))
+    .map(log => ({
+      id: log.id,
+      createdAt: log.createdAt,
+      userName: log.userName || '—',
+      cardNumber: log.cardNumber || '—',
+      channelPoint: log.channelPoint || '—',
+      ruleName: log.ruleName || '—',
+      status: log.status,
+      denyReason: log.denyReason || '',
+      deductionSummary: log.deductionSummary || '',
+    }));
+}
+
+/**
+ * @param {Array<object>} validatorTxs
+ * @param {Array<object>} orders
+ * @param {Map<string, object>} usersById
+ * @param {{ start: Date, end: Date }} period
+ */
+export function buildClientTransactionsReport(validatorTxs, orders, usersById, period) {
+  const start = period.start.getTime();
+  const end = period.end.getTime();
+
+  const validatorRows = filterLogsByPeriod(validatorTxs, period).map(tx => ({
+    createdAt: tx.createdAt,
+    userName: tx.userName || usersById.get(tx.userId)?.name || '—',
+    typeLabel: 'Списание по валидатору (По пропуску)',
+    amount: -(Number(tx.amount) || 0),
+    balanceAfter: tx.balanceAfter,
+    detail: tx.ruleName || tx.walletName || '—',
+  }));
+
+  const orderRows = [...orders]
+    .filter(o => {
+      const ts = o.createdAt?.toMillis?.() ?? 0;
+      return ts >= start && ts <= end && o.paymentStatus === 'paid';
+    })
+    .map(order => {
+      const user = usersById.get(order.userId);
+      return {
+        createdAt: order.createdAt,
+        userName: user?.name || '—',
+        typeLabel: 'Оплата заказа',
+        amount: -orderTotal(order.items),
+        balanceAfter: null,
+        detail: `№ ${order.orderNumber || order.id?.slice(0, 8)}`,
+      };
+    });
+
+  return [...validatorRows, ...orderRows]
+    .sort((a, b) => logTimestamp(b) - logTimestamp(a));
+}

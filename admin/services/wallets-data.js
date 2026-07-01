@@ -11,6 +11,7 @@ import {
   COL,
   DEFAULT_WALLET_DEFS,
   createWalletDoc,
+  normalizeWalletAllowedCategories,
 } from '../../shared/schema.js';
 
 const FALLBACK_WALLETS = [
@@ -18,13 +19,15 @@ const FALLBACK_WALLETS = [
     id: 'personal',
     name: DEFAULT_WALLET_DEFS.personal.name,
     description: 'Личные средства клиента',
-    restrictions: [],
+    allowedCategories: [],
+    allowedUserGroups: [],
   },
   {
     id: 'dotation',
     name: DEFAULT_WALLET_DEFS.dotation.name,
     description: 'Корпоративная дотация',
-    restrictions: [],
+    allowedCategories: [],
+    allowedUserGroups: [],
   },
 ];
 
@@ -43,7 +46,8 @@ export function normalizeWallet(raw) {
     id: raw.id,
     name: raw.name || raw.id,
     description: raw.description || '',
-    restrictions: Array.isArray(raw.restrictions) ? raw.restrictions : [],
+    allowedCategories: normalizeWalletAllowedCategories(raw),
+    allowedUserGroups: Array.isArray(raw.allowedUserGroups) ? raw.allowedUserGroups : [],
   };
 }
 
@@ -67,6 +71,26 @@ export async function fetchWalletById(id) {
   return normalizeWallet({ id: snap.id, ...snap.data() });
 }
 
+export function walletMeta(wallet) {
+  const parts = [];
+  const catCount = wallet.allowedCategories?.length || 0;
+  const groupCount = wallet.allowedUserGroups?.length || 0;
+
+  if (catCount) parts.push(`${catCount} кат.`);
+  if (groupCount) parts.push(`${groupCount} ${clientGroupsCountLabel(groupCount)}`);
+  if (!parts.length) return 'Все категории и группы';
+  return parts.join(' · ');
+}
+
+/** @param {number} count */
+function clientGroupsCountLabel(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'группа клиентов';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'группы клиентов';
+  return 'групп клиентов';
+}
+
 export async function ensureDefaultWallets() {
   for (const wallet of FALLBACK_WALLETS) {
     const ref = doc(db, COL.WALLETS, wallet.id);
@@ -75,7 +99,8 @@ export async function ensureDefaultWallets() {
       await setDoc(ref, {
         name: wallet.name,
         description: wallet.description || '',
-        restrictions: wallet.restrictions,
+        allowedCategories: wallet.allowedCategories,
+        allowedUserGroups: wallet.allowedUserGroups,
       });
     }
   }

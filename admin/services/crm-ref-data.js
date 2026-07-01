@@ -12,11 +12,13 @@ import {
   createLoyaltyCategoryDoc,
   createUserGroupDoc,
 } from '../../shared/schema.js';
+import { normalizeGroupAllowedWalletIds } from '../../shared/group-wallets.js';
+import { syncGroupWalletsToMembers } from './users-data.js';
 
 const FALLBACK_USER_GROUPS = [
-  { id: 'office_romashka', name: 'Офис Ромашка', description: 'Офисные сотрудники' },
-  { id: 'production', name: 'Производство', description: 'Производственный персонал' },
-  { id: 'askona', name: 'Завод Аскона', description: 'Корпоративное питание' },
+  { id: 'office_romashka', name: 'Офис Ромашка', description: 'Офисные сотрудники', allowedWalletIds: ['personal', 'dotation'] },
+  { id: 'production', name: 'Производство', description: 'Производственный персонал', allowedWalletIds: ['personal', 'dotation'] },
+  { id: 'askona', name: 'Завод Аскона', description: 'Корпоративное питание', allowedWalletIds: ['personal', 'dotation'] },
 ];
 
 const FALLBACK_LOYALTY_CATEGORIES = [
@@ -25,12 +27,20 @@ const FALLBACK_LOYALTY_CATEGORIES = [
   { id: 'gold', name: 'Золото', discountPercent: 10, cashbackPercent: 7 },
 ];
 
+/** @param {object} raw */
+export function normalizeUserGroup(raw) {
+  return {
+    ...raw,
+    allowedWalletIds: normalizeGroupAllowedWalletIds(raw),
+  };
+}
+
 /** @returns {Promise<Array<object>>} */
 export async function fetchUserGroups() {
   const snap = await getDocs(collection(db, COL.USER_GROUPS));
-  if (snap.empty) return [...FALLBACK_USER_GROUPS];
+  if (snap.empty) return FALLBACK_USER_GROUPS.map(normalizeUserGroup);
   return snap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
+    .map(d => normalizeUserGroup({ id: d.id, ...d.data() }))
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
 }
 
@@ -43,12 +53,13 @@ export async function fetchLoyaltyCategories() {
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
 }
 
-/** @param {object} data */
+/** @param {object} data @returns {Promise<{ payload: object, syncedUsers: number }>} */
 export async function saveUserGroup(data) {
   const id = data.id || doc(collection(db, COL.USER_GROUPS)).id;
   const payload = createUserGroupDoc({ ...data, id });
   await setDoc(doc(db, COL.USER_GROUPS, id), payload, { merge: true });
-  return payload;
+  const syncedUsers = await syncGroupWalletsToMembers(id, payload.allowedWalletIds);
+  return { payload, syncedUsers };
 }
 
 /** @param {string} id */
@@ -74,7 +85,11 @@ export async function ensureDefaultCrmRefs() {
     const ref = doc(db, COL.USER_GROUPS, group.id);
     const snap = await getDoc(ref);
     if (!snap.exists()) {
-      await setDoc(ref, { name: group.name, description: group.description || '' });
+      await setDoc(ref, {
+        name: group.name,
+        description: group.description || '',
+        allowedWalletIds: group.allowedWalletIds || ['personal', 'dotation'],
+      });
     }
   }
   for (const cat of FALLBACK_LOYALTY_CATEGORIES) {

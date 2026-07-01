@@ -5,15 +5,17 @@ import { normalizeCatalogItem } from './composite-meals.js';
 
 /**
  * Menu items visible in the web portal (personal account).
+ * Treats missing visibleInWeb as visible (same as admin / menu-catalog defaults).
  * @returns {Promise<Array<import('./schema.js').MenuItemDoc & { id: string }>>}
  */
 export async function fetchWebMenuItems() {
   const snap = await getDocs(query(
     collection(db, COL.ITEMS),
-    where('visibleInWeb', '==', true),
     where('isAvailable', '==', true),
   ));
-  return snap.docs.map(d => normalizeCatalogItem({ id: d.id, ...d.data() }));
+  return snap.docs
+    .map(d => normalizeCatalogItem({ id: d.id, ...d.data() }))
+    .filter(item => item.visibleInWeb !== false);
 }
 
 /**

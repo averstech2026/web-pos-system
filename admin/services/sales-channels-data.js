@@ -62,10 +62,24 @@ export async function saveSalesChannel(channel) {
 export async function ensureDefaultSalesChannels() {
   const ref = doc(db, COL.SETTINGS, SETTINGS_DOC_ID);
   const snap = await getDoc(ref);
-  if (snap.exists() && Array.isArray(snap.data().channels) && snap.data().channels.length) {
-    return;
+  const stored = snap.exists() && Array.isArray(snap.data().channels) ? snap.data().channels : [];
+  const byId = new Map(stored.map(raw => [raw.id, raw]));
+
+  let changed = !stored.length;
+  for (const def of DEFAULT_SALES_CHANNELS) {
+    if (!byId.has(def.id)) {
+      byId.set(def.id, toPersistedSalesChannel(
+        createDefaultSalesChannels().find(ch => ch.id === def.id) || def,
+        def.id,
+      ));
+      changed = true;
+    }
   }
-  await setDoc(ref, {
-    channels: createDefaultSalesChannels().map(ch => toPersistedSalesChannel(ch, ch.id)),
-  }, { merge: true });
+
+  if (changed) {
+    const payload = DEFAULT_SALES_CHANNELS.map(def => (
+      toPersistedSalesChannel(byId.get(def.id) || def, def.id)
+    ));
+    await setDoc(ref, { channels: payload }, { merge: true });
+  }
 }

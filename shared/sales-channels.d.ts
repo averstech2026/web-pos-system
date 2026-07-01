@@ -9,4 +9,6 @@ export interface SalesChannel {
   sendToDelivery: boolean;
   scheduleId: string | null;
   maintenanceMessage: string;
+  /** Payment method ids from payment_methods catalog; sales channels only */
+  allowedPaymentMethods: string[];
 }

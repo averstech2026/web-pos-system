@@ -87,6 +87,7 @@ export class CrmWalletsPage {
     this.editor = createWalletsEditor(host, {
       wallets: this.wallets,
       categoryGroups: this.categoryGroups,
+      userGroups: this.groups,
       onSaved: () => this.loadData(),
       onDistribute: (walletId) => this.openDistribution(walletId),
     });

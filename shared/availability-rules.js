@@ -21,6 +21,7 @@
  * @property {string} id
  * @property {string} name
  * @property {'active'|'archived'} [status]
+ * @property {boolean} [isActive] - false = шаблон на паузе (в списке, но не применяется)
  * @property {AvailabilityCondition[]} conditions
  */
 
@@ -75,9 +76,19 @@ export function isRuleArchived(rule) {
   return rule?.status === 'archived';
 }
 
+/** @param {Partial<AvailabilityRuleDoc>|null|undefined} rule */
+export function isRuleEnabled(rule) {
+  return !isRuleArchived(rule) && rule?.isActive !== false;
+}
+
 /** @param {Partial<AvailabilityRuleDoc>[]} rules */
 export function filterActiveRules(rules) {
   return (rules || []).filter(r => !isRuleArchived(r));
+}
+
+/** Non-archived and enabled — for selects and runtime */
+export function filterEnabledRules(rules) {
+  return (rules || []).filter(isRuleEnabled);
 }
 
 /** @param {Partial<AvailabilityCondition>|null|undefined} raw */
@@ -111,6 +122,7 @@ export function normalizeAvailabilityRuleDoc(raw, docId = '') {
     id,
     name: String(raw?.name || '').trim() || 'Без названия',
     status: raw?.status === 'archived' ? 'archived' : 'active',
+    isActive: raw?.status === 'archived' ? false : raw?.isActive !== false,
     conditions,
   };
 }
@@ -308,7 +320,7 @@ export function isItemAvailable(itemRuleId, groupRuleId, allRules, slot) {
   if (!activeRuleId) return true;
 
   const rule = findRuleById(allRules, activeRuleId);
-  if (!rule || isRuleArchived(rule)) return true;
+  if (!rule || isRuleArchived(rule) || rule.isActive === false) return true;
 
   const { date, time } = resolveSlot(slot);
   return evaluateRuleAt(rule, date, time);
@@ -464,6 +476,7 @@ export function buildAvailabilityRulePayload(rule) {
   return {
     name: normalized.name,
     status: normalized.status === 'archived' ? 'archived' : 'active',
+    isActive: normalized.isActive !== false,
     conditions: normalized.conditions.map(c => ({
       type: c.type,
       isActive: c.isActive !== false,

@@ -22,6 +22,7 @@ import {
 } from 'firebase/auth';
 import { auth, db } from './firebase.js';
 import { COL, ROLES, createItemDoc, createUserDoc, USER_STATUS, DEFAULT_ITEM_VISIBLE_IN_WEB, DEFAULT_ITEM_VISIBLE_IN_KIOSK } from './schema.js';
+import { buildValidationRulePayload, normalizeValidationRuleDoc } from './validation-rules.js';
 import { isCompositeItem } from './composite-meals.js';
 import { DEFAULT_GROUP_VISIBLE_IN_WEB, DEFAULT_GROUP_VISIBLE_IN_KIOSK, normalizeCategoryGroup } from './menu-catalog.js';
 import { getItemImageUrl } from './item-images.js';
@@ -74,8 +75,8 @@ const DEMO_USERS = [
     allergens: ['gluten'],
     allowsWebAccess: true,
     wallets: {
-      personal: { balance: 686, name: 'Личные средства', restrictions: [] },
-      dotation: { balance: 1000, name: 'Дотация', restrictions: ['bakery_id'] },
+      personal: { balance: 686, name: 'Личные средства', allowedCategories: [] },
+      dotation: { balance: 1000, name: 'Дотация', allowedCategories: [] },
     },
   }),
   createUserDoc({
@@ -149,7 +150,147 @@ export async function seedDatabase() {
     });
   }
 
+  await seedValidatorDemo({ skipAuth: true });
+
   console.log('[seed] Done! 🎉');
+}
+
+/** Demo cards + validation rules for cafeteria validator terminal */
+const DEMO_VALIDATOR_CARD_USERS = [
+  createUserDoc({
+    id: 'demo-vld-ivanov',
+    name: 'Иванов Петр Сергеевич',
+    email: 'ivanov.vld@ifcm.demo',
+    role: ROLES.CLIENT,
+    balance: 0,
+    phone: '+7 900 100-01-01',
+    status: USER_STATUS.ACTIVE,
+    userGroupId: 'askona',
+    loyaltyCategoryId: 'silver',
+    qrCode: '048291',
+    allowsWebAccess: false,
+    wallets: {
+      dotation: { balance: 0, name: 'Дотация', allowedCategories: [] },
+    },
+  }),
+  createUserDoc({
+    id: 'demo-vld-petrov',
+    name: 'Петров Алексей Иванович',
+    email: 'petrov.vld@ifcm.demo',
+    role: ROLES.CLIENT,
+    balance: 100,
+    phone: '+7 900 100-02-02',
+    status: USER_STATUS.ACTIVE,
+    userGroupId: 'office_romashka',
+    loyaltyCategoryId: 'silver',
+    qrCode: '048292',
+    allowsWebAccess: false,
+    wallets: {
+        dotation: { balance: 100, name: 'Субсидия предприятия', allowedCategories: [] },
+    },
+  }),
+  createUserDoc({
+    id: 'demo-vld-sidorov',
+    name: 'Сидоров Николай Петрович',
+    email: 'sidorov.vld@ifcm.demo',
+    role: ROLES.CLIENT,
+    balance: 500,
+    phone: '+7 900 100-03-03',
+    status: USER_STATUS.ACTIVE,
+    userGroupId: 'production',
+    loyaltyCategoryId: 'bronze',
+    qrCode: '048293',
+    allowsWebAccess: false,
+    wallets: {
+      dotation: { balance: 500, name: 'Дотация', allowedCategories: [] },
+    },
+  }),
+];
+
+/**
+ * Seed demo validator cards, users and validation rules.
+ * Run from browser console: await seedValidatorDemo()
+ *
+ * @param {{ skipAuth?: boolean }} [opts]
+ */
+export async function seedValidatorDemo(opts = {}) {
+  const { skipAuth = false } = opts;
+
+  if (!skipAuth) {
+    await signInWithEmailAndPassword(auth, 'admin@ifcm.demo', STAFF_DEMO_PASSWORD).catch(async () => {
+      await signInWithEmailAndPassword(auth, 'manager@ifcm.demo', STAFF_DEMO_PASSWORD);
+    });
+  }
+
+  console.log('[seed] Validator demo users…');
+  for (const user of DEMO_VALIDATOR_CARD_USERS) {
+    await setDoc(doc(db, COL.USERS, user.id), user, { merge: true });
+  }
+
+  const itemsSnap = await getDocs(collection(db, COL.ITEMS));
+  const itemsByName = new Map(itemsSnap.docs.map(d => [d.data().name, d.id]));
+  const borschtId = itemsByName.get('Борщ с мясом') || '';
+  const kotletaId = itemsByName.get('Котлета с пюре') || '';
+  const mealItemIds = [borschtId, kotletaId].filter(Boolean);
+
+  const rules = [
+    normalizeValidationRuleDoc({
+      id: 'vld-demo-lunch-standard',
+      name: 'Ланч Стандарт (Подход №1)',
+      targetUserGroupIds: ['askona', 'production'],
+      availabilityRuleId: null,
+      approachLimit: 1,
+      approachInterval: 'day',
+      approachNumber: 1,
+      actionType: 'meal_set',
+      itemIds: mealItemIds,
+      isActive: true,
+    }, 'vld-demo-lunch-standard'),
+    normalizeValidationRuleDoc({
+      id: 'vld-demo-money-office',
+      name: 'Списание 300₽ (Офис)',
+      targetUserGroupIds: ['office_romashka'],
+      availabilityRuleId: null,
+      approachLimit: 99,
+      approachInterval: 'day',
+      approachNumber: 1,
+      actionType: 'money',
+      amount: 300,
+      walletId: 'dotation',
+      allowOverdraft: true,
+      isActive: true,
+    }, 'vld-demo-money-office'),
+    normalizeValidationRuleDoc({
+      id: 'vld-demo-weekdays-only',
+      name: 'Будни только',
+      targetUserGroupIds: ['production'],
+      scheduleTemplate: 'weekdays',
+      approachLimit: 1,
+      approachInterval: 'day',
+      approachNumber: 1,
+      actionType: 'pass_only',
+      isActive: true,
+    }, 'vld-demo-weekdays-only'),
+  ];
+
+  console.log('[seed] Validator demo rules…');
+  for (const rule of rules) {
+    const { id, ...payload } = buildValidationRulePayload(rule);
+    await setDoc(doc(db, COL.VALIDATION_RULES, id), payload, { merge: true });
+  }
+
+  if (!skipAuth) {
+    await signOut(auth).catch(() => {});
+  }
+
+  console.log(
+    '%c[seed] Validator demo ready!\n' +
+    'Карты: 048291 (Иванов), 048292 (Петров), 048293 (Сидоров)\n' +
+    'Терминал: npm run dev:validator → http://localhost:3007',
+    'color:#047857;font-weight:bold',
+  );
+
+  return { users: DEMO_VALIDATOR_CARD_USERS.length, rules: rules.length };
 }
 
 /**
@@ -352,6 +493,7 @@ const STAFF_ACCOUNTS = [
   { email: 'manager@ifcm.demo', name: 'Менеджер',        role: ROLES.MANAGER },
   { email: 'cashier@ifcm.demo', name: 'Кассир',          role: ROLES.CASHIER },
   { email: 'kiosk@ifcm.demo',   name: 'Киоск',           role: ROLES.CASHIER },
+  { email: 'queue@ifcm.demo',   name: 'Экран очереди',   role: ROLES.CASHIER },
 ];
 
 /**
@@ -381,9 +523,13 @@ export async function seedStaffAuth(password = STAFF_DEMO_PASSWORD) {
           const badPass = signInErr.code === 'auth/invalid-credential'
             || signInErr.code === 'auth/wrong-password';
           if (badPass) {
-            console.error(
+            const hint = acc.email === 'queue@ifcm.demo'
+              ? 'Экран очереди использует kiosk@ifcm.demo — этот аккаунт можно не трогать.\n'
+              : '';
+            console.warn(
               `[seed] ${acc.email} — аккаунт есть, но пароль не "${password}".\n` +
-              'Удалите пользователя в Firebase Console → Authentication → Users,\n' +
+              hint +
+              'Чтобы пересоздать: Firebase Console → Authentication → Users → удалить,\n' +
               'затем снова: await seedStaffAuth()',
             );
             continue;
@@ -429,7 +575,9 @@ export async function seedStaffAuth(password = STAFF_DEMO_PASSWORD) {
     console.log(
       '%c[seed] Staff accounts ready!\n' +
       'Kitchen login: cook@ifcm.demo / demo1234\n' +
+      'Validator: npm run dev:validator (port 3007)\n' +
       'Kiosk login: kiosk@ifcm.demo / demo1234\n' +
+      'Queue screen: queue@ifcm.demo / demo1234\n' +
       'Also: admin@ifcm.demo, manager@ifcm.demo, cashier@ifcm.demo\n' +
       'Перелогиньтесь в админке: admin@ifcm.demo / demo1234',
       'color:#1E1B4B;font-weight:bold',

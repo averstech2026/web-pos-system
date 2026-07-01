@@ -1,10 +1,16 @@
 import { formatAvailabilityRuleShort } from '../../shared/availability-rules.js';
 import {
   DEFAULT_MAINTENANCE_MESSAGE,
+  INTERNAL_CHANNEL_ROW_LABELS,
   SALES_CHANNEL_IDS,
+  SALES_CHANNEL_LIST_GROUPS,
   SALES_CHANNEL_ROUTING_MODES,
   SALES_CHANNEL_STATUS,
   SALES_CHANNEL_STATUS_OPTIONS,
+  getSalesChannelLaunchUrl,
+  SALES_CHANNEL_TERMINAL_INFO,
+  isInternalChannel,
+  isSalesPointChannel,
   normalizeSalesChannel,
   resolveSalesChannelRoutingMode,
   routingFlagsFromMode,
@@ -22,9 +28,22 @@ const SCH_ICON_KIOSK = `<svg xmlns="http://www.w3.org/2000/svg" width="20" heigh
 
 const SCH_ICON_WEB = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg>`;
 
+const SCH_ICON_KITCHEN = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.245-.025-.51-.08-.75a2.5 2.5 0 0 0-1.32-1.68C15.24 12.12 14.06 12 13 12H11c-1.06 0-2.24.12-3.6.62a2.5 2.5 0 0 0-1.32 1.68c-.055.24-.08.505-.08.75V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/><path d="M9 5.07A4 4 0 0 1 12 3a4 4 0 0 1 3 3.07"/><path d="M6 9h12"/></svg>`;
+
+const SCH_ICON_VALIDATOR = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10"/><path d="M7 12h6"/><path d="m16 16 2 2 4-4"/></svg>`;
+
+const SCH_ICON_DELIVERY = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 16h6v6H16z"/><path d="M2 16h6v6H2z"/><path d="M9 6h6l3 7H6l3-7Z"/><path d="M12 6V3"/></svg>`;
+
+const SCH_ICON_QUEUE = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10"/><path d="M7 13h10"/><path d="M7 17h6"/></svg>`;
+
 /** @param {string} channelId */
 function channelRowIcon(channelId) {
-  return channelId === SALES_CHANNEL_IDS.KIOSK ? SCH_ICON_KIOSK : SCH_ICON_WEB;
+  if (channelId === SALES_CHANNEL_IDS.KIOSK) return SCH_ICON_KIOSK;
+  if (channelId === SALES_CHANNEL_IDS.KITCHEN) return SCH_ICON_KITCHEN;
+  if (channelId === SALES_CHANNEL_IDS.DELIVERY) return SCH_ICON_DELIVERY;
+  if (channelId === SALES_CHANNEL_IDS.QUEUE) return SCH_ICON_QUEUE;
+  if (channelId === SALES_CHANNEL_IDS.VALIDATOR) return SCH_ICON_VALIDATOR;
+  return SCH_ICON_WEB;
 }
 
 /**
@@ -32,11 +51,13 @@ function channelRowIcon(channelId) {
  * @param {object} p
  * @param {import('../../shared/sales-channels.d.ts').SalesChannel[]} p.channels
  * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} [p.availabilityRules]
+ * @param {Array<{ id: string, name: string }>} [p.paymentMethods]
  * @param {() => void|Promise<void>} [p.onSaved]
  */
 export function createSalesChannelsEditor(host, {
   channels: initialChannels,
   availabilityRules = [],
+  paymentMethods = [],
   onSaved,
 }) {
   /** @type {import('../../shared/sales-channels.d.ts').SalesChannel[]} */
@@ -60,6 +81,7 @@ export function createSalesChannelsEditor(host, {
         sendToDelivery: ch.sendToDelivery,
         scheduleId: ch.scheduleId || null,
         maintenanceMessage: ch.maintenanceMessage || '',
+        allowedPaymentMethods: [...(ch.allowedPaymentMethods || [])].sort(),
       })).sort((a, b) => a.id.localeCompare(b.id)),
     );
   }
@@ -95,12 +117,6 @@ export function createSalesChannelsEditor(host, {
     return channel.status === SALES_CHANNEL_STATUS.HIDDEN;
   }
 
-  function partitionChannelsForList() {
-    const active = channels.filter(ch => !isChannelHidden(ch));
-    const hidden = channels.filter(ch => isChannelHidden(ch));
-    return { active, hidden };
-  }
-
   function renderHiddenChannelsDivider(count) {
     if (count <= 0) return '';
     return `
@@ -110,13 +126,35 @@ export function createSalesChannelsEditor(host, {
     `;
   }
 
+  function renderGroupHeader(group) {
+    return `
+      <li class="sch-list-group-head" aria-hidden="true">
+        <span class="sch-list-group-title">${esc(group.label)}</span>
+        <span class="sch-list-group-hint">${esc(group.hint)}</span>
+      </li>
+    `;
+  }
+
   function renderListItemsHtml() {
-    const { active, hidden } = partitionChannelsForList();
-    return [
-      ...active.map(ch => renderRow(ch)),
-      renderHiddenChannelsDivider(hidden.length),
-      ...hidden.map(ch => renderRow(ch)),
-    ].join('');
+    const byId = new Map(channels.map(ch => [ch.id, ch]));
+    const parts = [];
+
+    for (const group of SALES_CHANNEL_LIST_GROUPS) {
+      const visible = group.channelIds
+        .map(id => byId.get(id))
+        .filter(ch => ch && !isChannelHidden(ch));
+      if (!visible.length) continue;
+      parts.push(renderGroupHeader(group));
+      parts.push(...visible.map(ch => renderRow(ch)));
+    }
+
+    const hidden = channels.filter(ch => isChannelHidden(ch));
+    if (hidden.length) {
+      parts.push(renderHiddenChannelsDivider(hidden.length));
+      parts.push(...hidden.map(ch => renderRow(ch)));
+    }
+
+    return parts.join('');
   }
 
   function refreshListOrder() {
@@ -180,6 +218,10 @@ export function createSalesChannelsEditor(host, {
 
   /** @param {import('../../shared/sales-channels.d.ts').SalesChannel} channel */
   function routingIndicatorsHtml(channel) {
+    if (isInternalChannel(channel.id)) {
+      const label = INTERNAL_CHANNEL_ROW_LABELS[channel.id] || 'Терминал';
+      return `<span class="sch-row-tag">${esc(label)}</span>`;
+    }
     return `${routingBadgeHtml('kitchen', channel)}${routingBadgeHtml('delivery', channel)}`;
   }
 
@@ -214,16 +256,30 @@ export function createSalesChannelsEditor(host, {
     const panel = host.querySelector('#sch-detail-panel');
     if (!selectedId || !panel) return;
 
-    const prevStatus = channels.find(ch => ch.id === selectedId)?.status;
+    const current = channels.find(ch => ch.id === selectedId);
+    const prevStatus = current?.status;
     const name = panel.querySelector('[data-field="name"]')?.value.trim() || '';
     const status = panel.querySelector('[data-sch-status].period-tab--active')?.dataset.schStatus
       || SALES_CHANNEL_STATUS.ACTIVE;
-    const routingMode = panel.querySelector('[data-sch-routing-mode].period-tab--active')?.dataset.schRoutingMode
-      || 'everywhere';
-    const { sendToKitchen, sendToDelivery } = routingFlagsFromMode(routingMode);
+
+    let sendToKitchen;
+    let sendToDelivery;
+    if (isInternalChannel(selectedId)) {
+      sendToKitchen = current?.sendToKitchen ?? false;
+      sendToDelivery = current?.sendToDelivery ?? false;
+    } else {
+      const routingMode = panel.querySelector('[data-sch-routing-mode].period-tab--active')?.dataset.schRoutingMode
+        || 'everywhere';
+      ({ sendToKitchen, sendToDelivery } = routingFlagsFromMode(routingMode));
+    }
+
     const scheduleRaw = panel.querySelector('[data-field="schedule-id"]')?.value || '';
     const scheduleId = scheduleRaw ? scheduleRaw : null;
     const maintenanceMessage = panel.querySelector('[data-field="maintenance-message"]')?.value.trim() || '';
+    const allowedPaymentMethods = isSalesPointChannel(selectedId)
+      ? [...panel.querySelectorAll('[data-sch-payment-method]:checked')]
+        .map(el => el.dataset.schPaymentMethod)
+      : [];
 
     channels = channels.map(ch => (
       ch.id === selectedId
@@ -235,6 +291,7 @@ export function createSalesChannelsEditor(host, {
           sendToDelivery,
           scheduleId,
           maintenanceMessage,
+          allowedPaymentMethods,
         }
         : ch
     ));
@@ -345,7 +402,9 @@ export function createSalesChannelsEditor(host, {
           placeholder="${escAttr(DEFAULT_MAINTENANCE_MESSAGE)}"
         >${esc(channel.maintenanceMessage || '')}</textarea>
         <p class="sch-fieldset__hint">
-          Отображается на киоске и в веб-приложении, когда канал отключён или вне расписания.
+          ${isInternalChannel(channel.id)
+    ? 'Отображается на терминале, когда канал отключён или вне расписания.'
+    : 'Отображается на киоске, валидаторе и в веб-приложении, когда канал отключён или вне расписания.'}
         </p>
       </div>
     `;
@@ -364,7 +423,74 @@ export function createSalesChannelsEditor(host, {
   }
 
   /** @param {import('../../shared/sales-channels.d.ts').SalesChannel} channel */
+  function renderPaymentMethodsSection(channel) {
+    if (!isSalesPointChannel(channel.id)) return '';
+    const selected = new Set(channel.allowedPaymentMethods || []);
+    if (!paymentMethods.length) {
+      return `
+        <div class="sch-fieldset">
+          <span class="sch-fieldset__legend">Способы оплаты</span>
+          <p class="sch-fieldset__hint">Справочник способов оплаты пуст. Добавьте типы в разделе «Платежи».</p>
+        </div>
+      `;
+    }
+    return `
+      <div class="sch-fieldset" id="sch-payments-section">
+        <span class="sch-fieldset__legend">Способы оплаты</span>
+        <p class="sch-fieldset__hint">Какие типы платежей доступны клиенту в этом канале продаж.</p>
+        <div class="lnc-sales-points">
+          ${paymentMethods.map(method => `
+            <label class="admin-pill-check">
+              <input
+                type="checkbox"
+                class="admin-pill-check__input"
+                data-sch-payment-method="${escAttr(method.id)}"
+                ${selected.has(method.id) ? 'checked' : ''}
+              />
+              <span class="admin-pill-check__box" aria-hidden="true"></span>
+              <span class="admin-pill-check__label">${esc(method.name)}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  /** @param {import('../../shared/sales-channels.d.ts').SalesChannel} channel */
+  function renderTerminalLaunchSection(channel) {
+    const info = SALES_CHANNEL_TERMINAL_INFO[channel.id];
+    const url = getSalesChannelLaunchUrl(channel.id);
+    if (!info || !url) return '';
+    return `
+      <div class="sch-fieldset sch-terminal-launch">
+        <span class="sch-fieldset__legend">Запуск терминала</span>
+        <p class="sch-fieldset__hint">Откройте интерфейс канала в браузере по публичному адресу.</p>
+        <a class="btn btn-outline btn-press sch-terminal-link" href="${escAttr(url)}" target="_blank" rel="noopener noreferrer">
+          ${esc(info.label)} → ${esc(url)}
+        </a>
+      </div>
+    `;
+  }
+
+  /** @param {import('../../shared/sales-channels.d.ts').SalesChannel} channel */
+  function renderChannelKindBanner(channel) {
+    if (isInternalChannel(channel.id)) {
+      return `
+        <p class="sch-kind-note">
+          Внутренний интерфейс · без продаж · только для персонала
+        </p>
+      `;
+    }
+    return `
+      <p class="sch-kind-note">
+        Канал продаж · интерфейс для клиента · настраивается маршрутизация заказов
+      </p>
+    `;
+  }
+
+  /** @param {import('../../shared/sales-channels.d.ts').SalesChannel} channel */
   function renderDetailPanel(channel) {
+    const showRouting = isSalesPointChannel(channel.id);
     return `
       <div class="avr-detail-panel" id="sch-detail-panel">
         ${renderAvrDetailStickyHead({
@@ -376,6 +502,7 @@ export function createSalesChannelsEditor(host, {
         })}
         <div class="avr-detail-body sch-detail-body">
           <div class="admin-form-stack">
+            ${renderChannelKindBanner(channel)}
             <div class="admin-field-block">
               <label class="admin-field-label" for="sch-name">Название канала</label>
               <input
@@ -389,7 +516,9 @@ export function createSalesChannelsEditor(host, {
               />
             </div>
             ${renderAvailabilitySection(channel)}
-            ${renderRoutingSection(channel)}
+            ${showRouting ? renderRoutingSection(channel) : ''}
+            ${renderPaymentMethodsSection(channel)}
+            ${renderTerminalLaunchSection(channel)}
             ${renderScheduleSection(channel)}
             ${renderMaintenanceSection(channel)}
             <p class="alr-detail-id">ID: <code>${esc(channel.id)}</code></p>
@@ -410,7 +539,7 @@ export function createSalesChannelsEditor(host, {
       <div class="avr-detail-empty">
         <span class="avr-detail-empty-icon" aria-hidden="true">📡</span>
         <p class="avr-detail-empty-title">Выберите канал продаж</p>
-        <p class="avr-detail-empty-hint">Выберите канал из списка слева, чтобы настроить маршрутизацию заказов и доступность.</p>
+        <p class="avr-detail-empty-hint">Выберите канал продаж или внутренний интерфейс из списка слева.</p>
       </div>
     `;
   }
@@ -421,7 +550,7 @@ export function createSalesChannelsEditor(host, {
       <div class="avr-layout sch-layout">
         <div class="avr-master">
           <div class="avr-master-head">
-            <h2 class="avr-master-title">Каналы продаж (${channels.length})</h2>
+            <h2 class="avr-master-title">Точки и интерфейсы (${channels.length})</h2>
           </div>
           <ul class="avr-list" id="sch-list">${renderListItemsHtml()}</ul>
         </div>
@@ -447,6 +576,10 @@ export function createSalesChannelsEditor(host, {
     if (!channel) return false;
     if (!channel.name?.trim()) {
       showError('Укажите название канала');
+      return false;
+    }
+    if (isSalesPointChannel(channel.id) && !channel.allowedPaymentMethods?.length) {
+      showError('Выберите хотя бы один способ оплаты');
       return false;
     }
 
@@ -502,7 +635,7 @@ export function createSalesChannelsEditor(host, {
       if (e.target.matches('[data-field="name"], [data-field="maintenance-message"]')) syncPanel();
     });
     panel?.addEventListener('change', e => {
-      if (e.target.matches('[data-field="schedule-id"]')) {
+      if (e.target.matches('[data-field="schedule-id"], [data-sch-payment-method]')) {
         syncPanel();
       }
     });

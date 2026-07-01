@@ -877,6 +877,7 @@
       transform-origin: top left;
     }
     #kiosk-wrapper { opacity: 0; }
+    body.kiosk-booting #kiosk-wrapper,
     body.kiosk-ready #kiosk-wrapper { opacity: 1; }
     .modal-panel {
       width: 900px;

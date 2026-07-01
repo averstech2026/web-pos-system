@@ -2,7 +2,7 @@ import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
-/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'modifiers' | 'lunches' | 'allergens' | 'data-import' | 'schedules' | 'calendar' | 'marketing' | 'marketing-banners' | 'payments' | 'sales-channels' | 'users' | 'crm-groups' | 'crm-loyalty' | 'crm-wallets' | 'reports'} AdminSection */
+/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'modifiers' | 'lunches' | 'allergens' | 'data-import' | 'schedules' | 'calendar' | 'marketing' | 'marketing-banners' | 'payments' | 'sales-channels' | 'users' | 'crm-groups' | 'work-shifts' | 'crm-loyalty' | 'crm-wallets' | 'reports' | 'validation-rules'} AdminSection */
 
 /** @type {Record<string, string>} */
 const NAV_ICONS = {
@@ -44,6 +44,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'users', path: '/users', label: 'Клиенты' },
       { id: 'crm-groups', path: '/crm-groups', label: 'Группы клиентов' },
+      { id: 'work-shifts', path: '/work-shifts', label: 'Рабочие смены' },
       { id: 'crm-loyalty', path: '/crm-loyalty', label: 'Категории лояльности' },
     ],
   },
@@ -53,6 +54,7 @@ const NAV_GROUPS = [
     icon: 'wallet',
     items: [
       { id: 'crm-wallets', path: '/crm-wallets', label: 'Кошельки' },
+      { id: 'validation-rules', path: '/validation-rules', label: 'Правила валидации' },
       { id: 'payments', path: '/payments', label: 'Платежи' },
       { id: 'marketing', path: '/marketing', label: 'Конструктор акций' },
       { id: 'marketing-banners', path: '/marketing-banners', label: 'Баннеры' },
@@ -65,7 +67,7 @@ const NAV_GROUPS = [
     items: [
       { id: 'schedules', path: '/schedules', label: 'Расписания' },
       { id: 'calendar', path: '/calendar', label: 'Календарь дней' },
-      { id: 'sales-channels', path: '/sales-channels', label: 'Каналы продаж' },
+      { id: 'sales-channels', path: '/sales-channels', label: 'Точки и интерфейсы' },
       { id: 'reports', path: '/reports', label: 'Отчёты' },
       { id: 'data-import', path: '/data-import', label: 'Импорт данных' },
     ],

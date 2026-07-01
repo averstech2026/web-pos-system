@@ -1,6 +1,7 @@
 import { bindAdminShell, renderAdminShell } from '../components/layout.js';
 import { createUserGroupsEditor } from '../components/user-groups-editor.js';
 import { ensureDefaultCrmRefs, fetchUserGroups } from '../services/crm-ref-data.js';
+import { ensureDefaultWallets, fetchWallets } from '../services/wallets-data.js';
 
 export class CrmUserGroupsPage {
   constructor(container, navigate) {
@@ -21,8 +22,11 @@ export class CrmUserGroupsPage {
     this.loading = true;
     this.renderShell();
     try {
-      await ensureDefaultCrmRefs();
-      this.groups = await fetchUserGroups();
+      await Promise.all([ensureDefaultCrmRefs(), ensureDefaultWallets()]);
+      [this.groups, this.wallets] = await Promise.all([
+        fetchUserGroups(),
+        fetchWallets(),
+      ]);
       this.error = null;
     } catch (err) {
       console.error('[crm-groups]', err);
@@ -57,6 +61,7 @@ export class CrmUserGroupsPage {
     if (!host) return;
     this.editor = createUserGroupsEditor(host, {
       groups: this.groups,
+      wallets: this.wallets,
       onSaved: () => this.loadData(),
     });
   }

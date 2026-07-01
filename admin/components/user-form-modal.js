@@ -29,6 +29,9 @@ import {
   walletOpSign,
 } from '../utils/user-format.js';
 import { showToast } from '../utils/toast.js';
+import { fetchValidationLogs, fetchUserApproachStats } from '../services/validation-logs-data.js';
+import { fetchAllValidationRules } from '../services/validation-rules-data.js';
+import { DEFAULT_WORK_SHIFT_ID } from '../../shared/work-shifts.js';
 
 const STATUS_OPTIONS = [
   { id: USER_STATUS.ACTIVE, label: 'Активен' },
@@ -41,12 +44,14 @@ const TABS = [
   { id: 'wallets', label: 'Кошельки' },
   { id: 'history', label: 'Операции' },
   { id: 'orders', label: 'Заказы' },
+  { id: 'passes', label: 'История проходов и дотаций' },
 ];
 
 /**
  * @param {object} p
  * @param {object|null} p.user null = create mode
  * @param {Array<object>} p.groups
+ * @param {Array<object>} p.workShifts
  * @param {Array<object>} p.loyaltyCategories
  * @param {Array<object>} p.allergens
  * @param {() => void|Promise<void>} p.onSaved
@@ -54,6 +59,7 @@ const TABS = [
 export function openUserFormModal({
   user: initialUser,
   groups,
+  workShifts = [],
   loyaltyCategories,
   allergens,
   onSaved,
@@ -73,6 +79,7 @@ export function openUserFormModal({
       activeFrom: '',
       activeTo: '',
       userGroupId: '',
+      shiftId: DEFAULT_WORK_SHIFT_ID,
       loyaltyCategoryId: '',
       qrCode: generateQrCodeValue(),
       allergens: [],
@@ -88,6 +95,10 @@ export function openUserFormModal({
   let walletHistory = [];
   /** @type {Array<object>} */
   let userOrders = [];
+  /** @type {Array<object>} */
+  let validationLogs = [];
+  /** @type {Array<object>} */
+  let approachStats = [];
   /** @type {string[]} */
   let historyWalletFilters = [];
   let historyWalletDropdownOpen = false;
@@ -115,6 +126,7 @@ export function openUserFormModal({
     draft.activeFrom = root.querySelector('[data-field="activeFrom"]')?.value || '';
     draft.activeTo = root.querySelector('[data-field="activeTo"]')?.value || '';
     draft.userGroupId = root.querySelector('[data-field="userGroupId"]')?.value || '';
+    draft.shiftId = root.querySelector('[data-field="shiftId"]')?.value || DEFAULT_WORK_SHIFT_ID;
     draft.loyaltyCategoryId = root.querySelector('[data-field="loyaltyCategoryId"]')?.value || '';
     draft.qrCode = root.querySelector('[data-field="qrCode"]')?.value.trim() || '';
     draft.allowsWebAccess = root.querySelector('[data-field="allowsWebAccess"]')?.checked ?? true;
@@ -139,6 +151,16 @@ export function openUserFormModal({
     try {
       if (tab === 'history') walletHistory = await fetchWalletHistory(draft.id);
       if (tab === 'orders') userOrders = await fetchUserOrders(draft.id);
+      if (tab === 'passes') {
+        const rules = await fetchAllValidationRules();
+        const userRules = rules.filter(r =>
+          r.isActive && (!r.targetUserGroupIds.length || r.targetUserGroupIds.includes(draft.userGroupId)),
+        );
+        [validationLogs, approachStats] = await Promise.all([
+          fetchValidationLogs({ userId: draft.id, limitCount: 100 }),
+          fetchUserApproachStats(draft.id, userRules, new Date(), draft, workShifts),
+        ]);
+      }
     } catch (err) {
       showToast(err.message || 'Не удалось загрузить данные');
     } finally {
@@ -235,6 +257,16 @@ export function openUserFormModal({
                 `).join('')}
               </select>
             </label>
+            <label class="ufm-field">
+              <span class="ufm-label">Рабочая смена</span>
+              <select class="ufm-input" data-field="shiftId">
+                ${workShifts.length
+                  ? workShifts.map(s => `
+                    <option value="${escAttr(s.id)}" ${(draft.shiftId || DEFAULT_WORK_SHIFT_ID) === s.id ? 'selected' : ''}>${esc(s.name)}</option>
+                  `).join('')
+                  : `<option value="${escAttr(DEFAULT_WORK_SHIFT_ID)}">Стандарт 5/2</option>`}
+              </select>
+            </label>
           </div>
         </section>
 
@@ -302,9 +334,9 @@ export function openUserFormModal({
             <article class="ufm-wallet-card card">
               <h4 class="ufm-wallet-name">${esc(w.name)}</h4>
               <p class="ufm-wallet-balance">${fmtMoney(w.balance)}</p>
-              ${w.restrictions?.length
-                ? `<p class="ufm-wallet-meta">Ограничения: ${w.restrictions.map(r => esc(r)).join(', ')}</p>`
-                : '<p class="ufm-wallet-meta ufm-muted">Без ограничений</p>'}
+              ${w.allowedCategories?.length
+                ? `<p class="ufm-wallet-meta">Разрешено категорий: ${w.allowedCategories.length}</p>`
+                : '<p class="ufm-wallet-meta ufm-muted">Все категории</p>'}
               <div class="ufm-wallet-actions">
                 <button type="button" class="btn btn-outline btn-press ufm-wallet-btn" data-wallet-op="${escAttr(id)}" data-op-type="deposit">Пополнить</button>
                 <button type="button" class="btn btn-outline btn-press ufm-wallet-btn" data-op-type="withdraw" data-wallet-op="${escAttr(id)}">Списать</button>
@@ -457,6 +489,58 @@ export function openUserFormModal({
     `;
   }
 
+  function renderPassesTab() {
+    if (isCreate) return '<p class="ufm-muted ufm-empty">Нет проходов</p>';
+    if (tabLoading) return '<div class="admin-loading">Загрузка проходов…</div>';
+
+    const statsHtml = approachStats.length
+      ? `<div class="ufm-passes-stats">
+          ${approachStats.map(s => `
+            <div class="ufm-passes-stat">
+              <div class="ufm-passes-stat__label">${esc(s.ruleName)}</div>
+              <div class="ufm-passes-stat__value">${s.remaining} / ${s.limit}</div>
+              <div class="ufm-muted">осталось сегодня</div>
+            </div>
+          `).join('')}
+        </div>`
+      : '<p class="ufm-muted">Нет активных лимитов для группы клиента</p>';
+
+    if (!validationLogs.length) {
+      return `${statsHtml}<p class="ufm-muted ufm-empty">Проходов по пропуску пока нет</p>`;
+    }
+
+    return `
+      ${statsHtml}
+      <div class="ufm-table-wrap">
+        <table class="ufm-table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Точка</th>
+              <th>Правило</th>
+              <th>Статус</th>
+              <th>Детали</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${validationLogs.map(log => {
+              const ok = log.status === 'success';
+              return `
+                <tr>
+                  <td>${fmtOrderDateTime(log.createdAt)}</td>
+                  <td>${esc(log.channelPoint || '—')}</td>
+                  <td>${esc(log.ruleName || '—')}</td>
+                  <td><span class="vld-log-status ${ok ? 'vld-log-status--success' : 'vld-log-status--denied'}">${ok ? 'Успешно' : 'Отказ'}</span></td>
+                  <td>${esc(ok ? (log.deductionSummary || '—') : (log.denyReason || '—'))}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
   function renderOrdersTab() {
     if (isCreate) return '<p class="ufm-muted ufm-empty">Нет заказов</p>';
     if (tabLoading) return '<div class="admin-loading">Загрузка заказов…</div>';
@@ -504,7 +588,9 @@ export function openUserFormModal({
         ? renderWalletsTab()
         : activeTab === 'history'
           ? renderHistoryTab()
-          : renderOrdersTab();
+          : activeTab === 'passes'
+            ? renderPassesTab()
+            : renderOrdersTab();
 
     body.innerHTML = content;
 
@@ -593,6 +679,7 @@ export function openUserFormModal({
       activeFrom: draft.status === USER_STATUS.ACTIVE ? (draft.activeFrom || null) : null,
       activeTo: draft.status === USER_STATUS.ACTIVE ? (draft.activeTo || null) : null,
       userGroupId: draft.userGroupId || null,
+      shiftId: draft.shiftId || DEFAULT_WORK_SHIFT_ID,
       loyaltyCategoryId: draft.loyaltyCategoryId || null,
       qrCode: draft.qrCode,
       allergens: draft.allergens,
@@ -673,7 +760,7 @@ export function openUserFormModal({
         b.classList.toggle('crm-tab--active', b.dataset.tab === tab);
         b.setAttribute('aria-selected', String(b.dataset.tab === tab));
       });
-      if (tab === 'history' || tab === 'orders') loadTabData(tab);
+      if (tab === 'history' || tab === 'orders' || tab === 'passes') loadTabData(tab);
       else renderBody();
       updateFooterSaveBtn();
       return;

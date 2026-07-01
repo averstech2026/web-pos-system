@@ -6,23 +6,164 @@ export const SALES_CHANNEL_STATUS = {
   HIDDEN: 'hidden',
 };
 
-/** Fixed sales channel ids — align with ORDER_SOURCE */
+/** Fixed sales channel ids — align with ORDER_SOURCE where applicable */
 export const SALES_CHANNEL_IDS = {
   KIOSK: ORDER_SOURCE.KIOSK,
   WEB: ORDER_SOURCE.WEB,
+  KITCHEN: 'kitchen',
+  DELIVERY: 'delivery',
+  QUEUE: 'queue',
+  VALIDATOR: 'validator',
 };
 
-/** @type {Array<{ id: string, name: string, shortName: string }>} */
+/** @typedef {'sales'|'internal'} SalesChannelKind */
+
+export const SALES_CHANNEL_KIND = {
+  SALES: 'sales',
+  INTERNAL: 'internal',
+};
+
+/** User-facing channels with order routing */
+export const SALES_POINT_CHANNEL_IDS = [
+  SALES_CHANNEL_IDS.KIOSK,
+  SALES_CHANNEL_IDS.VALIDATOR,
+  SALES_CHANNEL_IDS.WEB,
+];
+
+/** Staff terminals — no sales, no order routing */
+export const INTERNAL_CHANNEL_IDS = [
+  SALES_CHANNEL_IDS.KITCHEN,
+  SALES_CHANNEL_IDS.DELIVERY,
+  SALES_CHANNEL_IDS.QUEUE,
+];
+
+/** @deprecated use INTERNAL_CHANNEL_IDS */
+export const STAFF_TERMINAL_CHANNEL_IDS = INTERNAL_CHANNEL_IDS;
+
+/** Row tag labels for internal interfaces */
+export const INTERNAL_CHANNEL_ROW_LABELS = {
+  [SALES_CHANNEL_IDS.KITCHEN]: 'Терминал кухни',
+  [SALES_CHANNEL_IDS.DELIVERY]: 'Терминал выдачи',
+  [SALES_CHANNEL_IDS.QUEUE]: 'Экран очереди',
+};
+
+/** @deprecated */
+export const STAFF_TERMINAL_ROW_LABELS = INTERNAL_CHANNEL_ROW_LABELS;
+
+/** List grouping in admin «Каналы продаж» */
+export const SALES_CHANNEL_LIST_GROUPS = [
+  {
+    id: SALES_CHANNEL_KIND.SALES,
+    label: 'Каналы продаж',
+    hint: 'Интерфейс для клиента · маршрутизация заказов',
+    channelIds: SALES_POINT_CHANNEL_IDS,
+  },
+  {
+    id: SALES_CHANNEL_KIND.INTERNAL,
+    label: 'Внутренние интерфейсы',
+    hint: 'Терминалы персонала · без продаж',
+    channelIds: INTERNAL_CHANNEL_IDS,
+  },
+];
+
+/** @param {string} channelId @returns {SalesChannelKind} */
+export function getSalesChannelKind(channelId) {
+  return INTERNAL_CHANNEL_IDS.includes(channelId)
+    ? SALES_CHANNEL_KIND.INTERNAL
+    : SALES_CHANNEL_KIND.SALES;
+}
+
+/** @param {string} channelId */
+export function isInternalChannel(channelId) {
+  return INTERNAL_CHANNEL_IDS.includes(channelId);
+}
+
+/** @param {string} channelId */
+export function isSalesPointChannel(channelId) {
+  return SALES_POINT_CHANNEL_IDS.includes(channelId);
+}
+
+/** @param {string} channelId */
+export function isStaffTerminalChannel(channelId) {
+  return isInternalChannel(channelId);
+}
+
+/** Public GitHub Pages base for terminal launch links in admin */
+export const SALES_CHANNEL_PUBLIC_BASE = 'https://averstech2026.github.io/web-pos-system';
+
+/** Launch info shown in admin channel settings */
+export const SALES_CHANNEL_TERMINAL_INFO = {
+  [SALES_CHANNEL_IDS.KIOSK]: { slug: 'kiosk', label: 'Открыть киоск' },
+  [SALES_CHANNEL_IDS.WEB]: { slug: 'client-lk', label: 'Открыть веб-витрину' },
+  [SALES_CHANNEL_IDS.KITCHEN]: { slug: 'kitchen-terminal', label: 'Открыть кухонный монитор' },
+  [SALES_CHANNEL_IDS.DELIVERY]: { slug: 'delivery-terminal', label: 'Открыть монитор выдачи' },
+  [SALES_CHANNEL_IDS.QUEUE]: { slug: 'queue-screen', label: 'Открыть экран очереди' },
+  [SALES_CHANNEL_IDS.VALIDATOR]: { slug: 'validator-terminal', label: 'Открыть валидатор' },
+};
+
+/** @param {string} channelId */
+export function getSalesChannelLaunchUrl(channelId) {
+  const info = SALES_CHANNEL_TERMINAL_INFO[channelId];
+  if (!info?.slug) return null;
+  return `${SALES_CHANNEL_PUBLIC_BASE}/${info.slug}/`;
+}
+
+/** Default payment methods per sales channel (payment_methods ids) */
+export const DEFAULT_SALES_CHANNEL_PAYMENT_METHODS = {
+  [SALES_CHANNEL_IDS.KIOSK]: ['card', 'internal'],
+  [SALES_CHANNEL_IDS.WEB]: ['card', 'internal'],
+  [SALES_CHANNEL_IDS.VALIDATOR]: ['internal'],
+};
+
+/** @param {object} raw @param {string} channelId */
+export function normalizeAllowedPaymentMethods(raw, channelId) {
+  if (!isSalesPointChannel(channelId)) return [];
+  if (Array.isArray(raw?.allowedPaymentMethods)) {
+    return [...new Set(raw.allowedPaymentMethods.map(String).filter(Boolean))];
+  }
+  return [...(DEFAULT_SALES_CHANNEL_PAYMENT_METHODS[channelId] || ['cash', 'card', 'internal'])];
+}
+
+/** @type {Array<{ id: string, name: string, shortName: string, sendToKitchen?: boolean, sendToDelivery?: boolean, allowedPaymentMethods?: string[] }>} */
 export const DEFAULT_SALES_CHANNELS = [
   {
     id: SALES_CHANNEL_IDS.KIOSK,
     name: 'Информационный киоск',
     shortName: 'Киоск',
+    allowedPaymentMethods: DEFAULT_SALES_CHANNEL_PAYMENT_METHODS[SALES_CHANNEL_IDS.KIOSK],
+  },
+  {
+    id: SALES_CHANNEL_IDS.VALIDATOR,
+    name: 'Терминал валидатора',
+    shortName: 'Валидатор',
+    allowedPaymentMethods: DEFAULT_SALES_CHANNEL_PAYMENT_METHODS[SALES_CHANNEL_IDS.VALIDATOR],
   },
   {
     id: SALES_CHANNEL_IDS.WEB,
     name: 'Веб-витрина (Сайт/Приложение)',
     shortName: 'Веб-витрина',
+    allowedPaymentMethods: DEFAULT_SALES_CHANNEL_PAYMENT_METHODS[SALES_CHANNEL_IDS.WEB],
+  },
+  {
+    id: SALES_CHANNEL_IDS.KITCHEN,
+    name: 'Кухонный монитор',
+    shortName: 'Кухня',
+    sendToKitchen: true,
+    sendToDelivery: false,
+  },
+  {
+    id: SALES_CHANNEL_IDS.DELIVERY,
+    name: 'Монитор выдачи',
+    shortName: 'Выдача',
+    sendToKitchen: false,
+    sendToDelivery: true,
+  },
+  {
+    id: SALES_CHANNEL_IDS.QUEUE,
+    name: 'Экран очереди',
+    shortName: 'Очередь',
+    sendToKitchen: false,
+    sendToDelivery: false,
   },
 ];
 
@@ -89,22 +230,37 @@ export function salesChannelRoutingModeLabel(mode) {
  */
 export function normalizeSalesChannel(raw, fallbackId = '') {
   const def = DEFAULT_SALES_CHANNELS.find(c => c.id === (raw.id || fallbackId));
+  const channelId = raw.id || fallbackId;
   const status = raw.status === SALES_CHANNEL_STATUS.HIDDEN
     ? SALES_CHANNEL_STATUS.HIDDEN
     : SALES_CHANNEL_STATUS.ACTIVE;
-  const name = String(raw.name ?? '').trim() || def?.name || raw.id || 'Канал';
+  const name = String(raw.name ?? '').trim() || def?.name || channelId || 'Канал';
   const scheduleId = raw.scheduleId ? String(raw.scheduleId).trim() : null;
   const maintenanceMessage = String(raw.maintenanceMessage ?? '').trim();
 
+  const isInternal = isInternalChannel(channelId);
+  let sendToKitchen = isInternal && def?.sendToKitchen !== undefined
+    ? def.sendToKitchen
+    : raw.sendToKitchen !== false;
+  let sendToDelivery = isInternal && def?.sendToDelivery !== undefined
+    ? def.sendToDelivery
+    : raw.sendToDelivery !== false;
+
+  if (!isInternal && sendToKitchen === false && sendToDelivery === false) {
+    sendToKitchen = true;
+    sendToDelivery = true;
+  }
+
   return {
-    id: raw.id || fallbackId,
+    id: channelId,
     name,
     shortName: String(raw.shortName ?? '').trim() || def?.shortName || name,
     status,
-    sendToKitchen: raw.sendToKitchen !== false,
-    sendToDelivery: raw.sendToDelivery !== false,
+    sendToKitchen,
+    sendToDelivery,
     scheduleId: scheduleId || null,
     maintenanceMessage,
+    allowedPaymentMethods: normalizeAllowedPaymentMethods(raw, channelId),
   };
 }
 
@@ -116,7 +272,7 @@ export function resolveMaintenanceMessage(channel) {
 /** Plain object for Firestore — always includes editable fields. */
 export function toPersistedSalesChannel(raw, fallbackId = '') {
   const n = normalizeSalesChannel(raw, fallbackId);
-  return {
+  const payload = {
     id: n.id,
     name: n.name,
     shortName: n.shortName,
@@ -126,6 +282,10 @@ export function toPersistedSalesChannel(raw, fallbackId = '') {
     scheduleId: n.scheduleId,
     maintenanceMessage: n.maintenanceMessage,
   };
+  if (isSalesPointChannel(n.id)) {
+    payload.allowedPaymentMethods = n.allowedPaymentMethods;
+  }
+  return payload;
 }
 
 /** @returns {import('./sales-channels.d.ts').SalesChannel[]} */
@@ -135,10 +295,11 @@ export function createDefaultSalesChannels() {
     name: def.name,
     shortName: def.shortName,
     status: SALES_CHANNEL_STATUS.ACTIVE,
-    sendToKitchen: true,
-    sendToDelivery: true,
+    sendToKitchen: def.sendToKitchen !== undefined ? def.sendToKitchen : true,
+    sendToDelivery: def.sendToDelivery !== undefined ? def.sendToDelivery : true,
     scheduleId: null,
     maintenanceMessage: '',
+    allowedPaymentMethods: def.allowedPaymentMethods,
   }));
 }
 

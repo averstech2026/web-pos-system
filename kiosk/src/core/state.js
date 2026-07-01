@@ -19,5 +19,6 @@ const state = {
   voiceChoice: null,
   voiceListening: false,
   compositeSelections: {},
+};
 
 export { state };

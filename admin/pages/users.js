@@ -3,6 +3,7 @@ import { openBulkWalletOperationModal } from '../components/bulk-wallet-operatio
 import { openUserFormModal } from '../components/user-form-modal.js';
 import { ensureDefaultCrmRefs, fetchLoyaltyCategories, fetchUserGroups } from '../services/crm-ref-data.js';
 import { bulkUpdateCrmUsers, fetchCrmUsers, filterCrmUsers } from '../services/users-data.js';
+import { ensureWorkShiftsMigration, fetchWorkShifts } from '../services/work-shifts-data.js';
 import { fetchMenuSettings } from '../services/menu-settings-data.js';
 import { ensureDefaultWallets, fetchWallets } from '../services/wallets-data.js';
 import { fmtCount, fmtMoney } from '../utils/format.js';
@@ -13,6 +14,7 @@ import {
   userStatusLabel,
 } from '../utils/user-format.js';
 import { showToast } from '../utils/toast.js';
+import { DEFAULT_WORK_SHIFT_ID } from '../../shared/work-shifts.js';
 import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
 
 export class UsersPage {
@@ -21,6 +23,7 @@ export class UsersPage {
     this.navigate = navigate;
     this.users = [];
     this.groups = [];
+    this.workShifts = [];
     this.loyaltyCategories = [];
     this.wallets = [];
     this.allergens = [];
@@ -56,19 +59,23 @@ export class UsersPage {
     try {
       await ensureDefaultCrmRefs();
       await ensureDefaultWallets();
-      const [users, groups, loyaltyCategories, menuSettings, wallets] = await Promise.all([
+      await ensureWorkShiftsMigration();
+      const [users, groups, loyaltyCategories, menuSettings, wallets, workShifts] = await Promise.all([
         fetchCrmUsers(),
         fetchUserGroups(),
         fetchLoyaltyCategories(),
         fetchMenuSettings([]),
         fetchWallets(),
+        fetchWorkShifts(),
       ]);
       this.users = users;
       this.groups = groups;
+      this.workShifts = workShifts;
       this.loyaltyCategories = loyaltyCategories;
       this.wallets = wallets;
       this.allergens = menuSettings.allergens || [];
       this.groupsById = new Map(groups.map(g => [g.id, g]));
+      this.shiftsById = new Map(workShifts.map(s => [s.id, s]));
       this.loyaltyById = new Map(loyaltyCategories.map(c => [c.id, c]));
       this.error = null;
     } catch (err) {
@@ -116,6 +123,11 @@ export class UsersPage {
   groupName(id) {
     if (!id) return '—';
     return this.groupsById?.get(id)?.name || id;
+  }
+
+  shiftName(id) {
+    const shiftId = id || DEFAULT_WORK_SHIFT_ID;
+    return this.shiftsById?.get(shiftId)?.name || '—';
   }
 
   usersCountText() {
@@ -391,6 +403,7 @@ export class UsersPage {
     this._modal = openUserFormModal({
       user,
       groups: this.groups,
+      workShifts: this.workShifts,
       loyaltyCategories: this.loyaltyCategories,
       allergens: this.allergens,
       onSaved: async () => {
@@ -544,6 +557,7 @@ export class UsersPage {
               </th>
               <th>ФИО / Email</th>
               <th>Группа</th>
+              <th>Смена</th>
               <th>Категория</th>
               <th class="users-th-balance">Баланс</th>
               <th>Статус</th>
@@ -569,6 +583,7 @@ export class UsersPage {
           ${user.email ? `<span class="orders-client-email">${esc(user.email)}</span>` : ''}
         </td>
         <td>${esc(this.groupName(user.userGroupId))}</td>
+        <td>${esc(this.shiftName(user.shiftId))}</td>
         <td><span class="crm-loyalty ${loyaltyBadgeClass(user.loyaltyCategoryId)}">${esc(loyaltyLabel(user.loyaltyCategoryId, this.loyaltyById))}</span></td>
         <td class="users-td-balance">${fmtMoney(user.balance)}</td>
         <td><span class="crm-badge ${userStatusBadgeClass(user.status)}">${userStatusLabel(user.status)}</span></td>

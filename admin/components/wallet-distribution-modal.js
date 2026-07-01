@@ -8,7 +8,7 @@ import { showToast } from '../utils/toast.js';
 
 /**
  * @param {object} p
- * @param {Array<{ id: string, name: string, restrictions?: string[] }>} p.wallets
+ * @param {Array<{ id: string, name: string, allowedCategories?: string[] }>} p.wallets
  * @param {Array<{ id: string, name: string }>} p.userGroups
  * @param {Array<{ id: string, name: string }>} p.loyaltyCategories
  * @param {Array<object>} p.users
@@ -315,7 +315,7 @@ export function openWalletDistributionModal({
       const result = await bulkAdjustWalletBalances({
         userIds,
         walletId,
-        walletDef: walletDef ? { name: walletDef.name, restrictions: walletDef.restrictions } : null,
+        walletDef: walletDef ? { name: walletDef.name, allowedCategories: walletDef.allowedCategories } : null,
         type,
         amount,
         comment,

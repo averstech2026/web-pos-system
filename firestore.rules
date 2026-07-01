@@ -12,16 +12,24 @@ service cloud.firestore {
       return isAuth() && request.auth.uid == userId;
     }
 
+    function userProfilePath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function hasUserProfile() {
+      return isAuth() && exists(userProfilePath());
+    }
+
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return hasUserProfile() ? get(userProfilePath()).data.role : null;
     }
 
     function isRole(role) {
-      return isAuth() && getUserRole() == role;
+      return getUserRole() == role;
     }
 
     function isStaff() {
-      return isAuth() && getUserRole() in ['cook', 'cashier', 'manager', 'admin'];
+      return getUserRole() in ['cook', 'cashier', 'manager', 'admin'];
     }
 
     function isStaffBalanceDebit() {
@@ -59,6 +67,12 @@ service cloud.firestore {
 
     // ── loyalty_categories (CRM loyalty tiers) ─────────────
     match /loyalty_categories/{categoryId} {
+      allow read: if isStaff();
+      allow write: if isRole('admin') || isRole('manager');
+    }
+
+    // ── work_shifts (employee work shift reference) ────────
+    match /work_shifts/{shiftId} {
       allow read: if isStaff();
       allow write: if isRole('admin') || isRole('manager');
     }
@@ -110,6 +124,19 @@ service cloud.firestore {
     match /marketing_banners/{bannerId} {
       allow read: if isAuth();
       allow write: if isRole('admin') || isRole('manager');
+    }
+
+    // ── validation_rules (cafeteria validator deduction rules) ─
+    match /validation_rules/{ruleId} {
+      allow read: if isStaff();
+      allow write: if isRole('admin') || isRole('manager');
+    }
+
+    // ── validation_logs (card tap audit trail) ────────────
+    match /validation_logs/{logId} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+      allow update, delete: if isRole('admin') || isRole('manager');
     }
 
     function isOrderOwner() {

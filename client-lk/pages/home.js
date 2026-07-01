@@ -412,7 +412,18 @@ export class HomePage {
           this.navigate(`/payment?orderId=${btn.dataset.orderid}`);
         });
       });
-    }, err => console.error('Orders snapshot error:', err));
+    }, err => {
+      console.error('Orders snapshot error:', err);
+      const el = document.getElementById('orders-list');
+      if (!el) return;
+      if (err.code === 'permission-denied') {
+        el.innerHTML = `
+          <p class="empty-text">
+            Не удалось загрузить заказы. Возможно, вы вошли под терминальным аккаунтом
+            (киоск / очередь). Выйдите и войдите с клиентским email.
+          </p>`;
+      }
+    });
   }
 
   subscribeUnreadCount() {

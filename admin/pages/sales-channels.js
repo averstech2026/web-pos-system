@@ -2,6 +2,7 @@ import { bindAdminShell, renderAdminShell } from '../components/layout.js';
 import { createSalesChannelsEditor } from '../components/sales-channels-editor.js';
 import { ensureDefaultSalesChannels, fetchSalesChannels } from '../services/sales-channels-data.js';
 import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
+import { ensureDefaultPaymentMethods, fetchPaymentMethods } from '../services/payments-data.js';
 
 export class SalesChannelsPage {
   constructor(container, navigate) {
@@ -23,12 +24,15 @@ export class SalesChannelsPage {
     this.renderShell();
     try {
       await ensureDefaultSalesChannels();
-      const [channels, availabilityRules] = await Promise.all([
+      await ensureDefaultPaymentMethods();
+      const [channels, availabilityRules, paymentMethods] = await Promise.all([
         fetchSalesChannels(),
         fetchActiveAvailabilityRules(),
+        fetchPaymentMethods(),
       ]);
       this.channels = channels;
       this.availabilityRules = availabilityRules;
+      this.paymentMethods = paymentMethods;
       this.error = null;
     } catch (err) {
       console.error('[sales-channels]', err);
@@ -48,8 +52,8 @@ export class SalesChannelsPage {
 
     this.container.innerHTML = renderAdminShell({
       active: 'sales-channels',
-      title: 'Каналы продаж',
-      subtitle: 'Маршрутизация заказов по каналам',
+      title: 'Точки и интерфейсы',
+      subtitle: 'Каналы продаж и внутренние терминалы',
       bodyHtml,
     });
 
@@ -64,6 +68,7 @@ export class SalesChannelsPage {
     this.editor = createSalesChannelsEditor(host, {
       channels: this.channels,
       availabilityRules: this.availabilityRules || [],
+      paymentMethods: this.paymentMethods || [],
       onSaved: async () => {
         this.channels = await fetchSalesChannels();
         this.editor?.replaceChannels(this.channels);

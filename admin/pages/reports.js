@@ -8,6 +8,8 @@ import {
   buildKitchenReport,
   buildNutritionSummary,
   buildOrdersPaymentsReport,
+  buildValidationLogsReport,
+  buildClientTransactionsReport,
   collectEmployeeOptions,
   collectLocationOptions,
   collectShiftOptions,
@@ -33,8 +35,9 @@ import {
   paymentStatusLabel,
 } from '../utils/order-format.js';
 import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
+import { fetchValidationLogs, fetchValidatorTransactions } from '../services/validation-logs-data.js';
 
-/** @typedef {'nutrition' | 'dishes' | 'orders' | 'kitchen'} ReportId */
+/** @typedef {'nutrition' | 'dishes' | 'orders' | 'kitchen' | 'validations' | 'client-transactions'} ReportId */
 
 const REPORT_CATALOG = [
   {
@@ -65,6 +68,20 @@ const REPORT_CATALOG = [
     icon: 'chef-hat',
     tone: 'amber',
   },
+  {
+    id: 'validations',
+    title: 'Отчёт по валидациям',
+    description: 'Лента проходов по пропуску: успешные выдачи и отказы в реальном времени',
+    icon: 'shield-check',
+    tone: 'emerald',
+  },
+  {
+    id: 'client-transactions',
+    title: 'Транзакции клиентов',
+    description: 'Финансовые движения: оплаты заказов и списания по валидатору',
+    icon: 'wallet',
+    tone: 'violet',
+  },
 ];
 
 /** @type {Record<string, string[]>} */
@@ -73,6 +90,8 @@ const TABLE_COL_WIDTHS = {
   dishes: ['48px', '32%', '26%', '110px', '110px'],
   orders: ['48px', '12%', '14%', '28%', '160px', '110px'],
   kitchen: ['42%', '32%', '26%'],
+  validations: ['14%', '14%', '10%', '12%', '16%', '10%', '24%'],
+  'client-transactions': ['14%', '18%', '28%', '12%', '14%', '14%'],
 };
 
 const NESTED_NUTRITION_COL_WIDTHS = ['80px', '120px', '13%', '15%', '28%', '88px', '10%'];
@@ -91,6 +110,8 @@ const REPORT_ICONS = {
   utensils: '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>',
   'shopping-bag': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
   'chef-hat': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21a1 1 0 0 0 1-1v-5.35c0-.245-.025-.51-.08-.75a2.5 2.5 0 0 0-1.32-1.68C15.24 12.12 14.06 12 13 12H11c-1.06 0-2.24.12-3.6.62a2.5 2.5 0 0 0-1.32 1.68c-.055.24-.08.505-.08.75V20a1 1 0 0 0 1 1Z"/><path d="M6 17h12"/><path d="M6 13h12"/><path d="M9 5.07A4 4 0 0 1 12 3a4 4 0 0 1 3 3.07"/><path d="M6 9h12"/></svg>',
+  'shield-check': '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>',
+  wallet: '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-2a2 2 0 0 0 0 4h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>',
   'arrow-left': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>',
   download: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>',
   refresh: '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>',
@@ -128,6 +149,8 @@ export class ReportsPage {
     this.itemsById = new Map();
     this.itemsByName = new Map();
     this.rulesById = new Map();
+    this.validationLogs = [];
+    this.validatorTransactions = [];
     this.kitchenPlanDate = tomorrowDateInputValue();
     /** @type {'today' | 'tomorrow' | 'custom'} */
     this.kitchenDayTab = 'tomorrow';
@@ -225,6 +248,14 @@ export class ReportsPage {
         start: toDateInputValue(period.start),
         end: toDateInputValue(period.end),
       };
+      this._reportPeriodRange = period;
+
+      if (this.activeReport === 'validations') {
+        this.validationLogs = await fetchValidationLogs({ limitCount: 1000 });
+      }
+      if (this.activeReport === 'client-transactions') {
+        this.validatorTransactions = await fetchValidatorTransactions(1000);
+      }
     } catch (err) {
       console.error('[reports]', err);
       this.error = err.message || 'Не удалось загрузить данные отчёта';
@@ -653,6 +684,40 @@ export class ReportsPage {
         ...data.map(r => [r.name, r.workshop, r.totalQty]),
       ];
       filename = `kitchen-plan-${this.kitchenPlanDate}`;
+    } else if (meta.id === 'validations') {
+      const period = this._reportPeriodRange || resolvePeriod(this.periodPreset, this.customFrom, this.customTo);
+      const data = buildValidationLogsReport(this.validationLogs, period);
+      rows = [
+        ['Время', 'Сотрудник', 'Карта', 'Точка', 'Правило', 'Статус', 'Причина / Списание'],
+        ...data.map(r => [
+          fmtOrderDateTime(r.createdAt),
+          r.userName,
+          r.cardNumber,
+          r.channelPoint,
+          r.ruleName,
+          r.status === 'success' ? 'Успешно' : 'Отказ',
+          r.status === 'success' ? r.deductionSummary : r.denyReason,
+        ]),
+      ];
+    } else if (meta.id === 'client-transactions') {
+      const period = this._reportPeriodRange || resolvePeriod(this.periodPreset, this.customFrom, this.customTo);
+      const data = buildClientTransactionsReport(
+        this.validatorTransactions,
+        this.filteredOrders(),
+        this.usersById,
+        period,
+      );
+      rows = [
+        ['Дата', 'Сотрудник', 'Тип', 'Сумма', 'Баланс после', 'Детали'],
+        ...data.map(r => [
+          fmtOrderDateTime(r.createdAt),
+          r.userName,
+          r.typeLabel,
+          r.amount,
+          r.balanceAfter ?? '—',
+          r.detail,
+        ]),
+      ];
     }
 
     const csv = rows.map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(';')).join('\n');
@@ -755,7 +820,7 @@ export class ReportsPage {
 
         ${this.error ? `<div class="admin-error card">${esc(this.error)}</div>` : ''}
         <div id="reports-body-host" class="reports-body-host">
-          ${this.loading && !this.orders.length
+          ${this.loading
       ? '<div class="admin-loading">Загрузка данных…</div>'
       : this.renderActiveTable()}
         </div>
@@ -936,6 +1001,8 @@ export class ReportsPage {
       case 'dishes': return this.renderDishesTable();
       case 'orders': return this.renderOrdersTable();
       case 'kitchen': return this.renderKitchenTable();
+      case 'validations': return this.renderValidationsTable();
+      case 'client-transactions': return this.renderClientTransactionsTable();
       default: return '';
     }
   }
@@ -1148,6 +1215,95 @@ export class ReportsPage {
               <th scope="col">Сотрудник / гость</th>
               <th scope="col">Статус оплаты</th>
               <th class="reports-th-num" scope="col">Итого</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  renderValidationsTable() {
+    const period = this._reportPeriodRange || resolvePeriod(this.periodPreset, this.customFrom, this.customTo);
+    const rows = buildValidationLogsReport(this.validationLogs, period);
+
+    if (!rows.length) {
+      return '<div class="reports-empty card"><p>Нет проходов за выбранный период</p></div>';
+    }
+
+    const body = rows.map(row => {
+      const statusClass = row.status === 'success' ? 'vld-log-status--success' : 'vld-log-status--denied';
+      const statusLabel = row.status === 'success' ? 'Успешно' : 'Отказ';
+      return `
+        <tr>
+          <td class="reports-td-nowrap">${fmtOrderDateTime(row.createdAt)}</td>
+          <td>${esc(row.userName)}</td>
+          <td class="reports-td-mono">${esc(row.cardNumber)}</td>
+          <td>${esc(row.channelPoint)}</td>
+          <td>${esc(row.ruleName)}</td>
+          <td><span class="vld-log-status ${statusClass}">${statusLabel}</span></td>
+          <td>${esc(row.status === 'success' ? row.deductionSummary : row.denyReason)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="reports-table-wrap card">
+        <table class="reports-table">
+          ${renderColgroup('validations')}
+          <thead>
+            <tr>
+              <th scope="col">Время</th>
+              <th scope="col">Сотрудник</th>
+              <th scope="col">Номер карты</th>
+              <th scope="col">Канал/Точка</th>
+              <th scope="col">Правило</th>
+              <th scope="col">Статус</th>
+              <th scope="col">Причина отказа / Списание</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  renderClientTransactionsTable() {
+    const period = this._reportPeriodRange || resolvePeriod(this.periodPreset, this.customFrom, this.customTo);
+    const rows = buildClientTransactionsReport(
+      this.validatorTransactions,
+      this.filteredOrders(),
+      this.usersById,
+      period,
+    );
+
+    if (!rows.length) {
+      return '<div class="reports-empty card"><p>Нет транзакций за выбранный период</p></div>';
+    }
+
+    const body = rows.map(row => `
+      <tr>
+        <td class="reports-td-nowrap">${fmtOrderDateTime(row.createdAt)}</td>
+        <td>${esc(row.userName)}</td>
+        <td>${esc(row.typeLabel)}</td>
+        <td class="reports-td-num">${fmtMoney(Math.abs(row.amount))}</td>
+        <td class="reports-td-num">${row.balanceAfter != null ? fmtMoney(row.balanceAfter) : '—'}</td>
+        <td>${esc(row.detail)}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="reports-table-wrap card">
+        <table class="reports-table">
+          ${renderColgroup('client-transactions')}
+          <thead>
+            <tr>
+              <th scope="col">Дата</th>
+              <th scope="col">Сотрудник</th>
+              <th scope="col">Тип операции</th>
+              <th class="reports-th-num" scope="col">Сумма</th>
+              <th class="reports-th-num" scope="col">Баланс после</th>
+              <th scope="col">Детали</th>
             </tr>
           </thead>
           <tbody>${body}</tbody>

@@ -5,7 +5,7 @@ import { showToast } from '../utils/toast.js';
 /**
  * @param {object} p
  * @param {string[]} p.userIds
- * @param {Array<{ id: string, name: string, restrictions?: string[] }>} p.wallets
+ * @param {Array<{ id: string, name: string, allowedCategories?: string[] }>} p.wallets
  * @param {() => void|Promise<void>} [p.onComplete]
  */
 export function openBulkWalletOperationModal({ userIds, wallets, onComplete }) {
@@ -138,7 +138,7 @@ export function openBulkWalletOperationModal({ userIds, wallets, onComplete }) {
       const result = await bulkAdjustWalletBalances({
         userIds,
         walletId,
-        walletDef: walletDef ? { name: walletDef.name, restrictions: walletDef.restrictions } : null,
+        walletDef: walletDef ? { name: walletDef.name, allowedCategories: walletDef.allowedCategories } : null,
         type,
         amount,
         comment,
