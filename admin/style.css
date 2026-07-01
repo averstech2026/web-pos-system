@@ -574,7 +574,7 @@ body:has(.admin-shell) {
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: var(--space-sm);
   margin-bottom: var(--space-lg);
 }
@@ -3003,40 +3003,6 @@ body:has(.admin-shell) {
 }
 
 /* Lunch constructor editor */
-.lnc-layout .avr-row--thumb .avr-row-main {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
-.lnc-layout .lnc-row-thumb {
-  flex: 0 0 auto;
-}
-
-.lnc-layout .avr-row-thumb .products-thumb-wrap {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  border-radius: var(--radius-sm);
-}
-
-.lnc-layout .avr-row-thumb .products-thumb-wrap--has-img {
-  padding: 3px;
-  box-sizing: border-box;
-}
-
-.lnc-layout .avr-row-thumb .products-thumb {
-  object-fit: contain;
-}
-
-.lnc-layout .avr-row-thumb .products-thumb-wrap--empty {
-  background: color-mix(in srgb, #0f766e 10%, var(--color-surface-muted));
-}
-
-.lnc-layout .avr-row-thumb .products-thumb-fallback {
-  font-size: 1rem;
-}
-
 .lnc-composition-fieldset,
 .lnc-fieldset {
   margin-top: 4px;
@@ -3048,17 +3014,17 @@ body:has(.admin-shell) {
   gap: 0;
 }
 
-.lnc-step-block {
-  padding: 12px 0;
-  border: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-  border-radius: 0;
-  background: transparent;
+.lnc-step-card {
+  position: relative;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid #f1f5f9;
+  border-radius: 16px;
+  background: color-mix(in srgb, #f8fafc 50%, #fff);
 }
 
-.lnc-step-block:last-child {
-  border-bottom: none;
-  padding-bottom: 4px;
+.lnc-step-card:last-child {
+  margin-bottom: 0;
 }
 
 .lnc-step-head {
@@ -3066,7 +3032,7 @@ body:has(.admin-shell) {
   grid-template-columns: auto 1fr auto;
   gap: 8px;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .lnc-step-index {
@@ -3080,19 +3046,8 @@ body:has(.admin-shell) {
 
 .lnc-step-name-input {
   min-width: 0;
-  height: 34px;
-  min-height: 34px;
-  border: none;
-  border-bottom: 1px solid var(--color-border);
-  border-radius: 0;
-  padding-left: 0;
-  padding-right: 0;
-  background: transparent;
-}
-
-.lnc-step-name-input:focus {
-  border-bottom-color: var(--color-navy);
-  box-shadow: none;
+  height: 36px;
+  min-height: 36px;
 }
 
 .lnc-step-remove {
@@ -3107,6 +3062,7 @@ body:has(.admin-shell) {
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .lnc-step-remove:hover {
@@ -3120,78 +3076,98 @@ body:has(.admin-shell) {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  min-height: 0;
+  padding: 0;
+}
+
+.lnc-step-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  max-width: 100%;
+  padding: 0 8px 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.lnc-step-tag__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lnc-step-tag__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
   padding: 0;
   border: none;
-  border-radius: 0;
+  border-radius: var(--radius-pill);
   background: transparent;
+  color: #94a3b8;
+  line-height: 0;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
-.lnc-step-capsule__main {
-  cursor: default;
-}
-
-.lnc-layout .lnc-step-capsule {
-  background: color-mix(in srgb, #3b6fd4 11%, #eef4ff);
-  border-color: color-mix(in srgb, #3b6fd4 22%, #d4e2f7);
-  color: #1e3a6e;
-  box-shadow: none;
-}
-
-.lnc-layout .lnc-step-capsule .cgr-product-capsule__remove {
-  color: color-mix(in srgb, #1e3a6e 55%, var(--color-text-muted));
-}
-
-.lnc-layout .lnc-step-capsule .cgr-product-capsule__remove:hover {
+.lnc-step-tag__remove:hover {
   color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 10%, #eef4ff);
+  background: color-mix(in srgb, var(--color-danger) 10%, #fff);
 }
 
 .lnc-step-empty {
-  margin: 0 0 4px;
+  margin: 0;
   font-size: 12px;
   color: var(--color-text-muted);
+  line-height: 1.45;
 }
 
 .lnc-pick-products-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 9999px;
-  background: #fff;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-navy);
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.lnc-pick-products-btn:hover {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border-strong);
+  margin-top: 8px;
 }
 
 .lnc-add-step-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 10px;
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 9999px;
-  background: #fff;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-navy);
+  gap: 6px;
+  width: 100%;
+  margin-top: 16px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
   cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .lnc-add-step-btn:hover {
-  background: var(--color-surface-muted);
+  border-color: #60a5fa;
+  color: #2563eb;
+  background: color-mix(in srgb, #3b82f6 5%, transparent);
+}
+
+.lnc-add-step-btn__icon {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .lnc-sales-points {
@@ -3216,6 +3192,36 @@ body:has(.admin-shell) {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.lnc-allergens-hint {
+  margin: 0 0 8px;
+}
+
+.lnc-allergens-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lnc-allergen-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, #d97706 35%, var(--color-border));
+  background: color-mix(in srgb, #f59e0b 12%, #fffbeb);
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.lnc-allergens-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
 }
 
 .products-composite-badge {
@@ -7537,8 +7543,8 @@ body:has(.admin-shell) {
 }
 
 .pc-month--current {
-  border: 2px solid var(--color-navy);
-  box-shadow: 0 2px 12px -4px rgba(30, 27, 75, 0.1);
+  border: 2px solid var(--color-success);
+  box-shadow: 0 2px 12px -4px color-mix(in srgb, var(--color-success) 18%, transparent);
 }
 
 .pc-month-title {

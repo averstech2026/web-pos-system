@@ -242,6 +242,11 @@ export class DashboardPage {
         ${metricCard('Ср. блюд в заказе', fmtDecimal(s.avgItemsPerOrder), 'за сегодня')}
         ${metricCard('Порций продано', fmtCount(s.portionsSoldToday), 'за сегодня')}
         ${metricCard('Отмен сегодня', fmtCount(s.cancelledToday))}
+        ${metricCard(
+          'Каналы продаж',
+          `${fmtCount(s.ordersByChannel.web)} · ${fmtCount(s.ordersByChannel.kiosk)}`,
+          'Веб · Киоск',
+        )}
       </section>
 
       <div class="charts-grid">
@@ -261,6 +266,20 @@ export class DashboardPage {
           <p class="chart-sub">Динамика количества заказов</p>
           ${barChartHtml({
             items: dayItems.map(i => ({ label: i.day, count: i.count })),
+            valueKey: 'count',
+            labelKey: 'label',
+            emptyText: 'Нет заказов за выбранный период',
+          })}
+        </section>
+
+        <section class="chart-card card">
+          <h3 class="chart-title">Каналы продаж</h3>
+          <p class="chart-sub">Заказы по источнику: веб и киоск</p>
+          ${barChartHtml({
+            items: [
+              { label: 'Веб', count: a.ordersByChannel.web },
+              { label: 'Киоск', count: a.ordersByChannel.kiosk },
+            ],
             valueKey: 'count',
             labelKey: 'label',
             emptyText: 'Нет заказов за выбранный период',

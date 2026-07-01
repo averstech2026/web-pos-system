@@ -35,10 +35,11 @@ export async function fetchPickerCatalogItems() {
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
 }
 
-/** @param {import('../../shared/composite-meals.js').CompositeLunchItem} lunch @param {string} [existingId] */
-export async function saveLunch(lunch, existingId = '') {
+/** @param {import('../../shared/composite-meals.js').CompositeLunchItem} lunch @param {string} [existingId] @param {Array<{ id: string, allergens?: string[] }>} [catalogItems] */
+export async function saveLunch(lunch, existingId = '', catalogItems = null) {
   const id = String(existingId || lunch.id || '').trim();
-  const payload = buildCompositeLunchFirestorePayload(lunch);
+  const catalog = catalogItems || await fetchPickerCatalogItems();
+  const payload = buildCompositeLunchFirestorePayload(lunch, catalog);
   const isUpdate = id && !id.startsWith('draft_');
 
   if (isUpdate) {
@@ -46,6 +47,7 @@ export async function saveLunch(lunch, existingId = '') {
     if (!lunch.availabilityRuleId) update.availabilityRuleId = deleteField();
     if (!lunch.allowedPaymentMethods?.length) update.allowedPaymentMethods = deleteField();
     if (!lunch.modifierGroupIds?.length) update.modifierGroupIds = deleteField();
+    if (!payload.allergens?.length) update.allergens = deleteField();
     await updateDoc(doc(db, COL.ITEMS, id), update);
     return { id, ...normalizeCompositeLunch({ id, ...payload }) };
   }

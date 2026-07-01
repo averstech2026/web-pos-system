@@ -1,8 +1,8 @@
 import {
   formatLunchPrice,
-  lunchMetaLabel,
   normalizeCompositeLunch,
   parseLunchPrice,
+  resolveInheritedLunchAllergens,
   resolveStepItemNames,
 } from '../../shared/composite-meals.js';
 import { formatAvailabilityRuleShort } from '../../shared/availability-rules.js';
@@ -14,6 +14,10 @@ import { productThumbHtml } from '../utils/product-image.js';
 import { renderChannelAvailabilityGrid } from '../utils/admin-form.js';
 import { renderAvrDetailStickyHead, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 import { readModifierGroupIds, renderModifierGroupsField } from './modifier-groups-field.js';
+import {
+  renderListMetaWithSchedule,
+  scheduleStatusForGroup,
+} from '../utils/schedule-status.js';
 
 const REMOVE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
@@ -32,6 +36,7 @@ const LUNCH_SALES_POINT_MODES = [
  * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} p.availabilityRules
  * @param {Array<{ id: string, name: string }>} p.paymentMethods
  * @param {import('../../shared/menu-catalog.js').ModifierGroup[]} [p.modifierGroups]
+ * @param {Array<{ id: string, name: string }>} [p.allergens]
  * @param {() => void|Promise<void>} [p.onSaved]
  */
 export function createLunchesEditor(host, {
@@ -40,6 +45,7 @@ export function createLunchesEditor(host, {
   availabilityRules,
   paymentMethods,
   modifierGroups = [],
+  allergens = [],
   onSaved,
 }) {
   /** @type {import('../../shared/composite-meals.js').CompositeLunchItem[]} */
@@ -48,6 +54,7 @@ export function createLunchesEditor(host, {
     lunchSteps: (l.lunchSteps || []).map(s => ({ ...s, itemIds: [...(s.itemIds || [])] })),
     allowedPaymentMethods: [...(l.allowedPaymentMethods || [])],
   }));
+  const rulesMap = new Map(availabilityRules.map(r => [r.id, r]));
   /** @type {string|null} */
   let selectedId = lunches[0]?.id || null;
 
@@ -139,20 +146,100 @@ export function createLunchesEditor(host, {
     ));
   }
 
+  function lunchScheduleStatus(lunch) {
+    const rule = lunch.availabilityRuleId ? rulesMap.get(lunch.availabilityRuleId) : null;
+    return scheduleStatusForGroup(lunch, rule);
+  }
+
+  function isLunchHidden(lunch) {
+    return resolveChannelMode(lunch.visibleInWeb, lunch.visibleInKiosk) === 'hidden';
+  }
+
+  function isLunchDeprioritized(lunch) {
+    return isLunchHidden(lunch) || lunchScheduleStatus(lunch).isExpired === true;
+  }
+
+  function channelBadgeHtml(channel, lunch) {
+    const isWeb = channel === 'web';
+    const active = isWeb
+      ? lunch.visibleInWeb !== false
+      : lunch.visibleInKiosk === true;
+    const letter = isWeb ? 'W' : 'K';
+    const channelLabel = isWeb ? 'Веб' : 'Киоск';
+    const classes = [
+      'cgr-channel-badge',
+      isWeb ? 'cgr-channel-badge--web' : 'cgr-channel-badge--kiosk',
+      active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
+    ].join(' ');
+
+    return `<span class="${classes}" aria-label="${escAttr(active ? `${channelLabel}, активен` : `${channelLabel}, неактивен`)}">${letter}</span>`;
+  }
+
+  function channelIndicatorsHtml(lunch) {
+    return `${channelBadgeHtml('web', lunch)}${channelBadgeHtml('kiosk', lunch)}`;
+  }
+
+  function lunchListMainMeta(lunch) {
+    const steps = lunch.lunchSteps?.length || 0;
+    const mod10 = steps % 10;
+    const mod100 = steps % 100;
+    const stepsWord = mod10 === 1 && mod100 !== 11
+      ? 'шаг'
+      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+        ? 'шага'
+        : 'шагов';
+    return `${formatLunchPrice(lunch.price)} · ${steps} ${stepsWord}`;
+  }
+
+  function listRowMetaHtml(lunch) {
+    return renderListMetaWithSchedule(lunchListMainMeta(lunch), lunchScheduleStatus(lunch));
+  }
+
+  function inheritedAllergenLabels(lunch) {
+    const ids = resolveInheritedLunchAllergens(lunch, catalogItems);
+    return ids.map(id => allergens.find(a => a.id === id)?.name || id);
+  }
+
+  function renderInheritedAllergensSection(lunch) {
+    const labels = inheritedAllergenLabels(lunch);
+    return `
+      <div class="admin-field-block lnc-allergens-block" id="lnc-allergens-section">
+        <span class="admin-field-label">Аллергены</span>
+        <p class="sch-fieldset__hint lnc-allergens-hint">
+          Наследуются автоматически из блюд в шагах (объединение без дублей). Обновляются при сохранении ланча.
+        </p>
+        ${labels.length
+          ? `<div class="lnc-allergens-list">${labels.map(name => `<span class="lnc-allergen-tag">${esc(name)}</span>`).join('')}</div>`
+          : '<p class="lnc-allergens-empty">Нет аллергенов — у блюд в составе аллергены не указаны.</p>'}
+      </div>
+    `;
+  }
+
+  function refreshInheritedAllergensSection() {
+    const lunch = selectedLunch();
+    const block = host.querySelector('#lnc-allergens-section');
+    if (!lunch || !block) return;
+    block.outerHTML = renderInheritedAllergensSection(lunch);
+  }
+
   function renderListRow(lunch) {
     const active = lunch.id === selectedId;
+    const deprioritized = isLunchDeprioritized(lunch);
     return `
-      <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''}" data-id="${escAttr(lunch.id)}">
-        <button type="button" class="avr-row-main btn-press" data-action="select" aria-pressed="${active}">
-          <span class="avr-row-thumb lnc-row-thumb">${productThumbHtml(
-            { name: lunch.name, imageUrl: lunch.imageUrl },
-            'products-thumb',
-            { fallback: '🍱' },
-          )}</span>
-          <span class="avr-row-info">
-            <span class="avr-row-name">${esc(lunch.name)}</span>
-            <span class="avr-row-meta">${esc(lunchMetaLabel(lunch))}</span>
+      <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''} ${deprioritized ? 'cgr-row--hidden' : ''}" data-id="${escAttr(lunch.id)}">
+        <button type="button" class="avr-row-main btn-press cgr-row-main" data-action="select" aria-pressed="${active}">
+          <span class="cgr-row-left">
+            <span class="avr-row-thumb">${productThumbHtml(
+              { name: lunch.name, imageUrl: lunch.imageUrl },
+              'products-thumb',
+              { fallback: '🍱' },
+            )}</span>
+            <span class="avr-row-info">
+              <span class="avr-row-name">${esc(lunch.name)}</span>
+              <span class="avr-row-meta">${listRowMetaHtml(lunch)}</span>
+            </span>
           </span>
+          <span class="cgr-row-indicators">${channelIndicatorsHtml(lunch)}</span>
         </button>
       </li>
     `;
@@ -164,26 +251,24 @@ export function createLunchesEditor(host, {
     }
     const names = resolveStepItemNames(catalogItems, step.itemIds);
     return step.itemIds.map((id, index) => `
-      <div class="cgr-product-capsule lnc-step-capsule" data-step-item="${escAttr(id)}">
-        <span class="cgr-product-capsule__main lnc-step-capsule__main">
-          <span class="cgr-product-capsule__name">${esc(names[index] || '—')}</span>
-        </span>
+      <span class="lnc-step-tag" data-step-item="${escAttr(id)}">
+        <span class="lnc-step-tag__name">${esc(names[index] || '—')}</span>
         <button
           type="button"
-          class="cgr-product-capsule__remove btn-press"
+          class="lnc-step-tag__remove btn-press"
           data-action="remove-step-item"
           data-step-id="${escAttr(step.id)}"
           data-item-id="${escAttr(id)}"
           title="Убрать из шага"
           aria-label="Убрать товар из шага"
         >${REMOVE_ICON}</button>
-      </div>
+      </span>
     `).join('');
   }
 
   function renderStepBlock(step, index) {
     return `
-      <div class="lnc-step-block" data-step-block data-step-id="${escAttr(step.id)}">
+      <div class="lnc-step-card" data-step-block data-step-id="${escAttr(step.id)}">
         <div class="lnc-step-head">
           <label class="lnc-step-index">Шаг ${index + 1}</label>
           <input
@@ -203,12 +288,12 @@ export function createLunchesEditor(host, {
             aria-label="Удалить шаг"
           >${REMOVE_ICON}</button>
         </div>
-        <div class="lnc-step-products lnc-step-products-list" data-step-products="${escAttr(step.id)}">
+        <div class="lnc-step-products-list" data-step-products="${escAttr(step.id)}">
           ${renderStepProducts(step)}
         </div>
         <button
           type="button"
-          class="lnc-pick-products-btn btn-press"
+          class="btn btn-primary btn-press products-create-btn lnc-pick-products-btn"
           data-action="pick-step-products"
           data-step-id="${escAttr(step.id)}"
         >+ Добавить товары из базы</button>
@@ -227,7 +312,10 @@ export function createLunchesEditor(host, {
         <div class="lnc-steps" id="lnc-steps">
           ${steps.map((s, i) => renderStepBlock(s, i)).join('')}
         </div>
-        <button type="button" class="lnc-add-step-btn btn-press" data-action="add-step">+ Добавить шаг</button>
+        <button type="button" class="lnc-add-step-btn btn-press" data-action="add-step">
+          <span class="lnc-add-step-btn__icon" aria-hidden="true">+</span>
+          <span>Добавить шаг</span>
+        </button>
       </div>
     `;
   }
@@ -350,6 +438,7 @@ export function createLunchesEditor(host, {
             </div>
 
             ${renderCompositionSection(lunch)}
+            ${renderInheritedAllergensSection(lunch)}
             ${renderScheduleSection(lunch)}
             ${renderPaymentsSection(lunch)}
 
@@ -382,7 +471,7 @@ export function createLunchesEditor(host, {
   function render() {
     const lunch = selectedLunch();
     host.innerHTML = `
-      <div class="avr-layout lnc-layout">
+      <div class="avr-layout lnc-layout cgr-layout">
         <div class="avr-master">
           <div class="avr-master-head">
             <h2 class="avr-master-title">${headerText()}</h2>
@@ -407,7 +496,25 @@ export function createLunchesEditor(host, {
     const lunch = lunches.find(l => l.id === id);
     if (!row || !lunch) return;
     row.querySelector('.avr-row-name')?.replaceChildren(document.createTextNode(lunch.name));
-    row.querySelector('.avr-row-meta')?.replaceChildren(document.createTextNode(lunchMetaLabel(lunch)));
+    const metaEl = row.querySelector('.avr-row-meta');
+    if (metaEl) metaEl.innerHTML = listRowMetaHtml(lunch);
+    row.classList.toggle('cgr-row--hidden', isLunchDeprioritized(lunch));
+    const indicatorsEl = row.querySelector('.cgr-row-indicators');
+    if (indicatorsEl) indicatorsEl.innerHTML = channelIndicatorsHtml(lunch);
+    const thumbEl = row.querySelector('.avr-row-thumb');
+    if (thumbEl) {
+      thumbEl.innerHTML = productThumbHtml(
+        { name: lunch.name, imageUrl: lunch.imageUrl },
+        'products-thumb',
+        { fallback: '🍱' },
+      );
+    }
+  }
+
+  function refreshCompositionUi() {
+    if (!selectedId) return;
+    updateListRow(selectedId);
+    refreshInheritedAllergensSection();
   }
 
   function showError(msg, listError = false) {
@@ -474,7 +581,7 @@ export function createLunchesEditor(host, {
     if (btn) btn.disabled = true;
 
     try {
-      const saved = await saveLunch(normalized, normalized.id.startsWith('draft_') ? '' : normalized.id);
+      const saved = await saveLunch(normalized, normalized.id.startsWith('draft_') ? '' : normalized.id, catalogItems);
       lunches = lunches.map(l => (l.id === lunch.id ? saved : l));
       if (selectedId === lunch.id) selectedId = saved.id;
       commitBaseline();
@@ -590,12 +697,14 @@ export function createLunchesEditor(host, {
           b.setAttribute('aria-checked', active ? 'true' : 'false');
         });
         syncPanelToState();
+        if (selectedId) updateListRow(selectedId);
       });
     });
 
     panel?.addEventListener('change', e => {
       if (e.target.matches('[data-field="schedule-id"], [data-payment-method], [data-modifier-group-id]')) {
         syncPanelToState();
+        if (selectedId) updateListRow(selectedId);
       }
     });
 
@@ -618,7 +727,7 @@ export function createLunchesEditor(host, {
           renderStepBlock(step, (lunch.lunchSteps?.length || 0)),
         );
         renumberSteps();
-        updateListRow(selectedId);
+        refreshCompositionUi();
         return;
       }
 
@@ -638,7 +747,7 @@ export function createLunchesEditor(host, {
         ));
         host.querySelector(`[data-step-block][data-step-id="${CSS.escape(stepId)}"]`)?.remove();
         renumberSteps();
-        updateListRow(selectedId);
+        refreshCompositionUi();
         return;
       }
 
@@ -665,7 +774,7 @@ export function createLunchesEditor(host, {
                 : l
             ));
             refreshStepProducts(stepId);
-            updateListRow(selectedId);
+            refreshCompositionUi();
           },
         });
         return;
@@ -689,7 +798,7 @@ export function createLunchesEditor(host, {
             : l
         ));
         refreshStepProducts(stepId);
-        updateListRow(selectedId);
+        refreshCompositionUi();
       }
     });
 

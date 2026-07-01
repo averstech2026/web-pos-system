@@ -11,7 +11,7 @@ import { db } from '../../shared/firebase.js';
 import { COL, createItemDoc } from '../../shared/schema.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
 import { mergeCategories, normalizeModifierGroupIds } from '../../shared/menu-catalog.js';
-import { normalizeCatalogItem } from '../../shared/composite-meals.js';
+import { normalizeCatalogItem, isCompositeItem, resolveEffectiveItemAllergens } from '../../shared/composite-meals.js';
 
 export { DEFAULT_CATEGORIES } from '../../shared/menu-catalog.js';
 export { fetchWebMenuItems } from '../../shared/menu-items-data.js';
@@ -105,7 +105,7 @@ export function filterItems(items, {
 
   if (allergens?.length) {
     const set = new Set(allergens);
-    result = result.filter(i => Array.isArray(i.allergens) && i.allergens.some(id => set.has(id)));
+    result = result.filter(i => resolveEffectiveItemAllergens(i, items).some(id => set.has(id)));
   }
 
   const q = search.trim().toLowerCase();

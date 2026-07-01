@@ -6,7 +6,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '../../shared/firebase.js';
-import { COL, ROLES, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
+import { COL, ORDER_SOURCE, ROLES, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
 import { eachDayKey, endOfDay, startOfDay } from '../utils/dates.js';
 import { pctChange, pctChangeNullable } from '../utils/format.js';
 
@@ -61,6 +61,18 @@ function uniqueClientIdsFromChecks(checks) {
 /** Exclude cancelled orders from analytics */
 function activeOrders(orders) {
   return orders.filter(o => o.status !== ORDER_STATUS.CANCELLED);
+}
+
+/** @param {Array<{ source?: string }>} orders */
+export function countOrdersByChannel(orders) {
+  let web = 0;
+  let kiosk = 0;
+  for (const order of orders) {
+    const src = order.source || ORDER_SOURCE.WEB;
+    if (src === ORDER_SOURCE.KIOSK) kiosk += 1;
+    else if (src === ORDER_SOURCE.WEB) web += 1;
+  }
+  return { web, kiosk };
 }
 
 function tsToMs(ts) {
@@ -221,6 +233,7 @@ export async function fetchDashboardSnapshot() {
     avgItemsPerOrder: todayPaid.length > 0 ? portionsSoldToday / todayPaid.length : 0,
     portionsSoldToday,
     cancelledToday: ordersToday.filter(o => o.status === ORDER_STATUS.CANCELLED).length,
+    ordersByChannel: countOrdersByChannel(todayActive),
   };
 }
 
@@ -248,5 +261,6 @@ export async function fetchPeriodAnalytics(start, end) {
     ordersByHour: aggregateOrdersByHour(filtered),
     ordersByDay: aggregateOrdersByDay(filtered, start, end),
     topDishes: aggregateTopDishes(filtered),
+    ordersByChannel: countOrdersByChannel(filtered),
   };
 }

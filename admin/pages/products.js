@@ -29,6 +29,7 @@ import { productThumbHtml } from '../utils/product-image.js';
 import { showToast } from '../utils/toast.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { formatAvailabilityRuleShort, buildGroupsByName, matchesScheduleFilter } from '../../shared/availability-rules.js';
+import { resolveEffectiveItemAllergens } from '../../shared/composite-meals.js';
 import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
 import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
 
@@ -595,7 +596,7 @@ export class ProductsPage {
     const visibleInWeb = isItemVisibleInWeb(item);
     const visibleInKiosk = isItemVisibleInKiosk(item);
     const archived = item.isArchived === true;
-    const allergenText = this.allergenLabels(item.allergens);
+    const allergenText = this.allergenLabels(resolveEffectiveItemAllergens(item, this.items));
     const rule = item.availabilityRuleId ? this.rulesMap.get(item.availabilityRuleId) : null;
     const scheduleText = rule ? formatAvailabilityRuleShort(rule) : '';
 

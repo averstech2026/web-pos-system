@@ -38,6 +38,7 @@ export class LunchesPage {
       this.availabilityRules = availabilityRules;
       this.paymentMethods = paymentMethods;
       this.modifierGroups = settings.modifierGroups;
+      this.allergens = settings.allergens;
       this.loading = false;
       this.renderShell();
     } catch (err) {
@@ -80,6 +81,7 @@ export class LunchesPage {
       availabilityRules: this.availabilityRules,
       paymentMethods: this.paymentMethods,
       modifierGroups: this.modifierGroups,
+      allergens: this.allergens,
       onSaved: () => this.loadData(),
     });
   }

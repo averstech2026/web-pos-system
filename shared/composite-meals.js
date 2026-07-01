@@ -15,6 +15,7 @@ export const LUNCH_ITEM_CATEGORY = 'Комплексные обеды';
  * @property {string|null} [availabilityRuleId]
  * @property {string[]} [allowedPaymentMethods]
  * @property {string[]} [modifierGroupIds]
+ * @property {string[]} [allergens] — вычисляемое объединение аллергенов блюд из шагов
  * @property {LunchStep[]} [lunchSteps]
  * @property {string} [category]
  * @property {string} [description]
@@ -98,9 +99,50 @@ export function normalizeCompositeLunch(lunch) {
   };
 }
 
-/** @param {CompositeLunchItem} lunch */
-export function buildCompositeLunchFirestorePayload(lunch) {
+/** @param {CompositeLunchItem|{ lunchSteps?: LunchStep[] }} lunch */
+export function collectLunchStepItemIds(lunch) {
+  const ids = new Set();
+  for (const step of lunch?.lunchSteps || []) {
+    for (const id of step?.itemIds || []) {
+      const key = String(id).trim();
+      if (key) ids.add(key);
+    }
+  }
+  return [...ids];
+}
+
+/**
+ * Объединение аллергенов всех товаров, входящих в шаги ланча.
+ * @param {CompositeLunchItem|{ lunchSteps?: LunchStep[] }} lunch
+ * @param {Array<{ id: string, allergens?: string[] }>} [catalogItems]
+ */
+export function resolveInheritedLunchAllergens(lunch, catalogItems = []) {
+  const byId = new Map(catalogItems.map(i => [i.id, i]));
+  const allergens = new Set();
+  for (const id of collectLunchStepItemIds(lunch)) {
+    for (const allergenId of byId.get(id)?.allergens || []) {
+      const key = String(allergenId).trim();
+      if (key) allergens.add(key);
+    }
+  }
+  return [...allergens].sort((a, b) => a.localeCompare(b, 'ru'));
+}
+
+/**
+ * @param {object} item
+ * @param {Array<{ id: string, allergens?: string[] }>} [catalogItems]
+ */
+export function resolveEffectiveItemAllergens(item, catalogItems = []) {
+  if (isCompositeItem(item)) {
+    return resolveInheritedLunchAllergens(item, catalogItems);
+  }
+  return [...new Set((item?.allergens || []).map(id => String(id).trim()).filter(Boolean))];
+}
+
+/** @param {CompositeLunchItem} lunch @param {Array<{ id: string, allergens?: string[] }>} [catalogItems] */
+export function buildCompositeLunchFirestorePayload(lunch, catalogItems = []) {
   const normalized = normalizeCompositeLunch(lunch);
+  const inheritedAllergens = resolveInheritedLunchAllergens(normalized, catalogItems);
   const payload = {
     name: normalized.name,
     description: normalized.description || `Составной обед: ${normalized.lunchSteps.map(s => s.name).join(', ')}`,
@@ -118,6 +160,9 @@ export function buildCompositeLunchFirestorePayload(lunch) {
   }
   if (normalized.modifierGroupIds.length) {
     payload.modifierGroupIds = normalized.modifierGroupIds;
+  }
+  if (inheritedAllergens.length) {
+    payload.allergens = inheritedAllergens;
   }
   return payload;
 }
