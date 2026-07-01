@@ -275,8 +275,8 @@ export async function seedValidatorDemo(opts = {}) {
 
   console.log('[seed] Validator demo rules…');
   for (const rule of rules) {
-    const { id, ...payload } = buildValidationRulePayload(rule);
-    await setDoc(doc(db, COL.VALIDATION_RULES, id), payload, { merge: true });
+    const payload = buildValidationRulePayload(rule);
+    await setDoc(doc(db, COL.VALIDATION_RULES, rule.id), payload, { merge: true });
   }
 
   if (!skipAuth) {

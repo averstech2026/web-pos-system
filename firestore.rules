@@ -40,6 +40,15 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance']);
     }
 
+    function isStaffValidatorWalletUpdate() {
+      return isStaff()
+        && request.resource.data.wallets is map
+        && resource.data.wallets is map
+        && request.resource.data.balance is number
+        && resource.data.balance is number
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['wallets', 'balance']);
+    }
+
     // ── users ────────────────────────────────────────────────
     match /users/{userId} {
       // Any authenticated user can read their own doc.
@@ -49,12 +58,12 @@ service cloud.firestore {
       // User can create/update their own doc (registration).
       // Admin can update anyone.
       allow create: if isAuth();
-      allow update: if isOwner(userId) || isRole('admin') || isRole('manager') || isStaffBalanceDebit();
+      allow update: if isOwner(userId) || isRole('admin') || isRole('manager') || isStaffBalanceDebit() || isStaffValidatorWalletUpdate();
       allow delete: if isRole('admin');
 
       match /wallet_history/{entryId} {
         allow read: if isOwner(userId) || isStaff();
-        allow create: if isRole('admin') || isRole('manager');
+        allow create: if isRole('admin') || isRole('manager') || isStaff();
         allow update, delete: if isRole('admin');
       }
     }
@@ -136,7 +145,7 @@ service cloud.firestore {
     match /validation_logs/{logId} {
       allow read: if isStaff();
       allow create: if isStaff();
-      allow update, delete: if isRole('admin') || isRole('manager');
+      allow update, delete: if isRole('admin') || isRole('manager') || isStaff();
     }
 
     function isOrderOwner() {

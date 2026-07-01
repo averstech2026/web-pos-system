@@ -64,6 +64,7 @@ export const TX_TYPE = {
   INTERNAL_BALANCE: 'internal_balance',
   BANK_CARD: 'bank_card',
   VALIDATOR_DEDUCT: 'validator_deduct',
+  VALIDATOR_REFUND: 'validator_refund',
 };
 
 /** @type {Record<string, string>} */
@@ -589,7 +590,10 @@ export function createCheckDoc({ orderId, userId, subtotal, total, paymentParts,
  * @param {string} p.orderId
  * @param {string} p.type    - one of TX_TYPE.*
  * @param {number} p.amount
- * @param {string} [p.status='success']
+ * @param {string} [p.ruleName='']
+ * @param {number|null} [p.balanceAfter=null]
+ * @param {string} [p.source='']
+ * @param {string} [p.comment='']
  */
 export function createTransactionDoc({
   checkId = '',
@@ -605,6 +609,7 @@ export function createTransactionDoc({
   ruleName = '',
   balanceAfter = null,
   source = '',
+  comment = '',
 }) {
   const doc = {
     checkId,
@@ -622,6 +627,7 @@ export function createTransactionDoc({
   if (ruleName) doc.ruleName = ruleName;
   if (balanceAfter != null) doc.balanceAfter = balanceAfter;
   if (source) doc.source = source;
+  if (comment) doc.comment = comment;
   return doc;
 }
 

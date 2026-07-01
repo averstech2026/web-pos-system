@@ -1,4 +1,4 @@
-import { ORDER_STATUS } from '../../shared/schema.js';
+import { ORDER_STATUS, TX_TYPE } from '../../shared/schema.js';
 import { orderTotal } from '../utils/order-format.js';
 import {
   buildItemsByNameMap,
@@ -336,14 +336,20 @@ export function buildClientTransactionsReport(validatorTxs, orders, usersById, p
   const start = period.start.getTime();
   const end = period.end.getTime();
 
-  const validatorRows = filterLogsByPeriod(validatorTxs, period).map(tx => ({
-    createdAt: tx.createdAt,
-    userName: tx.userName || usersById.get(tx.userId)?.name || '—',
-    typeLabel: 'Списание по валидатору (По пропуску)',
-    amount: -(Number(tx.amount) || 0),
-    balanceAfter: tx.balanceAfter,
-    detail: tx.ruleName || tx.walletName || '—',
-  }));
+  const validatorRows = filterLogsByPeriod(validatorTxs, period).map(tx => {
+    const isRefund = tx.type === TX_TYPE.VALIDATOR_REFUND;
+    const amount = Number(tx.amount) || 0;
+    return {
+      createdAt: tx.createdAt,
+      userName: tx.userName || usersById.get(tx.userId)?.name || '—',
+      typeLabel: isRefund
+        ? 'Возврат по валидатору (сброс демо)'
+        : 'Списание по валидатору (По пропуску)',
+      amount: isRefund ? amount : -amount,
+      balanceAfter: tx.balanceAfter,
+      detail: tx.comment || tx.ruleName || tx.walletName || '—',
+    };
+  });
 
   const orderRows = [...orders]
     .filter(o => {

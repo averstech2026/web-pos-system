@@ -2,7 +2,6 @@ import { auth } from '../../shared/firebase.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 import cardIconUrl from '../../kiosk/public/assets/card.png';
 import {
-  DEMO_VALIDATOR_CARDS,
   evaluateValidation,
   getDefaultValidationSuccessHeadline,
   resolveValidationDeniedHeadline,
@@ -12,10 +11,12 @@ import {
 import { fetchAllValidationRules } from '../../admin/services/validation-rules-data.js';
 import { fetchActiveAvailabilityRules } from '../../admin/services/availability-rules-data.js';
 import { rulesToMap } from '../../shared/availability-rules.js';
-import { fetchValidationLogs, persistValidationResult } from '../../admin/services/validation-logs-data.js';
+import { fetchValidationLogs, persistValidationResult, resetValidatorDemoForUsers } from '../../admin/services/validation-logs-data.js';
 import { fetchUserGroups } from '../../admin/services/crm-ref-data.js';
 import { fetchAllItems } from '../../admin/services/products-data.js';
 import { fetchWorkShifts } from '../../admin/services/work-shifts-data.js';
+import { fetchCrmUsers } from '../../admin/services/users-data.js';
+import { USER_STATUS } from '../../shared/schema.js';
 
 const CHANNEL_POINT = 'Раздача №1';
 
@@ -35,105 +36,32 @@ function resultDisplayMs(result) {
 }
 
 /**
- * @param {object} demoCard
- * @param {Map<string, number>} demoClickCounts
- * @param {Map<string, string>} groupsById
- * @param {Map<string, import('../../shared/availability-rules.js').AvailabilityRuleDoc>} availabilityRulesById
- * @param {Map<string, object>} [shiftsById]
- * @param {import('../../shared/validation-rules.js').ValidationRuleDoc[]} [allRules]
+ * Клиенты, для группы которых есть хотя бы одно активное правило валидации.
+ * @param {object[]} users
+ * @param {import('../../shared/validation-rules.js').ValidationRuleDoc[]} rules
  */
-function runDemoValidation(demoCard, demoClickCounts, groupsById, availabilityRulesById, shiftsById = new Map(), allRules = []) {
-  const card = DEMO_VALIDATOR_CARDS.find(c => c.id === demoCard.id);
-  if (!card) return null;
+function filterValidatorClients(users, rules) {
+  const groupIdsWithRules = new Set(
+    rules
+      .filter(r => r.isActive && r.targetUserGroupIds?.length)
+      .flatMap(r => r.targetUserGroupIds),
+  );
 
-  const persisted = card.rule?.id ? allRules.find(r => r.id === card.rule.id) : null;
-  const rule = persisted ? { ...card.rule, ...persisted } : { ...card.rule };
+  return users
+    .filter(u =>
+      u.status === USER_STATUS.ACTIVE
+      && u.qrCode
+      && u.userGroupId
+      && groupIdsWithRules.has(u.userGroupId))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ru'));
+}
 
-  const user = { ...card.user };
-  const clickCount = demoClickCounts.get(card.id) || 0;
-  demoClickCounts.set(card.id, clickCount + 1);
-  const groupName = groupsById.get(user.userGroupId)
-    || (user.userGroupId === 'askona' ? 'Завод Аскона' : '—');
-
-  if (card.id === 'demo-sidorov') {
-    return {
-      status: 'denied',
-      denyReason: 'Ошибка: В выходные дни подходы не доступны по вашему тарифу',
-      user,
-      rule,
-      userName: user.name,
-      cardNumber: user.qrCode,
-      groupName,
-      channelPoint: CHANNEL_POINT,
-    };
-  }
-
-  if (card.simulateLimitOnRepeat && clickCount >= 1) {
-    return {
-      status: 'denied',
-      denyReason: `Превышен лимит подходов на сегодня (${clickCount} из ${rule.approachLimit} уже использован${clickCount === 1 ? '' : 'о'})`,
-      user,
-      rule,
-      userName: user.name,
-      cardNumber: user.qrCode,
-      groupName,
-      channelPoint: CHANNEL_POINT,
-    };
-  }
-
-  if (card.id === 'demo-petrov') {
-    const wallet = user.wallets?.dotation;
-    const balance = Number(wallet?.balance) || 100;
-    const amount = 300;
-    const balanceAfter = balance - amount;
-    user.wallets = {
-      dotation: { ...wallet, balance: balanceAfter },
-    };
-    return {
-      status: 'success',
-      user,
-      rule,
-      userName: user.name,
-      cardNumber: user.qrCode,
-      groupName,
-      channelPoint: CHANNEL_POINT,
-      deductionType: 'money',
-      deductionSummary: `Списано: ${amount} руб. (Баланс кошелька "${wallet?.name || 'Субсидия'}")`,
-      balanceAfter,
-      walletId: 'dotation',
-      amount,
-      approachesLeft: 0,
-      allowOverdraft: true,
-    };
-  }
-
-  if (card.id === 'demo-ivanov') {
-    const mealLabel = (card.mealNames || []).join(', ');
-    return {
-      status: 'success',
-      user,
-      rule,
-      userName: user.name,
-      cardNumber: user.qrCode,
-      groupName,
-      channelPoint: CHANNEL_POINT,
-      deductionType: 'meal_set',
-      deductionSummary: `Списано: Обед составной (${mealLabel})`,
-      approachesLeft: 0,
-      itemIds: [],
-    };
-  }
-
-  return evaluateValidation({
-    user,
-    rules: [rule],
-    logs: [],
-    itemsById: new Map(),
-    groupsById,
-    shiftsById,
-    availabilityRules: availabilityRulesById,
-    channelPoint: CHANNEL_POINT,
-  });
+/** @param {object} user @param {Map<string, string>} groupsById */
+function clientButtonParts(user, groupsById) {
+  const parts = String(user.name || '').trim().split(/\s+/).filter(Boolean);
+  const name = parts[0] || user.name || '—';
+  const tag = groupsById.get(user.userGroupId) || '';
+  return { name, tag };
 }
 
 export class ValidatorPage {
@@ -144,14 +72,14 @@ export class ValidatorPage {
     this.resetTimer = null;
     this.rules = [];
     this.logs = [];
+    /** @type {object[]} */
+    this.clients = [];
     this.itemsById = new Map();
     this.groupsById = new Map();
     /** @type {Map<string, object>} */
     this.shiftsById = new Map();
     /** @type {Map<string, import('../../shared/availability-rules.js').AvailabilityRuleDoc>} */
     this.availabilityRulesById = new Map();
-    /** @type {Map<string, number>} */
-    this.demoClickCounts = new Map();
     this.init();
   }
 
@@ -162,13 +90,14 @@ export class ValidatorPage {
 
   async loadData() {
     try {
-      const [rules, groups, items, logs, availabilityRules, workShifts] = await Promise.all([
+      const [rules, groups, items, logs, availabilityRules, workShifts, users] = await Promise.all([
         fetchAllValidationRules(),
         fetchUserGroups(),
         fetchAllItems(),
         fetchValidationLogs({ limitCount: 300 }),
         fetchActiveAvailabilityRules(),
         fetchWorkShifts(),
+        fetchCrmUsers(),
       ]);
       this.rules = rules;
       this.logs = logs;
@@ -176,45 +105,85 @@ export class ValidatorPage {
       this.shiftsById = new Map(workShifts.map(s => [s.id, s]));
       this.itemsById = new Map(items.map(i => [i.id, i.name]));
       this.availabilityRulesById = rulesToMap(availabilityRules);
+      this.clients = filterValidatorClients(users, rules);
+      this.updateToolbar();
     } catch (err) {
-      console.warn('[validator] load failed, demo mode only', err);
+      console.warn('[validator] load failed', err);
     }
+  }
+
+  renderToolbarHtml() {
+    if (!this.clients.length) {
+      return `
+        <p class="vtd-toolbar-empty">
+          Нет клиентов с правилами валидации.
+          Создайте клиента в CRM, назначьте группу и добавьте правило для этой группы.
+        </p>
+      `;
+    }
+
+    return `
+      <div class="vtd-toolbar-inner">
+        <div class="vtd-demo-btns">
+          ${this.clients.map(client => {
+            const { name, tag } = clientButtonParts(client, this.groupsById);
+            return `
+              <button type="button" class="vtd-demo-btn btn-press" data-user-id="${escAttr(client.id)}">
+                <span class="vtd-demo-btn__name">${esc(name)}</span>
+                ${tag ? `<span class="vtd-demo-btn__tag">${esc(tag)}</span>` : ''}
+              </button>
+            `;
+          }).join('')}
+        </div>
+        <button type="button" class="vtd-reset-btn btn-press" data-action="reset-approaches"
+                aria-label="Сбросить счётчики подходов" title="Сбросить счётчики подходов">×</button>
+      </div>
+    `;
+  }
+
+  bindToolbar() {
+    this.container.querySelectorAll('[data-user-id]').forEach(btn => {
+      btn.addEventListener('click', () => this.handleCard(btn.dataset.userId));
+    });
+    this.container.querySelector('[data-action="reset-approaches"]')?.addEventListener('click', () => {
+      this.handleResetApproaches();
+    });
+  }
+
+  updateToolbar() {
+    const toolbar = this.container.querySelector('.vtd-toolbar');
+    if (!toolbar) return;
+    toolbar.innerHTML = this.renderToolbarHtml();
+    this.bindToolbar();
   }
 
   render() {
     this.container.innerHTML = `
       <div class="vtd-shell">
-        <header class="vtd-head">
-          <img class="vtd-logo" src="${logoUrl}" alt="iFCM TECH" />
-          <h1 class="vtd-head-title">Валидатор прохода</h1>
-          <div class="vtd-head-meta">
-            <span class="vtd-head-point">${esc(CHANNEL_POINT)}</span>
-            <span class="vtd-head-user">${esc(auth.currentUser?.email || '')}</span>
+        <div class="vtd-top">
+          <header class="vtd-head">
+            <img class="vtd-logo" src="${logoUrl}" alt="iFCM TECH" />
+            <h1 class="vtd-head-title">Валидатор прохода</h1>
+            <div class="vtd-head-meta">
+              <span class="vtd-head-point">${esc(CHANNEL_POINT)}</span>
+              <span class="vtd-head-user">${esc(auth.currentUser?.email || '')}</span>
+            </div>
+          </header>
+
+          <div class="vtd-toolbar">
+            ${this.renderToolbarHtml()}
           </div>
-        </header>
+        </div>
 
         <main class="vtd-main">
           <section class="vtd-board" aria-live="polite">
             ${this.renderBoard()}
           </section>
-
-          <aside class="vtd-demo">
-            <h2 class="vtd-demo-title">Эмуляция карт (тест демо)</h2>
-            <div class="vtd-demo-cards">
-              ${DEMO_VALIDATOR_CARDS.map(card => `
-                <button type="button" class="vtd-demo-card btn-press" data-demo-card="${escAttr(card.id)}">
-                  <span class="vtd-demo-card__label">${esc(card.label)}</span>
-                </button>
-              `).join('')}
-            </div>
-          </aside>
         </main>
       </div>
     `;
 
-    this.container.querySelectorAll('[data-demo-card]').forEach(btn => {
-      btn.addEventListener('click', () => this.handleDemoCard(btn.dataset.demoCard));
-    });
+    this.bindToolbar();
   }
 
   renderBoard() {
@@ -317,17 +286,39 @@ export class ValidatorPage {
     `;
   }
 
-  async handleDemoCard(cardId) {
+  async handleResetApproaches() {
+    const btn = this.container.querySelector('[data-action="reset-approaches"]');
+    if (!btn || btn.disabled || !this.clients.length) return;
+
+    btn.disabled = true;
+    try {
+      await resetValidatorDemoForUsers({
+        userIds: this.clients.map(c => c.id),
+        performedBy: auth.currentUser?.email || 'validator-terminal',
+      });
+      await this.loadData();
+    } catch (err) {
+      console.warn('[validator] reset approaches failed', err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async handleCard(userId) {
     clearTimeout(this.resetTimer);
-    const result = runDemoValidation(
-      { id: cardId },
-      this.demoClickCounts,
-      this.groupsById,
-      this.availabilityRulesById,
-      this.shiftsById,
-      this.rules,
-    );
-    if (!result) return;
+    const user = this.clients.find(u => u.id === userId);
+    if (!user) return;
+
+    const result = evaluateValidation({
+      user,
+      rules: this.rules,
+      logs: this.logs,
+      itemsById: this.itemsById,
+      groupsById: this.groupsById,
+      shiftsById: this.shiftsById,
+      availabilityRules: this.availabilityRulesById,
+      channelPoint: CHANNEL_POINT,
+    });
 
     this.state = 'result';
     this.result = result;
@@ -338,12 +329,6 @@ export class ValidatorPage {
         performedBy: auth.currentUser?.email || 'validator-terminal',
         channelPoint: CHANNEL_POINT,
       });
-      if (result.status === 'success' && result.deductionType === 'money' && result.user?.id?.startsWith('demo-')) {
-        const card = DEMO_VALIDATOR_CARDS.find(c => c.id === cardId);
-        if (card?.user?.wallets?.dotation) {
-          card.user.wallets.dotation.balance = result.balanceAfter;
-        }
-      }
       await this.loadData();
     } catch (err) {
       console.warn('[validator] log persist skipped', err.message);
