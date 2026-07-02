@@ -19,7 +19,9 @@ import {
   createValidationLogDoc,
   createWalletHistoryDoc,
   normalizeUserWallets,
+  totalWalletBalance,
 } from '../../shared/schema.js';
+import { assertWalletSpendable } from '../../shared/wallets.js';
 
 /**
  * @param {{ limitCount?: number, userId?: string }} [opts]
@@ -127,7 +129,7 @@ async function refundValidatorMoneyDeduction({
 
     tx.update(userRef, {
       wallets,
-      balance: Object.values(wallets).reduce((s, w) => s + (Number(w.balance) || 0), 0),
+      balance: totalWalletBalance(wallets, { spendableOnly: true }),
     });
 
     tx.set(doc(collection(userRef, USER_SUB.WALLET_HISTORY)), createWalletHistoryDoc({
@@ -155,7 +157,7 @@ async function refundValidatorMoneyDeduction({
 }
 
 /** @returns {Promise<Array<object>>} */
-export async function fetchValidatorTransactions(limitCount = 500) {
+export async function fetchClientTransactions(limitCount = 500) {
   const snap = await getDocs(query(
     collection(db, COL.TRANSACTIONS),
     orderBy('createdAt', 'desc'),
@@ -166,7 +168,17 @@ export async function fetchValidatorTransactions(limitCount = 500) {
     .filter(t =>
       t.type === TX_TYPE.VALIDATOR_DEDUCT
       || t.type === TX_TYPE.VALIDATOR_REFUND
+      || t.source === 'pos'
       || t.source === 'validator');
+}
+
+/** @returns {Promise<Array<object>>} */
+export async function fetchValidatorTransactions(limitCount = 500) {
+  const rows = await fetchClientTransactions(limitCount);
+  return rows.filter(t =>
+    t.type === TX_TYPE.VALIDATOR_DEDUCT
+    || t.type === TX_TYPE.VALIDATOR_REFUND
+    || t.source === 'validator');
 }
 
 /**
@@ -243,6 +255,7 @@ async function applyValidatorWalletDeduction({
     const wallets = normalizeUserWallets(userData);
     const wallet = wallets[walletId];
     if (!wallet) throw new Error('Кошелёк не найден');
+    assertWalletSpendable({ wallets }, walletId);
 
     const balanceAfter = (Number(wallet.balance) || 0) - sum;
     wallets[walletId] = { ...wallet, balance: balanceAfter };
@@ -250,7 +263,7 @@ async function applyValidatorWalletDeduction({
 
     tx.update(userRef, {
       wallets,
-      balance: Object.values(wallets).reduce((s, w) => s + (Number(w.balance) || 0), 0),
+      balance: totalWalletBalance(wallets, { spendableOnly: true }),
     });
 
     const historyRef = doc(collection(userRef, USER_SUB.WALLET_HISTORY));

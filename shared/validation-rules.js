@@ -551,6 +551,31 @@ export function evaluateValidation(ctx) {
 
     if (rule.actionType === 'money') {
       const wallet = user.wallets?.[rule.walletId];
+      if (!wallet) {
+        return {
+          status: 'denied',
+          denyReason: 'Кошелёк не найден у клиента',
+          user,
+          rule,
+          userName: user.name,
+          cardNumber: user.qrCode || '—',
+          groupName: groupsById.get(user.userGroupId) || '—',
+          channelPoint,
+        };
+      }
+      if (wallet.available === false) {
+        return {
+          status: 'denied',
+          denyReason: 'Кошелёк недоступен для клиента',
+          user,
+          rule,
+          userName: user.name,
+          cardNumber: user.qrCode || '—',
+          groupName: groupsById.get(user.userGroupId) || '—',
+          channelPoint,
+          walletName: wallet.name || rule.walletId,
+        };
+      }
       const balance = Number(wallet?.balance) || 0;
       const amount = Number(rule.amount) || 0;
       const balanceAfter = balance - amount;

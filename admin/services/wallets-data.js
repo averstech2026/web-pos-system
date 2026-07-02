@@ -56,6 +56,10 @@ export async function saveWallet(data) {
   const id = data.id || doc(collection(db, COL.WALLETS)).id;
   const payload = createWalletDoc({ ...data, id });
   await setDoc(doc(db, COL.WALLETS, id), payload, { merge: true });
+
+  const { syncWalletCatalogToUsers } = await import('./users-data.js');
+  await syncWalletCatalogToUsers(payload);
+
   return payload;
 }
 

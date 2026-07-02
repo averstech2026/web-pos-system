@@ -146,6 +146,11 @@ export function bindNumpad(numpadRoot, { onChange, onEnter, onCancel }) {
 
   return {
     getValue: () => value,
-    setValue: (v) => { value = v; emit(); },
+    setValue: (v) => {
+      value = v;
+      const hidden = numpadRoot.querySelector('[data-numpad-value]');
+      if (hidden) hidden.value = v;
+      emit();
+    },
   };
 }

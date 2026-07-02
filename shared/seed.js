@@ -192,7 +192,8 @@ const DEMO_VALIDATOR_CARD_USERS = [
     qrCode: '048292',
     allowsWebAccess: false,
     wallets: {
-        dotation: { balance: 100, name: 'Субсидия предприятия', allowedCategories: [] },
+        dotation: { balance: 100, name: 'Дотация', allowedCategories: [], available: true },
+        personal: { balance: 0, name: 'Личные средства', allowedCategories: [], available: true },
     },
   }),
   createUserDoc({

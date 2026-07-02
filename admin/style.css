@@ -1493,6 +1493,41 @@ body:has(.admin-shell) {
   color: var(--color-navy);
 }
 
+.orders-detail-payments {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.orders-detail-payments__title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.orders-detail-line--payment span:last-child {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.reports-nested-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reports-nested-wrap--payments {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
 /* ── Products section ───────────────────────────────────── */
 
 .products-page {
@@ -6877,6 +6912,40 @@ body:has(.admin-shell) {
 .ufm-allergen-chip span {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.ufm-wallet-card--unavailable {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.ufm-wallet-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ufm-wallet-badge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--admin-surface-muted, #eef1f4);
+  color: var(--admin-text-muted, #667085);
+}
+
+.ufm-wallet-section {
+  margin-top: 8px;
+}
+
+.ufm-section-title {
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--admin-text-muted, #667085);
 }
 
 .ufm-wallet-grid {

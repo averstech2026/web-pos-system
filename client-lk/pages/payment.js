@@ -1,7 +1,8 @@
 import { auth, db } from '../../shared/firebase.js';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { COL } from '../../shared/schema.js';
+import { COL, normalizeUserWallets } from '../../shared/schema.js';
 import { processOrderPayment } from '../../shared/payment.js';
+import { getSpendableWallets, resolveOrderCategoryGroupIds, sumWalletBalances } from '../../shared/wallets.js';
 import { cancelUnpaidOrder, canCancelOrder } from '../../shared/orders.js';
 import { getItemImageUrl, resolveProductImageUrl } from '../../shared/item-images.js';
 import { hasNutrition, renderNutritionGrid, sumNutrition } from '../../shared/nutrition.js';
@@ -61,6 +62,7 @@ export class PaymentPage {
     this.order = null;
     this.userData = null;
     this.useBalance = false;
+    this.selectedWalletId = null;
     this._updatingQty = false;
     this._updatingSlot = false;
     this.init();
@@ -83,7 +85,15 @@ export class PaymentPage {
       if (orderSnap.data().status === 'cancelled') { this.navigate('/home'); return; }
 
       this.order = orderSnap.data();
-      this.userData = userSnap.exists() ? userSnap.data() : { balance: 0 };
+      this.userData = userSnap.exists() ? userSnap.data() : { balance: 0, wallets: {} };
+      const wallets = normalizeUserWallets(this.userData);
+      const categoryGroupIds = resolveOrderCategoryGroupIds(
+        this.order.items,
+        cart._promoContext?.categoryGroups || [],
+      );
+      const spendable = getSpendableWallets(wallets, categoryGroupIds);
+      this.selectedWalletId = spendable[0]?.id || null;
+      this.useBalance = Boolean(this.selectedWalletId);
 
       if (this.order.dateSlot && this.order.timeSlot) {
         cart.setSlot(this.order.dateSlot, this.order.timeSlot);
@@ -175,7 +185,18 @@ export class PaymentPage {
     const o = this.order;
     const items = o.items || [];
     const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const balance = this.userData.balance || 0;
+    const wallets = normalizeUserWallets(this.userData);
+    const categoryGroupIds = resolveOrderCategoryGroupIds(
+      items,
+      cart._promoContext?.categoryGroups || [],
+    );
+    const spendableWallets = getSpendableWallets(wallets, categoryGroupIds);
+    const balance = sumWalletBalances(wallets, { spendableOnly: true });
+    const selectedWallet = spendableWallets.find(w => w.id === this.selectedWalletId) || spendableWallets[0] || null;
+    if (selectedWallet && this.selectedWalletId !== selectedWallet.id) {
+      this.selectedWalletId = selectedWallet.id;
+    }
+    const walletBalance = Number(selectedWallet?.balance) || 0;
     const orderNutrition = sumNutrition(items);
     const nutritionHtml = orderNutrition
       ? `<div class="pay-nutrition">${renderNutritionGrid(orderNutrition, { title: 'КБЖУ заказа' })}</div>`
@@ -208,25 +229,38 @@ export class PaymentPage {
             ${nutritionHtml}
           </div>
 
-          <!-- Balance toggle -->
-          ${balance > 0 ? `
+          <!-- Wallet picker -->
+          ${spendableWallets.length ? `
           <div class="card">
             <div class="balance-toggle">
               <div class="balance-toggle-label">
-                Списать с баланса
-                <div class="balance-toggle-sub">Доступно: ${balance.toLocaleString('ru-RU', { minimumFractionDigits: 2 })} р.</div>
+                Оплата с кошелька
+                <div class="balance-toggle-sub">Доступно кошельков: ${spendableWallets.length}</div>
               </div>
               <label class="toggle-switch">
                 <input type="checkbox" id="toggle-balance" ${this.useBalance ? 'checked' : ''}>
                 <span class="toggle-slider"></span>
               </label>
             </div>
+            ${this.useBalance ? `
+              <div class="pay-wallet-list">
+                ${spendableWallets.map(w => `
+                  <label class="pay-wallet-option">
+                    <input type="radio" name="pay-wallet" value="${w.id}" ${w.id === this.selectedWalletId ? 'checked' : ''} />
+                    <span class="pay-wallet-option-body">
+                      <strong>${w.name}</strong>
+                      <span>${(Number(w.balance) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} р.</span>
+                    </span>
+                  </label>
+                `).join('')}
+              </div>
+            ` : ''}
           </div>
           ` : ''}
 
           <!-- Split preview -->
           <div class="card pay-split-info" id="split-info">
-            ${this.renderSplit(subtotal, balance)}
+            ${this.renderSplit(subtotal, walletBalance)}
           </div>
 
           <!-- Date / time -->
@@ -246,10 +280,10 @@ export class PaymentPage {
       </div>
     `;
 
-    this.bindEvents(subtotal, balance);
+    this.bindEvents(subtotal, walletBalance, spendableWallets);
   }
 
-  renderSplit(total, balance) {
+  renderSplit(total, walletBalance) {
     const used = this.useBalance ? Math.min(balance, total) : 0;
     const card = total - used;
 
@@ -336,7 +370,7 @@ export class PaymentPage {
     }
   }
 
-  bindEvents(subtotal, balance) {
+  bindEvents(subtotal, walletBalance, spendableWallets) {
     document.getElementById('btn-back').addEventListener('click', () => this.navigate('/home'));
 
     document.getElementById('pay-items-list')?.addEventListener('click', e => {
@@ -350,7 +384,22 @@ export class PaymentPage {
     const toggle = document.getElementById('toggle-balance');
     toggle?.addEventListener('change', () => {
       this.useBalance = toggle.checked;
-      document.getElementById('split-info').innerHTML = this.renderSplit(this.getSubtotal(), balance);
+      if (this.useBalance && !this.selectedWalletId) {
+        this.selectedWalletId = spendableWallets[0]?.id || null;
+      }
+      document.getElementById('split-info').innerHTML = this.renderSplit(this.getSubtotal(), walletBalance);
+      this.render();
+    });
+
+    document.querySelectorAll('input[name="pay-wallet"]').forEach(input => {
+      input.addEventListener('change', () => {
+        this.selectedWalletId = input.value;
+        const selected = spendableWallets.find(w => w.id === input.value);
+        document.getElementById('split-info').innerHTML = this.renderSplit(
+          this.getSubtotal(),
+          Number(selected?.balance) || 0,
+        );
+      });
     });
 
     document.getElementById('btn-pay').addEventListener('click', () => this.pay());
@@ -405,7 +454,12 @@ export class PaymentPage {
     btn.textContent = 'Обрабатываем оплату…';
 
     try {
-      const result = await processOrderPayment(this.orderId, this.useBalance);
+      const result = await processOrderPayment(this.orderId, {
+        useBalance: this.useBalance,
+        walletId: this.useBalance ? this.selectedWalletId : null,
+        categoryGroups: cart._promoContext?.categoryGroups || [],
+        performedBy: 'client-lk',
+      });
       cart.clear();
       this.renderSuccess(result);
     } catch (err) {

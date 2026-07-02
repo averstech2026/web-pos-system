@@ -61,6 +61,7 @@ import {
 } from '../../shared/group-wallets.js';
 
 import { fetchWallets } from './wallets-data.js';
+import { applyCatalogEntryToUserWallets } from '../../shared/wallets.js';
 /** @param {string|null} groupId @returns {Promise<object|null>} */
 async function fetchUserGroupById(groupId) {
   if (!groupId) return null;
@@ -78,7 +79,7 @@ function walletsPatchForGroup(user, group, walletCatalog) {
   const wallets = buildUserWalletsFromGroup(user.wallets, group, walletCatalog);
   return {
     wallets,
-    balance: totalWalletBalance(wallets),
+    balance: totalWalletBalance(wallets, { spendableOnly: true }),
   };
 }
 
@@ -115,6 +116,43 @@ export async function syncGroupWalletsToMembers(groupId, allowedWalletIds) {
     for (const user of chunk) {
       const patch = walletsPatchForGroup(user, group, walletCatalog);
       batch.update(doc(db, COL.USERS, user.id), patch);
+    }
+
+    await batch.commit();
+    updated += chunk.length;
+  }
+
+  return updated;
+}
+
+/**
+ * Propagate catalog wallet metadata (name, allowedCategories) to all users who have this wallet.
+ * @param {object} catalogEntry
+ * @returns {Promise<number>}
+ */
+export async function syncWalletCatalogToUsers(catalogEntry) {
+  if (!catalogEntry?.id) return 0;
+
+  const usersSnap = await getDocs(query(collection(db, COL.USERS), where('role', '==', ROLES.CLIENT)));
+  const members = usersSnap.docs
+    .map(d => normalizeCrmUser({ id: d.id, ...d.data() }))
+    .filter(u => u.wallets?.[catalogEntry.id]);
+
+  if (!members.length) return 0;
+
+  const BATCH_LIMIT = 500;
+  let updated = 0;
+
+  for (let i = 0; i < members.length; i += BATCH_LIMIT) {
+    const chunk = members.slice(i, i + BATCH_LIMIT);
+    const batch = writeBatch(db);
+
+    for (const user of chunk) {
+      const wallets = applyCatalogEntryToUserWallets(user.wallets, catalogEntry);
+      batch.update(doc(db, COL.USERS, user.id), {
+        wallets,
+        balance: totalWalletBalance(wallets, { spendableOnly: true }),
+      });
     }
 
     await batch.commit();
@@ -162,7 +200,7 @@ export function normalizeCrmUser(raw) {
 
     wallets,
 
-    balance: totalWalletBalance(wallets),
+    balance: totalWalletBalance(wallets, { spendableOnly: true }),
 
   };
 
@@ -707,6 +745,7 @@ export async function bulkAdjustWalletBalances({
         name: walletDef.name,
         balance: 0,
         allowedCategories: walletDef.allowedCategories || [],
+        available: true,
       };
       needsWalletInit = true;
     }
@@ -746,6 +785,7 @@ export async function bulkAdjustWalletBalances({
       if (needsWalletInit) {
         updatePayload[`wallets.${walletId}.name`] = wallet.name;
         updatePayload[`wallets.${walletId}.allowedCategories`] = wallet.allowedCategories || [];
+        updatePayload[`wallets.${walletId}.available`] = true;
       }
 
       batch.update(userRef, updatePayload);

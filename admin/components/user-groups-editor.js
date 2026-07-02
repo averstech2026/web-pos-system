@@ -2,6 +2,7 @@ import { saveUserGroup, deleteUserGroup } from '../services/crm-ref-data.js';
 import { showToast } from '../utils/toast.js';
 import { renderAvrDetailStickyHead, runWithUnsavedGuard, bindAvrDetailCancel } from '../utils/avr-unsaved-changes.js';
 import { DEFAULT_GROUP_WALLET_IDS } from '../../shared/group-wallets.js';
+import { filterWalletCatalogForUserGroup } from '../../shared/wallets.js';
 
 const CHIP_SELECT_ICON = `<svg class="pay-restrictions-chip-btn__icon" xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`;
 
@@ -144,8 +145,9 @@ export function createUserGroupsEditor(host, { groups: initialGroups, wallets = 
   }
 
   function renderWalletRestrictions(group) {
-    if (!wallets.length) {
-      return '<p class="ufm-muted">Справочник кошельков пуст.</p>';
+    const groupWallets = filterWalletCatalogForUserGroup(wallets, group.id);
+    if (!groupWallets.length) {
+      return '<p class="ufm-muted">Нет кошельков, доступных для назначения этой группе. Проверьте справочник кошельков.</p>';
     }
     return renderRestrictionsBox(
       'Доступные кошельки',
@@ -153,7 +155,7 @@ export function createUserGroupsEditor(host, { groups: initialGroups, wallets = 
       'deselect-all-wallets',
       `
         <div class="wallet-restrictions-grid">
-          ${wallets.map(wallet => `
+          ${groupWallets.map(wallet => `
             <label class="ifm-allergen bulk-allergen-tag">
               <input
                 type="checkbox"
@@ -331,7 +333,8 @@ export function createUserGroupsEditor(host, { groups: initialGroups, wallets = 
       if (!btn) return;
       const action = btn.dataset.action;
       if (action === 'select-all-wallets') {
-        setWalletSelection(wallets.map(w => w.id));
+        const group = selectedGroup();
+        setWalletSelection(filterWalletCatalogForUserGroup(wallets, group?.id).map(w => w.id));
       }
       if (action === 'deselect-all-wallets') {
         setWalletSelection([]);

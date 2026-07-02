@@ -164,11 +164,13 @@ export class SalesPage {
           ${lines.map((line, idx) => {
             const selected = this.isLineSelected(line.id);
             const lineTotal = line.price * line.quantity * (1 - (line.discountPct || 0) / 100);
-            const zebra = idx % 2 === 1 ? 'ct-receipt-row--alt' : '';
             return `
-              <div class="ct-receipt-row ${zebra} ${selected ? 'ct-receipt-row--selected' : ''}" data-line-id="${escAttr(line.id)}">
+              <div class="ct-receipt-row ${selected ? 'ct-receipt-row--selected' : ''}" data-line-id="${escAttr(line.id)}">
                 <span class="ct-receipt-index">${idx + 1}</span>
-                <span class="ct-receipt-name">${esc(line.name)}</span>
+                <span class="ct-receipt-name-wrap">
+                  <span class="ct-receipt-name">${esc(line.name)}</span>
+                  ${line.honestSignCode ? '<span class="ct-receipt-badge ct-receipt-badge--hz" title="Марка Честный Знак">ЧЗ</span>' : ''}
+                </span>
                 <div class="ct-receipt-qty">
                   <button type="button" class="ct-qty-btn btn-press" data-action="line-minus" data-id="${escAttr(line.id)}">${TOOL_ICONS.minus}</button>
                   <span class="ct-qty-value">${line.quantity}</span>
@@ -457,6 +459,7 @@ export class SalesPage {
       if (!state.receiptLines.length) return;
       const total = resolveDisplayTotals()?.total ?? getTotal();
       const methods = resolvePosPaymentMethodButtons(state.channel, state.paymentMethods);
+      state.paymentsLog = [];
       state.modal = 'payment';
       state.modalData = {
         received: total.toFixed(2).replace('.', ','),

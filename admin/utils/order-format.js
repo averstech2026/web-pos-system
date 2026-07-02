@@ -31,6 +31,7 @@ export function paymentStatusLabel(status) {
 export function orderSalesChannelLabel(source) {
   const src = source || ORDER_SOURCE.WEB;
   if (src === ORDER_SOURCE.KIOSK) return 'Киоск';
+  if (src === ORDER_SOURCE.POS) return 'Касса';
   return 'Веб';
 }
 

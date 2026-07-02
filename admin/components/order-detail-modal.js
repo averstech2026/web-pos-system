@@ -28,6 +28,7 @@ export function openOrderDetailModal({ order, user = null, onClose, zIndex = 100
 
   const items = order.items || [];
   const total = orderTotal(items);
+  const posPayments = order.posPayments || [];
 
   function close() {
     overlay.remove();
@@ -70,6 +71,17 @@ export function openOrderDetailModal({ order, user = null, onClose, zIndex = 100
             <strong>${fmtMoney(total)}</strong>
           </div>
         </div>
+        ${posPayments.length ? `
+          <div class="orders-detail-payments">
+            <h3 class="orders-detail-payments__title">Платежи</h3>
+            ${posPayments.map(p => `
+              <div class="orders-detail-line orders-detail-line--payment">
+                <span>${esc(p.method || p.methodId || '—')}</span>
+                <span>${fmtMoney(p.amount)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
       </div>
       <div class="admin-modal-foot">
         <button type="button" class="action-btn action-btn-secondary btn-press" id="order-detail-close-2">Закрыть</button>

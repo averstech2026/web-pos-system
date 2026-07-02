@@ -2,6 +2,12 @@ import { fetchAllValidationRules } from '../../admin/services/validation-rules-d
 import { fetchUserGroups } from '../../admin/services/crm-ref-data.js';
 import { fetchCrmUsers, filterCrmUsers } from '../../admin/services/users-data.js';
 import { USER_STATUS, normalizeUserWallets } from '../../shared/schema.js';
+import {
+  canSpendFromWallet,
+  isUserWalletAvailable,
+  listUserWallets,
+  sumWalletBalances,
+} from '../../shared/wallets.js';
 import { esc, escAttr, formatMoney } from '../core/format.js';
 
 /** Demo clients for ?demo=1 (same shape as CRM users). */
@@ -13,7 +19,7 @@ export const DEMO_POS_CLIENTS = [
     status: USER_STATUS.ACTIVE,
     userGroupId: 'askona',
     balance: 5000,
-    wallets: { dotation: { balance: 5000, name: 'Дотация' } },
+    wallets: { dotation: { balance: 5000, name: 'Дотация', available: true } },
   },
   {
     id: 'demo-vld-petrov',
@@ -22,7 +28,7 @@ export const DEMO_POS_CLIENTS = [
     status: USER_STATUS.ACTIVE,
     userGroupId: 'office_romashka',
     balance: 3200,
-    wallets: { dotation: { balance: 150, name: 'Субсидия' } },
+    wallets: { dotation: { balance: 150, name: 'Дотация', available: true } },
   },
   {
     id: 'demo-vld-sidorov',
@@ -31,7 +37,7 @@ export const DEMO_POS_CLIENTS = [
     status: USER_STATUS.ACTIVE,
     userGroupId: 'production',
     balance: 1100,
-    wallets: { dotation: { balance: 100, name: 'Дотация' } },
+    wallets: { dotation: { balance: 100, name: 'Дотация', available: true } },
   },
 ];
 
@@ -63,6 +69,22 @@ export function filterPosClients(users, rules) {
 }
 
 /** @param {object} user @param {Map<string, string>|Record<string, string>} groupsById */
+export function clientPickerCardParts(user, groupsById) {
+  const fullName = String(user.name || '').trim();
+  const parts = fullName.split(/\s+/).filter(Boolean);
+  const displayName = parts.length >= 2 ? `${parts[0]} ${parts[1]}` : fullName || '—';
+  const tag = groupsById instanceof Map
+    ? groupsById.get(user.userGroupId) || ''
+    : groupsById[user.userGroupId] || '';
+  const identifier = user.qrCode
+    ? `карта: ${user.qrCode}`
+    : user.phone
+      ? `тел: ${user.phone}`
+      : '';
+  return { displayName, tag, identifier };
+}
+
+/** @param {object} user @param {Map<string, string>|Record<string, string>} groupsById */
 export function clientButtonParts(user, groupsById) {
   const parts = String(user.name || '').trim().split(/\s+/).filter(Boolean);
   const name = parts[0] || user.name || '—';
@@ -72,47 +94,48 @@ export function clientButtonParts(user, groupsById) {
   return { name, tag };
 }
 
-/** @param {object} user */
-function resolveGuestWallets(user) {
+/**
+ * @param {object} user
+ * @param {string[]} [categoryGroupIds]
+ */
+function resolveGuestWallets(user, categoryGroupIds = []) {
   const normalized = normalizeUserWallets(user);
-  const order = ['personal', 'dotation'];
-  const entries = Object.entries(normalized).map(([id, w]) => ({
-    id,
+  return listUserWallets(normalized, { spendableOnly: true }).map(w => ({
+    id: w.id,
     name: w.name,
     balance: Number(w.balance) || 0,
+    allowedCategories: w.allowedCategories || [],
+    available: isUserWalletAvailable(w),
+    canPay: canSpendFromWallet(w, categoryGroupIds),
   }));
-  entries.sort((a, b) => {
-    const ai = order.indexOf(a.id);
-    const bi = order.indexOf(b.id);
-    if (ai === -1 && bi === -1) return a.name.localeCompare(b.name, 'ru');
-    if (ai === -1) return 1;
-    if (bi === -1) return -1;
-    return ai - bi;
-  });
-  return entries;
 }
 
-/** @param {object} user */
-function resolveGuestLimit(user) {
-  const wallets = user.wallets || {};
-  const balances = Object.values(wallets)
-    .map(w => Number(w?.balance))
-    .filter(n => Number.isFinite(n));
-  if (balances.length) return Math.max(...balances);
+/** @param {object} user @param {string[]} [categoryGroupIds] */
+function resolveGuestLimit(user, categoryGroupIds = []) {
+  const wallets = normalizeUserWallets(user);
+  const spendable = listUserWallets(wallets, { spendableOnly: true })
+    .filter(w => canSpendFromWallet(w, categoryGroupIds));
+  if (spendable.length) {
+    return Math.max(...spendable.map(w => Number(w.balance) || 0));
+  }
   return Number(user.balance) || 0;
 }
 
-/** @param {object} user @param {Map<string, string>|Record<string, string>} groupsById */
-export function crmUserToGuest(user, groupsById) {
+/**
+ * @param {object} user
+ * @param {Map<string, string>|Record<string, string>} groupsById
+ * @param {string[]} [categoryGroupIds]
+ */
+export function crmUserToGuest(user, groupsById, categoryGroupIds = []) {
   const { name, tag } = clientButtonParts(user, groupsById);
-  const wallets = resolveGuestWallets(user);
+  const wallets = resolveGuestWallets(user, categoryGroupIds);
   return {
     id: user.id,
     card: user.qrCode,
     name,
     fullName: user.name || name,
-    balance: Number(user.balance) || 0,
-    limit: resolveGuestLimit(user),
+    balance: sumWalletBalances(normalizeUserWallets(user), { spendableOnly: true }),
+    limit: resolveGuestLimit(user, categoryGroupIds),
     group: tag,
     userGroupId: user.userGroupId,
     phone: user.phone || null,
@@ -134,13 +157,8 @@ export function renderPosGuestTotalsLine(guest) {
   }
 
   const wallets = guest.wallets?.length
-    ? guest.wallets
-    : [
-      { name: 'Личные средства', balance: guest.balance || 0 },
-      ...(guest.limit != null && guest.limit !== guest.balance
-        ? [{ name: 'Дотация', balance: guest.limit }]
-        : []),
-    ];
+    ? guest.wallets.filter(w => w.available !== false && w.canPay !== false)
+    : [];
 
   const walletsHtml = wallets.map((wallet, index) => `
     ${index > 0 ? '<span class="ct-totals-guest-wallet-sep" aria-hidden="true">·</span>' : ''}
@@ -176,12 +194,7 @@ function guestDetailValue(value) {
 export function renderGuestDetailsBody(guest) {
   const wallets = guest.wallets?.length
     ? guest.wallets
-    : [
-      { name: 'Личные средства', balance: guest.balance || 0 },
-      ...(guest.limit != null && guest.limit !== guest.balance
-        ? [{ name: 'Дотация', balance: guest.limit }]
-        : []),
-    ];
+    : [{ name: 'Личные средства', balance: guest.balance || 0 }];
 
   const walletsHtml = wallets.map(wallet => `
     <div class="ct-guest-detail-wallet">

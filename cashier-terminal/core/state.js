@@ -1,4 +1,4 @@
-/** @typedef {{ id: string, productId: string, name: string, price: number, quantity: number, priceCategory: string, discountPct: number, honestSignCode?: string, kitchenStatus: string }} ReceiptLine */
+/** @typedef {{ id: string, productId: string, name: string, price: number, quantity: number, priceCategory: string, discountPct: number, honestSignCode?: string, honestSignMarked?: boolean, kitchenStatus: string }} ReceiptLine */
 
 /** @type {{
  *   screen: string,
@@ -89,6 +89,12 @@ export function getTotal() {
 
 export function getReceivedTotal() {
   return state.paymentsLog.reduce((s, p) => s + p.amount, 0);
+}
+
+/** Sum still due on the current receipt after recorded payments. */
+export function getPaymentRemaining() {
+  const remaining = getTotal() - getReceivedTotal();
+  return Math.max(0, Math.round(remaining * 100) / 100);
 }
 
 export function nextLineId() {

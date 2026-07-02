@@ -1,4 +1,5 @@
 import { ORDER_STATUS, TX_TYPE } from '../../shared/schema.js';
+import { posPaymentTypeLabel } from '../../shared/pos-payment.js';
 import { orderTotal } from '../utils/order-format.js';
 import {
   buildItemsByNameMap,
@@ -232,6 +233,7 @@ export function buildOrdersPaymentsReport(orders, usersById) {
         paymentStatus: order.paymentStatus,
         total: orderTotal(order.items),
         items: order.items || [],
+        posPayments: order.posPayments || [],
       };
     });
 }
@@ -332,11 +334,27 @@ export function buildValidationLogsReport(logs, period) {
  * @param {Map<string, object>} usersById
  * @param {{ start: Date, end: Date }} period
  */
-export function buildClientTransactionsReport(validatorTxs, orders, usersById, period) {
+export function buildClientTransactionsReport(clientTxs, orders, usersById, period) {
   const start = period.start.getTime();
   const end = period.end.getTime();
 
-  const validatorRows = filterLogsByPeriod(validatorTxs, period).map(tx => {
+  const posOrderIds = new Set(
+    clientTxs.filter(tx => tx.source === 'pos' && tx.orderId).map(tx => tx.orderId),
+  );
+
+  const txRows = filterLogsByPeriod(clientTxs, period).map(tx => {
+    if (tx.source === 'pos') {
+      const amount = Number(tx.amount) || 0;
+      return {
+        createdAt: tx.createdAt,
+        userName: tx.userName || usersById.get(tx.userId)?.name || '—',
+        typeLabel: tx.typeLabel || posPaymentTypeLabel(tx.methodId, tx.methodName),
+        amount: -amount,
+        balanceAfter: tx.balanceAfter ?? null,
+        detail: tx.comment || (tx.orderNumber ? `№ ${tx.orderNumber}` : '—'),
+      };
+    }
+
     const isRefund = tx.type === TX_TYPE.VALIDATOR_REFUND;
     const amount = Number(tx.amount) || 0;
     return {
@@ -354,7 +372,9 @@ export function buildClientTransactionsReport(validatorTxs, orders, usersById, p
   const orderRows = [...orders]
     .filter(o => {
       const ts = o.createdAt?.toMillis?.() ?? 0;
-      return ts >= start && ts <= end && o.paymentStatus === 'paid';
+      return ts >= start && ts <= end
+        && o.paymentStatus === 'paid'
+        && !posOrderIds.has(o.id);
     })
     .map(order => {
       const user = usersById.get(order.userId);
@@ -368,6 +388,6 @@ export function buildClientTransactionsReport(validatorTxs, orders, usersById, p
       };
     });
 
-  return [...validatorRows, ...orderRows]
+  return [...txRows, ...orderRows]
     .sort((a, b) => logTimestamp(b) - logTimestamp(a));
 }

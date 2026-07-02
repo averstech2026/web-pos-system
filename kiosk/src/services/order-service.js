@@ -16,9 +16,12 @@ function isDevPaymentFallbackError(err) {
     || /quota/i.test(message);
 }
 
-async function processKioskPayment(orderId, useBalance) {
+async function processKioskPayment(orderId, options = false) {
+  const paymentOpts = typeof options === 'boolean'
+    ? { useBalance: options, walletId: options ? 'dotation' : null }
+    : options;
   try {
-    return await processOrderPayment(orderId, useBalance);
+    return await processOrderPayment(orderId, paymentOpts);
   } catch (err) {
     if (import.meta.env.DEV && isDevPaymentFallbackError(err)) {
       console.warn('[kiosk] demo payment fallback (dev only)', err);
@@ -53,6 +56,7 @@ function buildOrderItems() {
       name: p.name,
       price: p.price,
       quantity: qty,
+      category: p.category,
       ...(state.compositeSelections?.[id]?.length
         ? { lunchSelections: state.compositeSelections[id] }
         : {}),
@@ -102,7 +106,7 @@ export async function submitKioskOrder({ useBalance, customerUserId }) {
   });
 
   const ref = await addDoc(collection(db, COL.ORDERS), orderPayload);
-  await processKioskPayment(ref.id, useBalance);
+  await processKioskPayment(ref.id, useBalance ? { useBalance: true, walletId: 'dotation' } : false);
 
   return {
     orderId: ref.id,

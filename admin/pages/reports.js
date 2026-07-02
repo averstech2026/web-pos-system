@@ -35,7 +35,7 @@ import {
   paymentStatusLabel,
 } from '../utils/order-format.js';
 import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
-import { fetchValidationLogs, fetchValidatorTransactions } from '../services/validation-logs-data.js';
+import { fetchValidationLogs, fetchClientTransactions } from '../services/validation-logs-data.js';
 
 /** @typedef {'nutrition' | 'dishes' | 'orders' | 'kitchen' | 'validations' | 'client-transactions'} ReportId */
 
@@ -150,7 +150,7 @@ export class ReportsPage {
     this.itemsByName = new Map();
     this.rulesById = new Map();
     this.validationLogs = [];
-    this.validatorTransactions = [];
+    this.clientTransactions = [];
     this.kitchenPlanDate = tomorrowDateInputValue();
     /** @type {'today' | 'tomorrow' | 'custom'} */
     this.kitchenDayTab = 'tomorrow';
@@ -254,7 +254,7 @@ export class ReportsPage {
         this.validationLogs = await fetchValidationLogs({ limitCount: 1000 });
       }
       if (this.activeReport === 'client-transactions') {
-        this.validatorTransactions = await fetchValidatorTransactions(1000);
+        this.clientTransactions = await fetchClientTransactions(1000);
       }
     } catch (err) {
       console.error('[reports]', err);
@@ -702,7 +702,7 @@ export class ReportsPage {
     } else if (meta.id === 'client-transactions') {
       const period = this._reportPeriodRange || resolvePeriod(this.periodPreset, this.customFrom, this.customTo);
       const data = buildClientTransactionsReport(
-        this.validatorTransactions,
+        this.clientTransactions,
         this.filteredOrders(),
         this.usersById,
         period,
@@ -1174,6 +1174,32 @@ export class ReportsPage {
         </tr>
       `).join('');
 
+      const paymentRows = (row.posPayments || []).map(payment => `
+        <tr>
+          <td>${esc(payment.method || payment.methodId || '—')}</td>
+          <td class="reports-td-num">—</td>
+          <td class="reports-td-num">—</td>
+          <td class="reports-td-num">${fmtMoney(payment.amount)}</td>
+        </tr>
+      `).join('');
+
+      const paymentsSection = paymentRows ? `
+        <div class="reports-nested-wrap reports-nested-wrap--payments">
+          <p class="reports-nested-title">Платежи</p>
+          <table class="reports-nested-table">
+            <thead>
+              <tr>
+                <th>Способ оплаты</th>
+                <th class="reports-th-num">Кол-во</th>
+                <th class="reports-th-num">Цена</th>
+                <th class="reports-th-num">Сумма</th>
+              </tr>
+            </thead>
+            <tbody>${paymentRows}</tbody>
+          </table>
+        </div>
+      ` : '';
+
       return `
         <tr class="reports-row reports-row--expandable ${open ? 'reports-row--open' : ''}" data-expand-key="${escAttr(key)}" tabindex="0">
           <td class="reports-td-chevron"><span class="reports-chevron-cell">${REPORT_ICONS.chevron}</span></td>
@@ -1198,6 +1224,7 @@ export class ReportsPage {
                 <tbody>${itemRows || '<tr><td colspan="4" class="reports-td-muted">Пустой заказ</td></tr>'}</tbody>
               </table>
             </div>
+            ${paymentsSection}
           </td>
         </tr>
       `;
@@ -1271,7 +1298,7 @@ export class ReportsPage {
   renderClientTransactionsTable() {
     const period = this._reportPeriodRange || resolvePeriod(this.periodPreset, this.customFrom, this.customTo);
     const rows = buildClientTransactionsReport(
-      this.validatorTransactions,
+      this.clientTransactions,
       this.filteredOrders(),
       this.usersById,
       period,

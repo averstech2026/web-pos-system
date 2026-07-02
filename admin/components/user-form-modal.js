@@ -31,7 +31,11 @@ import {
 import { showToast } from '../utils/toast.js';
 import { fetchValidationLogs, fetchUserApproachStats } from '../services/validation-logs-data.js';
 import { fetchAllValidationRules } from '../services/validation-rules-data.js';
-import { DEFAULT_WORK_SHIFT_ID } from '../../shared/work-shifts.js';
+import {
+  filterWalletCatalogForUserGroup,
+  isUserWalletAvailable,
+  listUserWallets,
+} from '../../shared/wallets.js';
 
 const STATUS_OPTIONS = [
   { id: USER_STATUS.ACTIVE, label: 'Активен' },
@@ -326,24 +330,51 @@ export function openUserFormModal({
     if (isCreate) {
       return '<p class="ufm-muted ufm-empty">Сохраните профиль, чтобы управлять кошельками</p>';
     }
-    const wallets = draft.wallets || {};
+    const allWallets = listUserWallets(draft.wallets || {}, { includeUnavailable: true });
+    const available = allWallets.filter(w => isUserWalletAvailable(w));
+    const unavailable = allWallets.filter(w => !isUserWalletAvailable(w));
+
+    function renderWalletCard(w, disabled) {
+      const meta = w.allowedCategories?.length
+        ? `Разрешено категорий: ${w.allowedCategories.length}`
+        : 'Все категории';
+      return `
+        <article class="ufm-wallet-card card ${disabled ? 'ufm-wallet-card--unavailable' : ''}">
+          <div class="ufm-wallet-card-head">
+            <h4 class="ufm-wallet-name">${esc(w.name)}</h4>
+            ${disabled ? '<span class="ufm-wallet-badge ufm-wallet-badge--muted">Недоступен</span>' : ''}
+          </div>
+          <p class="ufm-wallet-balance">${fmtMoney(w.balance)}</p>
+          <p class="ufm-wallet-meta ${w.allowedCategories?.length ? '' : 'ufm-muted'}">${meta}</p>
+          ${disabled
+            ? '<p class="ufm-wallet-meta ufm-muted">Кошелёк снят с группы клиента. История операций сохранена.</p>'
+            : `<div class="ufm-wallet-actions">
+                <button type="button" class="btn btn-outline btn-press ufm-wallet-btn" data-wallet-op="${escAttr(w.id)}" data-op-type="deposit">Пополнить</button>
+                <button type="button" class="btn btn-outline btn-press ufm-wallet-btn" data-op-type="withdraw" data-wallet-op="${escAttr(w.id)}">Списать</button>
+              </div>`}
+        </article>
+      `;
+    }
+
+    if (!allWallets.length) {
+      return '<p class="ufm-muted ufm-empty">У клиента нет кошельков. Назначьте группу клиентов с доступными кошельками.</p>';
+    }
+
     return `
       <div class="ufm-stack">
-        <div class="ufm-wallet-grid">
-          ${Object.entries(wallets).map(([id, w]) => `
-            <article class="ufm-wallet-card card">
-              <h4 class="ufm-wallet-name">${esc(w.name)}</h4>
-              <p class="ufm-wallet-balance">${fmtMoney(w.balance)}</p>
-              ${w.allowedCategories?.length
-                ? `<p class="ufm-wallet-meta">Разрешено категорий: ${w.allowedCategories.length}</p>`
-                : '<p class="ufm-wallet-meta ufm-muted">Все категории</p>'}
-              <div class="ufm-wallet-actions">
-                <button type="button" class="btn btn-outline btn-press ufm-wallet-btn" data-wallet-op="${escAttr(id)}" data-op-type="deposit">Пополнить</button>
-                <button type="button" class="btn btn-outline btn-press ufm-wallet-btn" data-op-type="withdraw" data-wallet-op="${escAttr(id)}">Списать</button>
-              </div>
-            </article>
-          `).join('')}
-        </div>
+        ${available.length ? `
+          <div class="ufm-wallet-grid">
+            ${available.map(w => renderWalletCard(w, false)).join('')}
+          </div>
+        ` : ''}
+        ${unavailable.length ? `
+          <section class="ufm-wallet-section">
+            <h4 class="ufm-section-title">Недоступные кошельки</h4>
+            <div class="ufm-wallet-grid">
+              ${unavailable.map(w => renderWalletCard(w, true)).join('')}
+            </div>
+          </section>
+        ` : ''}
       </div>
     `;
   }

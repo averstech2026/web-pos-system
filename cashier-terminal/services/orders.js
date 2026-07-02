@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../../shared/firebase.js';
+import { finalizePosOrderPayment as persistPosOrderPayment } from '../../shared/pos-payment.js';
 import {
   COL,
   ORDER_SOURCE,
@@ -7,7 +8,7 @@ import {
   PAYMENT_STATUS,
   createOrderDoc,
 } from '../../shared/schema.js';
-import { state } from '../core/state.js';
+import { state, getTotal } from '../core/state.js';
 import { isDemoModeActive } from './dev-demo.js';
 
 function orderNum() {
@@ -75,12 +76,34 @@ function buildReceiptItems() {
   }));
 }
 
-/** Persist current receipt to the open order and open a new bill. */
-export async function finalizePosOrderOnPayment() {
+/**
+ * Persist paid receipt, split payments, check and transactions; open a new bill.
+ * @param {Array<{ method: string, methodId?: string, amount: number, at?: Date }>} [payments]
+ */
+export async function finalizePosOrderOnPayment(payments = []) {
   const order = state.currentOrder;
   const items = buildReceiptItems();
+  const orderTotal = getTotal();
 
-  if (order?.id && !isDemoModeActive() && items.length) {
+  if (order?.id && !isDemoModeActive() && items.length && payments.length) {
+    await persistPosOrderPayment({
+      orderId: order.id,
+      payments: payments.map(p => ({
+        methodId: p.methodId || '',
+        method: p.method,
+        amount: Number(p.amount) || 0,
+        at: p.at instanceof Date ? p.at : new Date(),
+      })),
+      items,
+      orderTotal,
+      guestId: state.guest?.id || null,
+      guestName: state.guest?.fullName || state.guest?.name || null,
+      cashierLogin: state.cashier?.login || state.cashier?.name || null,
+      posStationName: state.channel?.stationName || null,
+      posPointName: state.channel?.pointName || null,
+      performedBy: state.cashier?.login || 'pos-cashier',
+    });
+  } else if (order?.id && !isDemoModeActive() && items.length) {
     await updateDoc(doc(db, COL.ORDERS, order.id), {
       items,
       userId: resolveOrderUserId(),

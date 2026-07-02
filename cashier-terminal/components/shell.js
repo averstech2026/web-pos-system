@@ -4,6 +4,7 @@ import {
   POS_SUPPORT_PHONE,
 } from '../../shared/pos-channel.js';
 import { getPosHeaderContext } from '../core/header-context.js';
+import { renderRuntimeModeBadge, isRuntimeModeHidden, hideRuntimeModeBadge } from '../core/runtime-mode.js';
 import { formatClock, formatDateLong, formatOrderCreated, esc } from '../core/format.js';
 import { state } from '../core/state.js';
 
@@ -91,13 +92,26 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
   `;
 }
 
-export function renderShellFooter() {
+/** @param {{ showRuntimeMode?: boolean }} [opts] */
+export function renderShellFooter({ showRuntimeMode = false } = {}) {
+  const hasMode = showRuntimeMode && !isRuntimeModeHidden();
+  const modeHtml = hasMode ? renderRuntimeModeBadge() : '';
   return `
-    <footer class="ct-footer">
-      <span>Техподдержка 24/7: ${esc(POS_SUPPORT_PHONE)}</span>
-      <span>Версия: ${esc(POS_SOFTWARE_VERSION)}</span>
+    <footer class="ct-footer ${hasMode ? 'ct-footer--with-mode' : ''}">
+      <span class="ct-footer__support">Техподдержка 24/7: ${esc(POS_SUPPORT_PHONE)}</span>
+      ${modeHtml}
+      <span class="ct-footer__version">Версия: ${esc(POS_SOFTWARE_VERSION)}</span>
     </footer>
   `;
+}
+
+/** @param {HTMLElement} root */
+export function bindRuntimeModeFooter(root) {
+  root.querySelector('[data-action="hide-runtime-mode"]')?.addEventListener('click', () => {
+    hideRuntimeModeBadge();
+    root.querySelector('.ct-runtime-mode-wrap')?.remove();
+    root.querySelector('.ct-footer')?.classList.remove('ct-footer--with-mode');
+  });
 }
 
 export function bindLiveClock(root) {

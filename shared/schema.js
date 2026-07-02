@@ -63,6 +63,8 @@ export const PAYMENT_STATUS = {
 export const TX_TYPE = {
   INTERNAL_BALANCE: 'internal_balance',
   BANK_CARD: 'bank_card',
+  CASH: 'cash',
+  DOTATION: 'dotation',
   VALIDATOR_DEDUCT: 'validator_deduct',
   VALIDATOR_REFUND: 'validator_refund',
 };
@@ -136,88 +138,64 @@ export function normalizeWalletAllowedCategories(wallet = {}) {
   return [];
 }
 
+/** @param {object|null|undefined} wallet @param {boolean} [defaultAvailable=true] */
+export function normalizeUserWalletInstance(wallet, id, defaultAvailable = true) {
+  return {
+    name: wallet?.name || DEFAULT_WALLET_DEFS[id]?.name || id,
+    balance: Number(wallet?.balance) || 0,
+    allowedCategories: normalizeWalletAllowedCategories(wallet),
+    available: wallet?.available !== false && defaultAvailable,
+  };
+}
+
 // ─── Document factory functions ───────────────────────────────────────────────
 
 /**
  * @param {object} [user]
  * @param {{ strict?: boolean }} [options]
- * @returns {Record<string, { balance: number, name: string, allowedCategories: string[] }>}
+ * @returns {Record<string, { balance: number, name: string, allowedCategories: string[], available: boolean }>}
  */
 export function normalizeUserWallets(user = {}, options = {}) {
   const { strict = false } = options;
   const wallets = user.wallets && typeof user.wallets === 'object' ? { ...user.wallets } : {};
 
-  if (strict) {
-    /** @type {Record<string, { balance: number, name: string, allowedCategories: string[] }>} */
+  if (strict || Object.keys(wallets).length > 0) {
+    /** @type {Record<string, { balance: number, name: string, allowedCategories: string[], available: boolean }>} */
     const normalized = {};
     for (const [id, w] of Object.entries(wallets)) {
-      normalized[id] = {
-        name: w?.name || DEFAULT_WALLET_DEFS[id]?.name || id,
-        balance: Number(w?.balance) || 0,
-        allowedCategories: normalizeWalletAllowedCategories(w),
-      };
-    }
-    return normalized;
-  }
-
-  if (Object.keys(wallets).length > 0) {
-    /** @type {Record<string, { balance: number, name: string, allowedCategories: string[] }>} */
-    const normalized = {};
-    for (const [id, w] of Object.entries(wallets)) {
-      normalized[id] = {
-        name: w?.name || DEFAULT_WALLET_DEFS[id]?.name || id,
-        balance: Number(w?.balance) || 0,
-        allowedCategories: normalizeWalletAllowedCategories(w),
-      };
+      normalized[id] = normalizeUserWalletInstance(w, id);
     }
     return normalized;
   }
 
   const legacyBalance = Number(user.balance) || 0;
 
-  if (!wallets.personal) {
-    wallets.personal = {
+  return {
+    personal: {
       balance: legacyBalance,
       name: DEFAULT_WALLET_DEFS.personal.name,
       allowedCategories: [...DEFAULT_WALLET_DEFS.personal.allowedCategories],
-    };
-  } else {
-    wallets.personal = {
-      name: wallets.personal.name || DEFAULT_WALLET_DEFS.personal.name,
-      balance: Number(wallets.personal.balance) || 0,
-      allowedCategories: normalizeWalletAllowedCategories(wallets.personal),
-    };
-  }
-
-  if (!wallets.dotation) {
-    wallets.dotation = {
+      available: true,
+    },
+    dotation: {
       balance: 0,
       name: DEFAULT_WALLET_DEFS.dotation.name,
       allowedCategories: [...DEFAULT_WALLET_DEFS.dotation.allowedCategories],
-    };
-  } else {
-    wallets.dotation = {
-      name: wallets.dotation.name || DEFAULT_WALLET_DEFS.dotation.name,
-      balance: Number(wallets.dotation.balance) || 0,
-      allowedCategories: normalizeWalletAllowedCategories(wallets.dotation),
-    };
-  }
-
-  for (const [id, w] of Object.entries(wallets)) {
-    if (id === 'personal' || id === 'dotation') continue;
-    wallets[id] = {
-      name: w?.name || id,
-      balance: Number(w?.balance) || 0,
-      allowedCategories: normalizeWalletAllowedCategories(w),
-    };
-  }
-
-  return wallets;
+      available: true,
+    },
+  };
 }
 
-/** @param {Record<string, { balance: number }>} wallets */
-export function totalWalletBalance(wallets) {
-  return Object.values(wallets || {}).reduce((s, w) => s + (Number(w?.balance) || 0), 0);
+/**
+ * @param {Record<string, { balance?: number, available?: boolean }>} wallets
+ * @param {{ spendableOnly?: boolean }} [opts]
+ */
+export function totalWalletBalance(wallets, opts = {}) {
+  const { spendableOnly = false } = opts;
+  return Object.values(wallets || {}).reduce((s, w) => {
+    if (spendableOnly && w?.available === false) return s;
+    return s + (Number(w?.balance) || 0);
+  }, 0);
 }
 
 /**
@@ -276,7 +254,7 @@ export function createUserDoc({
     name,
     email,
     role,
-    balance: role === ROLES.CLIENT ? totalWalletBalance(normalizedWallets) : 0,
+    balance: role === ROLES.CLIENT ? totalWalletBalance(normalizedWallets, { spendableOnly: true }) : 0,
     phone,
     birthDate,
     printReceipt,
