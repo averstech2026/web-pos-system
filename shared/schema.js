@@ -475,6 +475,9 @@ export const DEFAULT_ITEM_IS_COMPOSITE = false;
  * @property {string[]} [modifierGroupIds]
  * @property {boolean} [visibleInWeb] - show in personal account (web portal)
  * @property {boolean} [visibleInKiosk] - show on self-service kiosk
+ * @property {boolean} [visibleInPos] - show on cashier POS terminal
+ * @property {boolean} [honestSignMarked] - requires Chestny Znak (ЧЗ) marking
+ * @property {string|null} [honestSignCategory] - ЧЗ category id (dairy, water, …)
  * @property {boolean} [isComposite] - composite lunch / combo meal
  * @property {Array<{ id: string, name: string, itemIds: string[] }>} [lunchSteps]
  * @property {string[]} [allowedPaymentMethods]
@@ -494,6 +497,9 @@ export const DEFAULT_ITEM_IS_COMPOSITE = false;
  * @param {string[]} [p.modifierGroupIds=[]]
  * @param {boolean} [p.visibleInWeb=true]
  * @param {boolean} [p.visibleInKiosk=false]
+ * @param {boolean} [p.visibleInPos=false]
+ * @param {boolean} [p.honestSignMarked=false]
+ * @param {string|null} [p.honestSignCategory=null]
  * @param {boolean} [p.isComposite=false]
  */
 export function createItemDoc({
@@ -501,6 +507,9 @@ export function createItemDoc({
   imageUrl = null, nutrition = null, allergens = [], modifierGroupIds = [],
   visibleInWeb = DEFAULT_ITEM_VISIBLE_IN_WEB,
   visibleInKiosk = DEFAULT_ITEM_VISIBLE_IN_KIOSK,
+  visibleInPos = false,
+  honestSignMarked = false,
+  honestSignCategory = null,
   isComposite = DEFAULT_ITEM_IS_COMPOSITE,
 }) {
   const doc = {
@@ -512,7 +521,12 @@ export function createItemDoc({
     isComposite: isComposite === true,
     visibleInWeb: visibleInWeb !== false,
     visibleInKiosk: visibleInKiosk === true,
+    visibleInPos: visibleInPos === true,
+    honestSignMarked: honestSignMarked === true,
   };
+  if (honestSignMarked && honestSignCategory) {
+    doc.honestSignCategory = String(honestSignCategory);
+  }
   if (availabilityRuleId) doc.availabilityRuleId = availabilityRuleId;
   if (imageUrl) doc.imageUrl = imageUrl;
   if (nutrition) doc.nutrition = nutrition;
@@ -527,6 +541,7 @@ export const ORDER_SOURCE = {
   WEB: 'web',
   KIOSK: 'kiosk',
   ADMIN: 'admin',
+  POS: 'pos',
 };
 
 /**

@@ -47,8 +47,10 @@ const DEMO_ITEMS = [
   { name: 'Чай чёрный',             description: 'С сахаром',              price: 40,  category: 'Напитки' },
   { name: 'Морс ягодный 0.5л',      description: 'Клюква и брусника',       price: 60,  category: 'Напитки' },
   { name: 'Компот',                 description: 'Из сухофруктов',          price: 50,  category: 'Напитки' },
+  { name: 'Вода Aqua Minerale 1л',  description: 'Без газа, лимон',         price: 89,  category: 'Напитки', honestSignMarked: true, honestSignCategory: 'water' },
 
   { name: 'Хлеб бородинский',       description: '2 куска',                price: 20,  category: 'Выпечка' },
+  { name: 'Булочка ванильная',      description: 'Сдобная выпечка',         price: 150, category: 'Выпечка' },
   { name: 'Блинчики с джемом',      description: 'Со сметаной',             price: 90,  category: 'Выпечка' },
 ].map(item => ({
   ...item,
@@ -110,6 +112,10 @@ export async function seedDatabase() {
     await setDoc(ref, createItemDoc({
       ...item,
       imageUrl: getItemImageUrl(item.name),
+      visibleInKiosk: true,
+      visibleInPos: true,
+      honestSignMarked: item.honestSignMarked === true,
+      honestSignCategory: item.honestSignCategory || null,
     }));
   }
 
@@ -493,6 +499,7 @@ const STAFF_ACCOUNTS = [
   { email: 'manager@ifcm.demo', name: 'Менеджер',        role: ROLES.MANAGER },
   { email: 'cashier@ifcm.demo', name: 'Кассир',          role: ROLES.CASHIER },
   { email: 'kiosk@ifcm.demo',   name: 'Киоск',           role: ROLES.CASHIER },
+  { email: 'pos@ifcm.demo',     name: 'Кассовый модуль', role: ROLES.CASHIER },
   { email: 'queue@ifcm.demo',   name: 'Экран очереди',   role: ROLES.CASHIER },
 ];
 
@@ -577,6 +584,7 @@ export async function seedStaffAuth(password = STAFF_DEMO_PASSWORD) {
       'Kitchen login: cook@ifcm.demo / demo1234\n' +
       'Validator: npm run dev:validator (port 3007)\n' +
       'Kiosk login: kiosk@ifcm.demo / demo1234\n' +
+      'POS terminal: pos@ifcm.demo / demo1234\n' +
       'Queue screen: queue@ifcm.demo / demo1234\n' +
       'Also: admin@ifcm.demo, manager@ifcm.demo, cashier@ifcm.demo\n' +
       'Перелогиньтесь в админке: admin@ifcm.demo / demo1234',

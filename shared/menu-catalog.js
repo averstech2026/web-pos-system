@@ -1,4 +1,4 @@
-import { formatAvailabilityRuleShort } from './availability-rules.js';
+import { DEFAULT_CATEGORY_COLORS, resolveCategoryColor } from './pos-channel.js';
 
 /** Default product categories (menu groups). */
 export const DEFAULT_CATEGORIES = [
@@ -12,6 +12,7 @@ export const DEFAULT_CATEGORIES = [
 /** Default visibility for new/existing groups without explicit flags. */
 export const DEFAULT_GROUP_VISIBLE_IN_WEB = true;
 export const DEFAULT_GROUP_VISIBLE_IN_KIOSK = false;
+export const DEFAULT_GROUP_VISIBLE_IN_POS = true;
 
 /**
  * @typedef {object} CategoryGroup
@@ -21,8 +22,11 @@ export const DEFAULT_GROUP_VISIBLE_IN_KIOSK = false;
  * @property {string|null} [availabilityRuleId] - ref to availability_rules/{id}; null = always available
  * @property {boolean} [visibleInWeb] - show in personal account (web portal)
  * @property {boolean} [visibleInKiosk] - show on self-service kiosk
+ * @property {boolean} [visibleInPos] - show on cashier POS terminal
+ * @property {string|null} [color] - tile background color when photos disabled
  * @property {number} [webOrder] - sort index in web menu
  * @property {number} [kioskOrder] - sort index on kiosk menu
+ * @property {number} [posOrder] - sort index on POS terminal
  * @property {string[]} [modifierGroupIds] - modifier groups offered for items in this category
  */
 
@@ -33,9 +37,9 @@ export function normalizeGroupOrderIndex(value, fallback = 0) {
   return Math.floor(n);
 }
 
-/** @param {CategoryGroup[]} groups @param {'web'|'kiosk'} channel */
+/** @param {CategoryGroup[]} groups @param {'web'|'kiosk'|'pos'} channel */
 export function sortCategoryGroupsByChannel(groups, channel = 'web') {
-  const key = channel === 'kiosk' ? 'kioskOrder' : 'webOrder';
+  const key = channel === 'kiosk' ? 'kioskOrder' : channel === 'pos' ? 'posOrder' : 'webOrder';
   return [...groups].sort((a, b) => {
     const ao = normalizeGroupOrderIndex(a[key], 0);
     const bo = normalizeGroupOrderIndex(b[key], 0);
@@ -85,8 +89,11 @@ export function normalizeCategoryGroup(raw, fallbackName = '') {
     availabilityRuleId: ruleId,
     visibleInWeb: raw?.visibleInWeb !== false,
     visibleInKiosk: raw?.visibleInKiosk === true,
+    visibleInPos: raw?.visibleInPos !== false,
+    color: resolveCategoryColor(name, raw?.color),
     webOrder: normalizeGroupOrderIndex(raw?.webOrder, 0),
     kioskOrder: normalizeGroupOrderIndex(raw?.kioskOrder, 0),
+    posOrder: normalizeGroupOrderIndex(raw?.posOrder, 0),
     modifierGroupIds: normalizeModifierGroupIds(raw?.modifierGroupIds),
   };
 }
@@ -100,6 +107,13 @@ export function filterWebVisibleCategoryGroups(groups) {
 export function filterKioskVisibleCategoryGroups(groups) {
   return groups.filter(g => g.visibleInKiosk === true);
 }
+
+/** @param {CategoryGroup[]} groups */
+export function filterPosVisibleCategoryGroups(groups) {
+  return groups.filter(g => g.visibleInPos !== false);
+}
+
+export { DEFAULT_CATEGORY_COLORS, resolveCategoryColor };
 
 /** @param {CategoryGroup[]} groups */
 export function categoryGroupsToNames(groups) {

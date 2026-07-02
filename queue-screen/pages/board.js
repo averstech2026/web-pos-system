@@ -3,6 +3,7 @@ import {
   collection, query, where, onSnapshot,
 } from 'firebase/firestore';
 import { COL, ORDER_STATUS } from '../../shared/schema.js';
+import { ensureQueueSession } from '../services/auth.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
 export class QueueBoard {
@@ -16,11 +17,18 @@ export class QueueBoard {
     this._prevReadyIds = new Set();
     this._highlightIds = new Set();
     this._highlightTimer = null;
+    this._reauthPending = false;
   }
 
   init() {
     this.renderShell();
     this.startClock();
+    this.subscribe();
+  }
+
+  resubscribe() {
+    this._unsubs.forEach(fn => fn());
+    this._unsubs = [];
     this.subscribe();
   }
 
@@ -68,8 +76,24 @@ export class QueueBoard {
     );
   }
 
-  handleSubscribeError(err) {
+  async handleSubscribeError(err) {
     console.error('[queue-screen]', err);
+    const code = err?.code || '';
+
+    if (code === 'permission-denied' && !this._reauthPending) {
+      this._reauthPending = true;
+      try {
+        await ensureQueueSession();
+        this.error = null;
+        this.resubscribe();
+        return;
+      } catch (reauthErr) {
+        console.error('[queue-screen] re-auth', reauthErr);
+      } finally {
+        this._reauthPending = false;
+      }
+    }
+
     this.error = err.message || 'Не удалось загрузить очередь';
     this.renderShell();
   }

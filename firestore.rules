@@ -198,11 +198,17 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkId', 'paymentStatus', 'status', 'paidAt']);
     }
 
+    // Paid orders on the public queue board (cooking / ready only).
+    function isPublicQueueOrder() {
+      return resource.data.paymentStatus == 'paid'
+        && resource.data.status in ['cooking', 'ready'];
+    }
+
     // ── orders ───────────────────────────────────────────────
     match /orders/{orderId} {
-      // Client reads own orders; staff reads all.
+      // Client reads own orders; staff reads all; queue screen reads active kitchen queue.
       allow read: if isAuth() && (
-        resource.data.userId == request.auth.uid || isStaff()
+        resource.data.userId == request.auth.uid || isStaff() || isPublicQueueOrder()
       );
       // Client creates orders; staff updates status.
       allow create: if isAuth();

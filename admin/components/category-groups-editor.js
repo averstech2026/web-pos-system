@@ -18,6 +18,7 @@ import {
   slugFromCategoryName,
   formatGroupScheduleSummary,
   sortCategoryGroupsByChannel,
+  DEFAULT_CATEGORY_COLORS,
 } from '../../shared/menu-catalog.js';
 import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.js';
 import {
@@ -246,6 +247,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
       id: selectedId,
       name: panel.querySelector('[data-field="name"]')?.value.trim() || '',
       imageUrl: panel.querySelector('[data-field="image-url"]')?.value.trim() || null,
+      color: panel.querySelector('[data-field="color"]')?.value || null,
       availabilityRuleId: ruleId || null,
       visibleInWeb,
       visibleInKiosk,
@@ -439,7 +441,20 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
             </div>
 
             <div class="admin-field-block">
-              <div class="cgr-products-head">
+              <label class="admin-field-label" for="cgr-group-color">Цвет плитки на кассе</label>
+              <div class="cgr-color-row">
+                <input
+                  id="cgr-group-color"
+                  type="color"
+                  class="cgr-color-input"
+                  data-field="color"
+                  value="${escAttr(group.color || DEFAULT_CATEGORY_COLORS[group.name] || '#C5CED6')}"
+                />
+                <span class="cgr-color-hint">Используется на кассе, когда фото товаров отключены</span>
+              </div>
+            </div>
+
+            <div class="admin-field-block">
                 <span class="admin-field-label">Товары в группе</span>
                 <span class="cgr-products-count" id="cgr-detail-count">${productCountLabel(group)}</span>
               </div>

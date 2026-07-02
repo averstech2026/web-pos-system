@@ -13,19 +13,22 @@ const FALLBACK_TERMINAL_EMAILS = [
   'queue@ifcm.demo',
 ];
 
+const TERMINAL_STAFF_ROLES = [ROLES.CASHIER, ROLES.COOK, ROLES.MANAGER, ROLES.ADMIN];
+
 async function ensureQueueTerminalUser(user, displayName = 'Экран очереди') {
   const ref = doc(db, COL.USERS, user.uid);
   const snap = await getDoc(ref);
-  if (snap.exists()) return;
+  const role = snap.data()?.role;
+  if (snap.exists() && role && TERMINAL_STAFF_ROLES.includes(role)) return;
 
   await setDoc(ref, createUserDoc({
     id: user.uid,
-    name: displayName,
+    name: snap.data()?.name || displayName,
     email: user.email || QUEUE_TERMINAL_EMAIL,
     role: ROLES.CASHIER,
     balance: 0,
     allowsWebAccess: false,
-  }));
+  }), { merge: true });
 }
 
 async function signInTerminal() {
@@ -46,7 +49,7 @@ async function signInTerminal() {
   );
 }
 
-/** Terminal session — required by Firestore rules to read all orders. */
+/** Terminal session — anonymous kiosk auth for Firestore (isAuth). */
 export async function ensureQueueSession() {
   let user = auth.currentUser;
 
@@ -55,7 +58,7 @@ export async function ensureQueueSession() {
   } else {
     const profile = await getDoc(doc(db, COL.USERS, user.uid));
     const role = profile.data()?.role;
-    const isTerminalStaff = role && [ROLES.CASHIER, ROLES.COOK, ROLES.MANAGER, ROLES.ADMIN].includes(role);
+    const isTerminalStaff = role && TERMINAL_STAFF_ROLES.includes(role);
     if (!isTerminalStaff) {
       user = await signInTerminal();
     }

@@ -1,4 +1,8 @@
 import { ORDER_SOURCE } from './schema.js';
+import {
+  normalizePosChannelSettings,
+  toPersistedPosChannelSettings,
+} from './pos-channel.js';
 
 /** @type {Record<string, string>} */
 export const SALES_CHANNEL_STATUS = {
@@ -10,6 +14,7 @@ export const SALES_CHANNEL_STATUS = {
 export const SALES_CHANNEL_IDS = {
   KIOSK: ORDER_SOURCE.KIOSK,
   WEB: ORDER_SOURCE.WEB,
+  POS: ORDER_SOURCE.POS,
   KITCHEN: 'kitchen',
   DELIVERY: 'delivery',
   QUEUE: 'queue',
@@ -28,6 +33,7 @@ export const SALES_POINT_CHANNEL_IDS = [
   SALES_CHANNEL_IDS.KIOSK,
   SALES_CHANNEL_IDS.VALIDATOR,
   SALES_CHANNEL_IDS.WEB,
+  SALES_CHANNEL_IDS.POS,
 ];
 
 /** Staff terminals — no sales, no order routing */
@@ -95,6 +101,7 @@ export const SALES_CHANNEL_PUBLIC_BASE = 'https://averstech2026.github.io/web-po
 export const SALES_CHANNEL_TERMINAL_INFO = {
   [SALES_CHANNEL_IDS.KIOSK]: { slug: 'kiosk', label: 'Открыть киоск' },
   [SALES_CHANNEL_IDS.WEB]: { slug: 'client-lk', label: 'Открыть веб-витрину' },
+  [SALES_CHANNEL_IDS.POS]: { slug: 'cashier-terminal', label: 'Открыть кассовый модуль' },
   [SALES_CHANNEL_IDS.KITCHEN]: { slug: 'kitchen-terminal', label: 'Открыть кухонный монитор' },
   [SALES_CHANNEL_IDS.DELIVERY]: { slug: 'delivery-terminal', label: 'Открыть монитор выдачи' },
   [SALES_CHANNEL_IDS.QUEUE]: { slug: 'queue-screen', label: 'Открыть экран очереди' },
@@ -113,6 +120,7 @@ export const DEFAULT_SALES_CHANNEL_PAYMENT_METHODS = {
   [SALES_CHANNEL_IDS.KIOSK]: ['card', 'internal'],
   [SALES_CHANNEL_IDS.WEB]: ['card', 'internal'],
   [SALES_CHANNEL_IDS.VALIDATOR]: ['internal'],
+  [SALES_CHANNEL_IDS.POS]: ['cash', 'card', 'internal', 'dotation'],
 };
 
 /** @param {object} raw @param {string} channelId */
@@ -143,6 +151,18 @@ export const DEFAULT_SALES_CHANNELS = [
     name: 'Веб-витрина (Сайт/Приложение)',
     shortName: 'Веб-витрина',
     allowedPaymentMethods: DEFAULT_SALES_CHANNEL_PAYMENT_METHODS[SALES_CHANNEL_IDS.WEB],
+  },
+  {
+    id: SALES_CHANNEL_IDS.POS,
+    name: 'Касса / Кассовый модуль',
+    shortName: 'Касса',
+    allowedPaymentMethods: DEFAULT_SALES_CHANNEL_PAYMENT_METHODS[SALES_CHANNEL_IDS.POS],
+    operationMode: 'cashier',
+    screenFormat: '1024x768',
+    catalogDisplay: 'folders',
+    showProductPhotos: false,
+    showQueueNumber: false,
+    posPaymentTypes: ['cash', 'card', 'internal', 'dotation'],
   },
   {
     id: SALES_CHANNEL_IDS.KITCHEN,
@@ -246,12 +266,13 @@ export function normalizeSalesChannel(raw, fallbackId = '') {
     ? def.sendToDelivery
     : raw.sendToDelivery !== false;
 
-  if (!isInternal && sendToKitchen === false && sendToDelivery === false) {
+  if (!isInternal && channelId !== SALES_CHANNEL_IDS.POS
+    && sendToKitchen === false && sendToDelivery === false) {
     sendToKitchen = true;
     sendToDelivery = true;
   }
 
-  return {
+  const base = {
     id: channelId,
     name,
     shortName: String(raw.shortName ?? '').trim() || def?.shortName || name,
@@ -262,6 +283,12 @@ export function normalizeSalesChannel(raw, fallbackId = '') {
     maintenanceMessage,
     allowedPaymentMethods: normalizeAllowedPaymentMethods(raw, channelId),
   };
+
+  if (channelId === SALES_CHANNEL_IDS.POS) {
+    return { ...base, ...normalizePosChannelSettings(raw) };
+  }
+
+  return base;
 }
 
 /** @param {{ maintenanceMessage?: string }} channel */
@@ -284,6 +311,9 @@ export function toPersistedSalesChannel(raw, fallbackId = '') {
   };
   if (isSalesPointChannel(n.id)) {
     payload.allowedPaymentMethods = n.allowedPaymentMethods;
+  }
+  if (n.id === SALES_CHANNEL_IDS.POS) {
+    Object.assign(payload, toPersistedPosChannelSettings(n));
   }
   return payload;
 }

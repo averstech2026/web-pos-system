@@ -15,6 +15,12 @@ import {
   resolveSalesChannelRoutingMode,
   routingFlagsFromMode,
 } from '../../shared/sales-channels.js';
+import {
+  POS_CATALOG_DISPLAY_OPTIONS,
+  POS_OPERATION_MODE_OPTIONS,
+  POS_PAYMENT_TYPE_OPTIONS,
+  POS_SCREEN_FORMAT_OPTIONS,
+} from '../../shared/pos-channel.js';
 import { saveSalesChannel } from '../services/sales-channels-data.js';
 import { showToast } from '../utils/toast.js';
 import {
@@ -36,9 +42,12 @@ const SCH_ICON_DELIVERY = `<svg xmlns="http://www.w3.org/2000/svg" width="20" he
 
 const SCH_ICON_QUEUE = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10"/><path d="M7 13h10"/><path d="M7 17h6"/></svg>`;
 
+const SCH_ICON_POS = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h4"/><path d="M6 12h8"/><path d="M6 16h6"/><circle cx="17" cy="12" r="2"/></svg>`;
+
 /** @param {string} channelId */
 function channelRowIcon(channelId) {
   if (channelId === SALES_CHANNEL_IDS.KIOSK) return SCH_ICON_KIOSK;
+  if (channelId === SALES_CHANNEL_IDS.POS) return SCH_ICON_POS;
   if (channelId === SALES_CHANNEL_IDS.KITCHEN) return SCH_ICON_KITCHEN;
   if (channelId === SALES_CHANNEL_IDS.DELIVERY) return SCH_ICON_DELIVERY;
   if (channelId === SALES_CHANNEL_IDS.QUEUE) return SCH_ICON_QUEUE;
@@ -82,6 +91,14 @@ export function createSalesChannelsEditor(host, {
         scheduleId: ch.scheduleId || null,
         maintenanceMessage: ch.maintenanceMessage || '',
         allowedPaymentMethods: [...(ch.allowedPaymentMethods || [])].sort(),
+        operationMode: ch.operationMode || 'cashier',
+        screenFormat: ch.screenFormat || '1024x768',
+        catalogDisplay: ch.catalogDisplay || 'folders',
+        showProductPhotos: ch.showProductPhotos === true,
+        showQueueNumber: ch.showQueueNumber === true,
+        posPaymentTypes: [...(ch.posPaymentTypes || [])].sort(),
+        stationName: (ch.stationName || '').trim(),
+        pointName: (ch.pointName || '').trim(),
       })).sort((a, b) => a.id.localeCompare(b.id)),
     );
   }
@@ -281,6 +298,21 @@ export function createSalesChannelsEditor(host, {
         .map(el => el.dataset.schPaymentMethod)
       : [];
 
+    let posFields = {};
+    if (selectedId === SALES_CHANNEL_IDS.POS) {
+      posFields = {
+        operationMode: panel.querySelector('[data-pos-operation-mode].period-tab--active')?.dataset.posOperationMode || 'cashier',
+        screenFormat: panel.querySelector('[data-field="screen-format"]')?.value || '1024x768',
+        catalogDisplay: panel.querySelector('[data-field="catalog-display"]')?.value || 'folders',
+        showProductPhotos: panel.querySelector('[data-field="show-product-photos"]')?.checked === true,
+        showQueueNumber: panel.querySelector('[data-field="show-queue-number"]')?.checked === true,
+        posPaymentTypes: [...panel.querySelectorAll('[data-pos-payment-type]:checked')]
+          .map(el => el.dataset.posPaymentType),
+        stationName: panel.querySelector('[data-field="pos-station-name"]')?.value.trim() || '',
+        pointName: panel.querySelector('[data-field="pos-point-name"]')?.value.trim() || '',
+      };
+    }
+
     channels = channels.map(ch => (
       ch.id === selectedId
         ? {
@@ -292,6 +324,7 @@ export function createSalesChannelsEditor(host, {
           scheduleId,
           maintenanceMessage,
           allowedPaymentMethods,
+          ...posFields,
         }
         : ch
     ));
@@ -457,6 +490,85 @@ export function createSalesChannelsEditor(host, {
   }
 
   /** @param {import('../../shared/sales-channels.d.ts').SalesChannel} channel */
+  function renderPosSettingsSection(channel) {
+    if (channel.id !== SALES_CHANNEL_IDS.POS) return '';
+    const opMode = channel.operationMode || 'cashier';
+    const selectedPayments = new Set(channel.posPaymentTypes || []);
+    return `
+      <div class="sch-fieldset" id="sch-pos-settings">
+        <span class="sch-fieldset__legend">Кассовый модуль</span>
+
+        <label class="admin-field-label" for="sch-pos-station-name">Название станции (в шапке кассы)</label>
+        <input
+          id="sch-pos-station-name"
+          class="admin-field-input"
+          data-field="pos-station-name"
+          value="${escAttr(channel.stationName || '')}"
+          placeholder="Касса 3 ТПУ: RNB3"
+        />
+
+        <label class="admin-field-label" for="sch-pos-point-name">Точка продаж (в шапке кассы)</label>
+        <input
+          id="sch-pos-point-name"
+          class="admin-field-input"
+          data-field="pos-point-name"
+          value="${escAttr(channel.pointName || '')}"
+          placeholder="Столовая Ст_Касса1"
+        />
+
+        <span class="admin-field-label">Режим работы</span>
+        <div class="period-tabs" role="radiogroup" aria-label="Режим работы кассы">
+          ${POS_OPERATION_MODE_OPTIONS.map(opt => `
+            <button
+              type="button"
+              class="period-tab btn-press ${opMode === opt.id ? 'period-tab--active' : ''}"
+              data-pos-operation-mode="${escAttr(opt.id)}"
+              aria-checked="${opMode === opt.id}"
+            >${esc(opt.label)}</button>
+          `).join('')}
+        </div>
+
+        <label class="admin-field-label" for="sch-screen-format">Формат экрана</label>
+        <select id="sch-screen-format" class="admin-field-input" data-field="screen-format">
+          ${POS_SCREEN_FORMAT_OPTIONS.map(opt => `
+            <option value="${escAttr(opt.id)}" ${(channel.screenFormat || '1024x768') === opt.id ? 'selected' : ''}>${esc(opt.label)}</option>
+          `).join('')}
+        </select>
+
+        <label class="admin-field-label" for="sch-catalog-display">Отображение каталога</label>
+        <select id="sch-catalog-display" class="admin-field-input" data-field="catalog-display">
+          ${POS_CATALOG_DISPLAY_OPTIONS.map(opt => `
+            <option value="${escAttr(opt.id)}" ${(channel.catalogDisplay || 'folders') === opt.id ? 'selected' : ''}>${esc(opt.label)}</option>
+          `).join('')}
+        </select>
+
+        <label class="admin-pill-check">
+          <input type="checkbox" class="admin-pill-check__input" data-field="show-product-photos" ${channel.showProductPhotos ? 'checked' : ''} />
+          <span class="admin-pill-check__box" aria-hidden="true"></span>
+          <span class="admin-pill-check__label">Показывать фото товаров</span>
+        </label>
+
+        <label class="admin-pill-check">
+          <input type="checkbox" class="admin-pill-check__input" data-field="show-queue-number" ${channel.showQueueNumber ? 'checked' : ''} />
+          <span class="admin-pill-check__box" aria-hidden="true"></span>
+          <span class="admin-pill-check__label">Показывать номер в электронной очереди на чеке</span>
+        </label>
+
+        <span class="admin-field-label">Разрешённые типы платежей</span>
+        <div class="lnc-sales-points">
+          ${POS_PAYMENT_TYPE_OPTIONS.map(opt => `
+            <label class="admin-pill-check">
+              <input type="checkbox" class="admin-pill-check__input" data-pos-payment-type="${escAttr(opt.id)}" ${selectedPayments.has(opt.id) ? 'checked' : ''} />
+              <span class="admin-pill-check__box" aria-hidden="true"></span>
+              <span class="admin-pill-check__label">${esc(opt.label)}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  /** @param {import('../../shared/sales-channels.d.ts').SalesChannel} channel */
   function renderTerminalLaunchSection(channel) {
     const info = SALES_CHANNEL_TERMINAL_INFO[channel.id];
     const url = getSalesChannelLaunchUrl(channel.id);
@@ -517,6 +629,7 @@ export function createSalesChannelsEditor(host, {
             </div>
             ${renderAvailabilitySection(channel)}
             ${showRouting ? renderRoutingSection(channel) : ''}
+            ${renderPosSettingsSection(channel)}
             ${renderPaymentMethodsSection(channel)}
             ${renderTerminalLaunchSection(channel)}
             ${renderScheduleSection(channel)}
@@ -635,11 +748,23 @@ export function createSalesChannelsEditor(host, {
       if (e.target.matches('[data-field="name"], [data-field="maintenance-message"]')) syncPanel();
     });
     panel?.addEventListener('change', e => {
-      if (e.target.matches('[data-field="schedule-id"], [data-sch-payment-method]')) {
+      if (e.target.matches('[data-field="schedule-id"], [data-sch-payment-method], [data-field="screen-format"], [data-field="catalog-display"], [data-field="show-product-photos"], [data-field="show-queue-number"], [data-pos-payment-type]')) {
         syncPanel();
       }
     });
     panel?.addEventListener('click', e => {
+      const posModeBtn = e.target.closest('[data-pos-operation-mode]');
+      if (posModeBtn && selectedId === SALES_CHANNEL_IDS.POS) {
+        e.preventDefault();
+        panel.querySelectorAll('[data-pos-operation-mode]').forEach(btn => {
+          const active = btn === posModeBtn;
+          btn.classList.toggle('period-tab--active', active);
+          btn.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+        syncPanel();
+        return;
+      }
+
       const statusBtn = e.target.closest('[data-sch-status]');
       if (statusBtn && selectedId) {
         e.preventDefault();

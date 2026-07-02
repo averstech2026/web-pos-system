@@ -30,3 +30,17 @@ export async function fetchKioskMenuItems() {
   ));
   return snap.docs.map(d => normalizeCatalogItem({ id: d.id, ...d.data() }));
 }
+
+/**
+ * Menu items visible on the cashier POS terminal.
+ * @returns {Promise<Array<import('./schema.js').MenuItemDoc & { id: string }>>}
+ */
+export async function fetchPosMenuItems() {
+  const snap = await getDocs(query(
+    collection(db, COL.ITEMS),
+    where('isAvailable', '==', true),
+  ));
+  return snap.docs
+    .map(d => normalizeCatalogItem({ id: d.id, ...d.data() }))
+    .filter(item => item.visibleInPos !== false);
+}

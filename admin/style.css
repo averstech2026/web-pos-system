@@ -10312,3 +10312,23 @@ body:has(.admin-shell) {
   margin-top: 4px;
 }
 
+.cgr-color-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cgr-color-input {
+  width: 48px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.cgr-color-hint {
+  font-size: 12px;
+  color: var(--color-text-muted, #718096);
+}
+

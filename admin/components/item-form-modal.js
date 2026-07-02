@@ -10,6 +10,7 @@ import { productThumbHtml } from '../utils/product-image.js';
 import { getItemImageUrl } from '../../shared/item-images.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { formatAvailabilityRuleSummary } from '../../shared/availability-rules.js';
+import { HONEST_SIGN_CATEGORIES } from '../../shared/pos-channel.js';
 import { readModifierGroupIds, renderModifierGroupsField } from './modifier-groups-field.js';
 
 /**
@@ -61,6 +62,9 @@ export function openItemFormModal({
     previewObjectUrl: null,
     availabilityRuleId: selectedRuleId,
     channelMode: resolveChannelMode(item?.visibleInWeb, item?.visibleInKiosk),
+    visibleInPos: item?.visibleInPos !== false,
+    honestSignMarked: item?.honestSignMarked === true,
+    honestSignCategory: item?.honestSignCategory || '',
   };
 
   const categoryOptions = [...new Set([...categories, state.category].filter(Boolean))];
@@ -236,6 +240,28 @@ export function openItemFormModal({
             hint: 'Дополнительно к модификаторам группы товара.',
           })}
 
+          <fieldset class="ifm-fieldset">
+            <legend>Честный Знак (маркировка)</legend>
+            <label class="ifm-allergen">
+              <input type="checkbox" id="ifm-honest-sign" ${state.honestSignMarked ? 'checked' : ''} />
+              <span>Товар подлежит маркировке Честный Знак</span>
+            </label>
+            <label class="ifm-field" id="ifm-honest-sign-category-wrap" ${state.honestSignMarked ? '' : 'hidden'}>
+              <span>Категория ЧЗ</span>
+              <select id="ifm-honest-sign-category" class="ifm-select">
+                <option value="">— Выберите категорию —</option>
+                ${HONEST_SIGN_CATEGORIES.map(c => `
+                  <option value="${escAttr(c.id)}" ${c.id === state.honestSignCategory ? 'selected' : ''}>${esc(c.label)}</option>
+                `).join('')}
+              </select>
+            </label>
+          </fieldset>
+
+          <label class="ifm-allergen">
+            <input type="checkbox" id="ifm-visible-pos" ${state.visibleInPos ? 'checked' : ''} />
+            <span>Отображать на кассовом модуле</span>
+          </label>
+
           <fieldset class="ifm-fieldset ifm-availability">
             <legend>Время доступности</legend>
             <label class="ifm-field">
@@ -289,6 +315,11 @@ export function openItemFormModal({
       showError(err.message || 'Не удалось переместить товар в архив');
       btn.disabled = false;
     }
+  });
+
+  overlay.querySelector('#ifm-honest-sign')?.addEventListener('change', e => {
+    const wrap = overlay.querySelector('#ifm-honest-sign-category-wrap');
+    if (wrap) wrap.hidden = !e.target.checked;
   });
 
   overlay.querySelectorAll('[data-channel-mode]').forEach(btn => {
@@ -366,6 +397,9 @@ export function openItemFormModal({
       isAvailable: channelFlags.isAvailable,
       visibleInWeb: channelFlags.visibleInWeb,
       visibleInKiosk: channelFlags.visibleInKiosk,
+      visibleInPos: overlay.querySelector('#ifm-visible-pos')?.checked !== false,
+      honestSignMarked: overlay.querySelector('#ifm-honest-sign')?.checked === true,
+      honestSignCategory: overlay.querySelector('#ifm-honest-sign-category')?.value || null,
       allergens: [...overlay.querySelectorAll('.ifm-allergens input:checked')].map(el => el.value),
       modifierGroupIds: readModifierGroupIds(overlay),
       imageUrl: overlay.querySelector('#ifm-image-url')?.value.trim() || getItemImageUrl(overlay.querySelector('#ifm-name')?.value.trim()),

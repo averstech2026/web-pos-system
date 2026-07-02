@@ -2,6 +2,8 @@ import '../shared/styles.css';
 import '../shared/global.css';
 import './style.css';
 
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../shared/firebase.js';
 import { ensureQueueSession, QUEUE_TERMINAL_EMAIL, QUEUE_TERMINAL_PASSWORD } from './services/auth.js';
 import { QueueBoard } from './pages/board.js';
 
@@ -17,6 +19,7 @@ if (import.meta.env.DEV) {
 
 const app = document.getElementById('app');
 let board = null;
+let initSeq = 0;
 
 function renderBoot(message = 'Подключение к очереди…') {
   app.innerHTML = `
@@ -43,21 +46,27 @@ function renderBootError(err) {
 }
 
 async function boot() {
+  const seq = ++initSeq;
   board?.destroy?.();
   board = null;
   renderBoot();
 
   try {
     await ensureQueueSession();
+    if (seq !== initSeq) return;
+
     board = new QueueBoard(app);
     board.init();
   } catch (err) {
+    if (seq !== initSeq) return;
     console.error('[queue-screen] boot', err);
     renderBootError(err);
   }
 }
 
-boot();
+onAuthStateChanged(auth, () => {
+  boot();
+});
 
 function esc(s) {
   return String(s ?? '')

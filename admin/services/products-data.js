@@ -168,6 +168,9 @@ export function buildItemPayload(data) {
     allergens,
     visibleInWeb: data.visibleInWeb,
     visibleInKiosk: data.visibleInKiosk,
+    visibleInPos: data.visibleInPos,
+    honestSignMarked: data.honestSignMarked,
+    honestSignCategory: data.honestSignCategory,
     isComposite: false,
   });
 
@@ -211,6 +214,10 @@ export async function updateItem(id, data, existing = {}) {
     update.availability = deleteField();
   } else {
     update.availability = deleteField();
+  }
+
+  if (!merged.honestSignMarked) {
+    update.honestSignCategory = deleteField();
   }
 
   update.isComposite = false;
