@@ -4,6 +4,7 @@
  */
 
 import { normalizeGroupOrderIndex } from './menu-catalog.js';
+import { isVisibleOnAnySalesChannel } from './sales-channel-modes.js';
 
 /** @typedef {'cart_amount'|'item_quantity'|'happy_hour'|'client_segment'} PromoTriggerType */
 
@@ -13,7 +14,8 @@ import { normalizeGroupOrderIndex } from './menu-catalog.js';
  * @typedef {object} PromoConditions
  * @property {number} [minSum] - cart_amount
  * @property {string} [requiredItemId] - item_quantity
- * @property {string} [requiredGroupId] - item_quantity (category group id)
+ * @property {string} [requiredGroupId] - item_quantity (legacy single group id)
+ * @property {string[]} [requiredGroupIds] - item_quantity (category group ids)
  * @property {number} [requiredQty] - item_quantity
  */
 
@@ -22,7 +24,8 @@ import { normalizeGroupOrderIndex } from './menu-catalog.js';
  * @property {'discount_percent'} type
  * @property {number} value - 0–100
  * @property {'cart'|'group'} [target] - default 'cart'
- * @property {string|null} [targetGroupId] - when target === 'group'
+ * @property {string|null} [targetGroupId] - legacy single group id
+ * @property {string[]} [targetGroupIds] - when target === 'group'
  */
 
 /**
@@ -50,9 +53,10 @@ import { normalizeGroupOrderIndex } from './menu-catalog.js';
  * @typedef {object} PromoRuleDoc
  * @property {string} id
  * @property {string} name
- * @property {boolean} isActive - derived: visible in web or kiosk
+ * @property {boolean} isActive - derived: visible in web, kiosk or POS
  * @property {boolean} [visibleInWeb] - show in personal account (web portal)
  * @property {boolean} [visibleInKiosk] - show on self-service kiosk
+ * @property {boolean} [visibleInPos] - show on cashier POS terminal
  * @property {number} [webOrder] - sort index for web promos
  * @property {number} [kioskOrder] - sort index for kiosk promos
  * @property {string|null} availabilityRuleId
@@ -89,22 +93,29 @@ const CLIENT_GROUP_IDS = CLIENT_GROUP_OPTIONS.map(o => o.id);
 
 /** @param {Partial<PromoRuleDoc>|null|undefined} raw */
 function resolvePromoChannelFields(raw) {
-  if (raw?.visibleInWeb !== undefined || raw?.visibleInKiosk !== undefined) {
-    return {
-      visibleInWeb: raw.visibleInWeb !== false,
-      visibleInKiosk: raw.visibleInKiosk === true,
-    };
+  if (
+    raw?.visibleInWeb !== undefined
+    || raw?.visibleInKiosk !== undefined
+    || raw?.visibleInPos !== undefined
+  ) {
+    const visibleInWeb = raw.visibleInWeb !== false;
+    const visibleInKiosk = raw.visibleInKiosk === true;
+    let visibleInPos = raw.visibleInPos === true;
+    if (raw.visibleInPos === undefined && visibleInWeb && visibleInKiosk) {
+      visibleInPos = true;
+    }
+    return { visibleInWeb, visibleInKiosk, visibleInPos };
   }
   if (raw?.isActive === true) {
-    return { visibleInWeb: true, visibleInKiosk: true };
+    return { visibleInWeb: true, visibleInKiosk: true, visibleInPos: true };
   }
-  return { visibleInWeb: false, visibleInKiosk: false };
+  return { visibleInWeb: false, visibleInKiosk: false, visibleInPos: false };
 }
 
 /** @param {PromoRuleDoc|Partial<PromoRuleDoc>} promo */
 export function isPromoHidden(promo) {
-  const { visibleInWeb, visibleInKiosk } = resolvePromoChannelFields(promo);
-  return !visibleInWeb && !visibleInKiosk;
+  const { visibleInWeb, visibleInKiosk, visibleInPos } = resolvePromoChannelFields(promo);
+  return !isVisibleOnAnySalesChannel(visibleInWeb, visibleInKiosk, visibleInPos);
 }
 
 /** @param {PromoRuleDoc[]} promos @param {'web'|'kiosk'} [channel] */
@@ -126,14 +137,27 @@ export function createDefaultPromoRule(id = '') {
     isActive: false,
     visibleInWeb: false,
     visibleInKiosk: false,
+    visibleInPos: false,
     webOrder: 0,
     kioskOrder: 0,
     availabilityRuleId: null,
     triggerType: 'happy_hour',
     conditions: {},
-    action: { type: 'discount_percent', value: 10, target: 'cart', targetGroupId: null },
+    action: { type: 'discount_percent', value: 10, target: 'cart', targetGroupIds: [] },
     targetClientGroups: [],
   };
+}
+
+/** @param {string|string[]|null|undefined} singleOrMany @param {string|string[]|null|undefined} [legacySingle] */
+export function normalizeGroupIdList(singleOrMany, legacySingle) {
+  const raw = Array.isArray(singleOrMany)
+    ? singleOrMany
+    : singleOrMany
+      ? [singleOrMany]
+      : legacySingle
+        ? [legacySingle]
+        : [];
+  return [...new Set(raw.map(id => String(id || '').trim()).filter(Boolean))];
 }
 
 /** @param {unknown[]} raw */
@@ -152,7 +176,18 @@ export function normalizePromoConditions(raw) {
     conditions.requiredQty = Math.max(1, Math.floor(Number(conditions.requiredQty) || 1));
   }
   if (conditions.requiredItemId === '') conditions.requiredItemId = undefined;
-  if (conditions.requiredGroupId === '') conditions.requiredGroupId = undefined;
+
+  const requiredGroupIds = normalizeGroupIdList(
+    conditions.requiredGroupIds,
+    conditions.requiredGroupId,
+  );
+  if (requiredGroupIds.length) {
+    conditions.requiredGroupIds = requiredGroupIds;
+  } else {
+    delete conditions.requiredGroupIds;
+  }
+  delete conditions.requiredGroupId;
+
   return conditions;
 }
 
@@ -185,9 +220,11 @@ export function normalizePromoAction(raw) {
 
   const value = Math.min(100, Math.max(0, Number(raw?.value) || 0));
   const target = raw?.target === 'group' ? 'group' : 'cart';
-  const targetGroupId = target === 'group' ? (raw?.targetGroupId || null) : null;
+  const targetGroupIds = target === 'group'
+    ? normalizeGroupIdList(raw?.targetGroupIds, raw?.targetGroupId)
+    : [];
 
-  return { type: 'discount_percent', value, target, targetGroupId };
+  return { type: 'discount_percent', value, target, targetGroupIds };
 }
 
 /** Strip irrelevant fields when trigger/action type changes. */
@@ -201,8 +238,11 @@ export function sanitizePromoRuleFields(rule) {
     if (rule.conditions?.requiredItemId) {
       conditions.requiredItemId = rule.conditions.requiredItemId;
       conditions.requiredQty = rule.conditions.requiredQty;
-    } else if (rule.conditions?.requiredGroupId) {
-      conditions.requiredGroupId = rule.conditions.requiredGroupId;
+    } else if (rule.conditions?.requiredGroupIds?.length || rule.conditions?.requiredGroupId) {
+      conditions.requiredGroupIds = normalizeGroupIdList(
+        rule.conditions.requiredGroupIds,
+        rule.conditions.requiredGroupId,
+      );
       conditions.requiredQty = rule.conditions.requiredQty;
     }
   }
@@ -223,14 +263,15 @@ export function sanitizePromoRuleFields(rule) {
 export function normalizePromoRuleDoc(raw, docId = '') {
   const id = String(raw?.id || docId || '').trim();
   const triggerType = TRIGGER_TYPES.includes(raw?.triggerType) ? raw.triggerType : 'happy_hour';
-  const { visibleInWeb, visibleInKiosk } = resolvePromoChannelFields(raw);
+  const { visibleInWeb, visibleInKiosk, visibleInPos } = resolvePromoChannelFields(raw);
 
   const draft = {
     id,
     name: String(raw?.name || '').trim() || 'Без названия',
-    isActive: visibleInWeb || visibleInKiosk,
+    isActive: isVisibleOnAnySalesChannel(visibleInWeb, visibleInKiosk, visibleInPos),
     visibleInWeb,
     visibleInKiosk,
+    visibleInPos,
     webOrder: normalizeGroupOrderIndex(raw?.webOrder, 0),
     kioskOrder: normalizeGroupOrderIndex(raw?.kioskOrder, 0),
     availabilityRuleId: raw?.availabilityRuleId || null,
@@ -256,9 +297,11 @@ export function formatPromoRuleSummary(rule, groups = [], items = []) {
     if (rule.conditions.requiredItemId) {
       const item = items.find(i => i.id === rule.conditions.requiredItemId);
       parts.push(`${qty}× ${item?.name || 'товар'}`);
-    } else if (rule.conditions.requiredGroupId) {
-      const group = groups.find(g => g.id === rule.conditions.requiredGroupId);
-      parts.push(`${qty}× ${group?.name || 'группа'}`);
+    } else if (rule.conditions.requiredGroupIds?.length) {
+      const names = rule.conditions.requiredGroupIds
+        .map(id => groups.find(g => g.id === id)?.name || id)
+        .join(', ');
+      parts.push(`${qty}× ${names || 'группы'}`);
     } else {
       parts.push(`${qty} шт.`);
     }
@@ -271,7 +314,11 @@ export function formatPromoRuleSummary(rule, groups = [], items = []) {
 
   if (rule.action.type === 'discount_percent') {
     const target = rule.action.target === 'group'
-      ? groups.find(g => g.id === rule.action.targetGroupId)?.name || 'группа'
+      ? (rule.action.targetGroupIds?.length
+        ? rule.action.targetGroupIds
+          .map(id => groups.find(g => g.id === id)?.name || id)
+          .join(', ')
+        : 'группы')
       : 'весь чек';
     parts.push(`−${rule.action.value}% на ${target}`);
   } else if (rule.action.type === 'discount_fixed') {
@@ -302,7 +349,7 @@ export function validatePromoRuleDoc(rule) {
   }
 
   if (normalized.triggerType === 'item_quantity') {
-    if (!normalized.conditions.requiredItemId && !normalized.conditions.requiredGroupId) {
+    if (!normalized.conditions.requiredItemId && !normalized.conditions.requiredGroupIds?.length) {
       throw new Error('Выберите товар или группу для условия количества');
     }
     if (!normalized.conditions.requiredQty || normalized.conditions.requiredQty < 1) {
@@ -320,7 +367,7 @@ export function validatePromoRuleDoc(rule) {
     if (normalized.action.value <= 0) {
       throw new Error('Укажите процент скидки больше 0');
     }
-    if (normalized.action.target === 'group' && !normalized.action.targetGroupId) {
+    if (normalized.action.target === 'group' && !normalized.action.targetGroupIds?.length) {
       throw new Error('Выберите группу товаров для скидки');
     }
   }
@@ -357,6 +404,7 @@ export function buildPromoRulePayload(rule) {
     isActive: normalized.isActive,
     visibleInWeb: normalized.visibleInWeb,
     visibleInKiosk: normalized.visibleInKiosk,
+    visibleInPos: normalized.visibleInPos,
     webOrder: normalized.webOrder,
     kioskOrder: normalized.kioskOrder,
     availabilityRuleId: normalized.availabilityRuleId || null,

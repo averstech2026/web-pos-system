@@ -9,6 +9,19 @@ export function formatMoneyShort(value) {
   return `${formatMoney(value)}р.`;
 }
 
+/** @param {number} value */
+export function formatMoneyRubHtml(value) {
+  return `${formatMoney(value)}<span class="ct-currency">₽</span>`;
+}
+
+/** @param {number} value */
+export function totalsAmountSizeClass(value) {
+  const len = formatMoney(value).length;
+  if (len >= 12) return ' ct-totals-amount--long';
+  if (len >= 9) return ' ct-totals-amount--medium';
+  return '';
+}
+
 /** @param {Date} [date] */
 export function formatClock(date = new Date()) {
   return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });

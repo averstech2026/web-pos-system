@@ -3,6 +3,7 @@ import { renderNumpad, bindNumpad } from '../components/numpad.js';
 import { renderModals } from '../components/modals.js';
 import { esc, escAttr } from '../core/format.js';
 import { state } from '../core/state.js';
+import { ROLES } from '../../shared/schema.js';
 
 const NFC_BADGE_ICON = `<svg class="ct-nfc-badge-icon" viewBox="0 0 128 128" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
   <path class="ct-nfc-wave ct-nfc-wave--1" d="M34 64c0-8.3 3.4-15.8 8.8-21.2" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
@@ -16,8 +17,8 @@ const NFC_BADGE_ICON = `<svg class="ct-nfc-badge-icon" viewBox="0 0 128 128" fil
 </svg>`;
 
 const DEMO_CASHIERS = {
-  '1234': { name: 'Кассир', login: 'cashier', department: 'ИТ Отдел Аверс Технолоджи', pin: '1234' },
-  '0000': { name: 'Администратор', login: 'admin', department: 'ИТ Отдел Аверс Технолоджи', pin: '0000' },
+  '1234': { name: 'Кассир', login: 'cashier', role: ROLES.CASHIER, department: 'ИТ Отдел Аверс Технолоджи', pin: '1234' },
+  '0000': { name: 'Администратор', login: 'admin', role: ROLES.ADMIN, department: 'ИТ Отдел Аверс Технолоджи', pin: '0000' },
 };
 
 export class AuthPage {

@@ -53,6 +53,21 @@ function countMatchingQuantity(lines, conditions, itemsById, groupsById) {
       .reduce((s, l) => s + l.quantity, 0);
   }
 
+  if (conditions.requiredGroupIds?.length) {
+    const groupNames = new Set(
+      conditions.requiredGroupIds
+        .map(id => groupsById.get(id)?.name)
+        .filter(Boolean),
+    );
+    if (!groupNames.size) return 0;
+    return paid
+      .filter(l => {
+        const item = itemsById.get(l.dishId);
+        return item?.category && groupNames.has(item.category);
+      })
+      .reduce((s, l) => s + l.quantity, 0);
+  }
+
   if (conditions.requiredGroupId) {
     const group = groupsById.get(conditions.requiredGroupId);
     if (!group) return 0;
@@ -105,8 +120,16 @@ function isPromoConditionMet(promo, lines, itemsById, groupsById, clientSegment 
  */
 function applyPercentDiscount(lines, action, promoRuleId, itemsById, groupsById) {
   const factor = 1 - action.value / 100;
-  const targetGroup = action.target === 'group' && action.targetGroupId
-    ? groupsById.get(action.targetGroupId)
+  const targetGroupNames = action.target === 'group'
+    ? new Set(
+      (action.targetGroupIds?.length
+        ? action.targetGroupIds
+        : action.targetGroupId
+          ? [action.targetGroupId]
+          : [])
+        .map(id => groupsById.get(id)?.name)
+        .filter(Boolean),
+    )
     : null;
 
   for (const line of lines) {
@@ -114,7 +137,7 @@ function applyPercentDiscount(lines, action, promoRuleId, itemsById, groupsById)
 
     const item = itemsById.get(line.dishId);
     const inTarget = action.target === 'cart'
-      || (targetGroup && item?.category === targetGroup.name);
+      || (targetGroupNames?.size && item?.category && targetGroupNames.has(item.category));
 
     if (!inTarget) continue;
 
@@ -236,6 +259,7 @@ export function applyPromoRules(cart, activePromos, allAvailabilityRules, option
     if (!p?.isActive) return false;
     if (channel === 'kiosk') return p.visibleInKiosk === true;
     if (channel === 'web') return p.visibleInWeb !== false;
+    if (channel === 'pos') return p.visibleInPos === true;
     if (!p.availabilityRuleId) return true;
     return isItemAvailable(p.availabilityRuleId, null, allAvailabilityRules, slot);
   });

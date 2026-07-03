@@ -2,7 +2,7 @@ import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 
-/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'modifiers' | 'lunches' | 'allergens' | 'data-import' | 'schedules' | 'calendar' | 'marketing' | 'marketing-banners' | 'payments' | 'sales-channels' | 'users' | 'crm-groups' | 'work-shifts' | 'crm-loyalty' | 'crm-wallets' | 'reports' | 'validation-rules'} AdminSection */
+/** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'modifiers' | 'lunches' | 'allergens' | 'data-import' | 'schedules' | 'calendar' | 'marketing' | 'discounts' | 'marketing-banners' | 'payments' | 'sales-channels' | 'users' | 'crm-groups' | 'work-shifts' | 'crm-loyalty' | 'crm-wallets' | 'reports' | 'validation-rules'} AdminSection */
 
 /** @type {Record<string, string>} */
 const NAV_ICONS = {
@@ -56,7 +56,8 @@ const NAV_GROUPS = [
       { id: 'crm-wallets', path: '/crm-wallets', label: 'Кошельки' },
       { id: 'validation-rules', path: '/validation-rules', label: 'Правила валидации' },
       { id: 'payments', path: '/payments', label: 'Платежи' },
-      { id: 'marketing', path: '/marketing', label: 'Конструктор акций' },
+      { id: 'marketing', path: '/marketing', label: 'Акции' },
+      { id: 'discounts', path: '/discounts', label: 'Скидки' },
       { id: 'marketing-banners', path: '/marketing-banners', label: 'Баннеры' },
     ],
   },

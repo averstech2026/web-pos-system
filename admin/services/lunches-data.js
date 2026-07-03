@@ -11,6 +11,7 @@ import { db } from '../../shared/firebase.js';
 import { COL } from '../../shared/schema.js';
 import {
   buildCompositeLunchFirestorePayload,
+  COMPOSITE_SET_MODES,
   isCompositeItem,
   normalizeCatalogItem,
   normalizeCompositeLunch,
@@ -48,6 +49,11 @@ export async function saveLunch(lunch, existingId = '', catalogItems = null) {
     if (!lunch.allowedPaymentMethods?.length) update.allowedPaymentMethods = deleteField();
     if (!lunch.modifierGroupIds?.length) update.modifierGroupIds = deleteField();
     if (!payload.allergens?.length) update.allergens = deleteField();
+    if (payload.compositeMode === COMPOSITE_SET_MODES.FIXED) {
+      update.lunchSteps = deleteField();
+    } else {
+      update.fixedItems = deleteField();
+    }
     await updateDoc(doc(db, COL.ITEMS, id), update);
     return { id, ...normalizeCompositeLunch({ id, ...payload }) };
   }

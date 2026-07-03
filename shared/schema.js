@@ -334,18 +334,27 @@ export function createWorkShiftDoc(p) {
  * @param {string} p.name
  * @param {number} [p.discountPercent=0]
  * @param {number} [p.cashbackPercent=0]
+ * @param {boolean} [p.applyOnPos]
+ * @param {boolean} [p.applyOnWeb]
+ * @param {boolean} [p.applyOnKiosk]
  */
 export function createLoyaltyCategoryDoc({
   id,
   name,
   discountPercent = 0,
   cashbackPercent = 0,
+  applyOnPos = true,
+  applyOnWeb = true,
+  applyOnKiosk = true,
 }) {
   return {
     id,
     name,
     discountPercent: Number(discountPercent) || 0,
     cashbackPercent: Number(cashbackPercent) || 0,
+    applyOnPos: applyOnPos === true,
+    applyOnWeb: applyOnWeb === true,
+    applyOnKiosk: applyOnKiosk === true,
   };
 }
 
@@ -457,7 +466,9 @@ export const DEFAULT_ITEM_IS_COMPOSITE = false;
  * @property {boolean} [honestSignMarked] - requires Chestny Znak (ЧЗ) marking
  * @property {string|null} [honestSignCategory] - ЧЗ category id (dairy, water, …)
  * @property {boolean} [isComposite] - composite lunch / combo meal
- * @property {Array<{ id: string, name: string, itemIds: string[] }>} [lunchSteps]
+ * @property {'fixed'|'steps'} [compositeMode]
+ * @property {Array<{ itemId: string, quantity: number }>} [fixedItems]
+ * @property {Array<{ id: string, name: string, itemIds: string[], minPick?: number, maxPick?: number }>} [lunchSteps]
  * @property {string[]} [allowedPaymentMethods]
  */
 

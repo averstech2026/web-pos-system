@@ -1,4 +1,9 @@
 import { openCompositeLunchModal } from '@shared/composite-lunch-flow.js';
+import {
+  buildFixedSetLunchSelections,
+  COMPOSITE_SET_MODES,
+  resolveCompositeSetMode,
+} from '@shared/composite-meals.js';
 import { getItemImageUrl, resolveProductImageUrl } from '@shared/item-images.js';
 import { PRODUCTS, CATALOG_LOOKUP } from '../services/catalog.js';
 import { addToCart } from '../core/cart.js';
@@ -15,18 +20,30 @@ export function tryAddProductToCart(productId) {
   const product = PRODUCTS.find(p => p.id === productId);
   if (!product) return;
 
-  if (product.isComposite && product.lunchSteps?.length) {
-    openCompositeLunchModal({
-      lunch: product,
-      catalogItems: [...CATALOG_LOOKUP.values()],
-      resolveImageUrl: item => resolveImage(item),
-      onConfirm: selections => {
-        if (!state.compositeSelections) state.compositeSelections = {};
-        state.compositeSelections[productId] = selections;
-        addToCart(productId);
-      },
-    });
-    return;
+  if (product.isComposite) {
+    const mode = resolveCompositeSetMode(product);
+    if (mode === COMPOSITE_SET_MODES.FIXED && product.fixedItems?.length) {
+      if (!state.compositeSelections) state.compositeSelections = {};
+      state.compositeSelections[productId] = buildFixedSetLunchSelections(
+        product,
+        [...CATALOG_LOOKUP.values()],
+      );
+      addToCart(productId);
+      return;
+    }
+    if (product.lunchSteps?.length) {
+      openCompositeLunchModal({
+        lunch: product,
+        catalogItems: [...CATALOG_LOOKUP.values()],
+        resolveImageUrl: item => resolveImage(item),
+        onConfirm: selections => {
+          if (!state.compositeSelections) state.compositeSelections = {};
+          state.compositeSelections[productId] = selections;
+          addToCart(productId);
+        },
+      });
+      return;
+    }
   }
 
   addToCart(productId);
@@ -39,9 +56,9 @@ export function tryOpenProduct(productId) {
   const product = PRODUCTS.find(p => p.id === productId);
   if (!product) return;
 
-  if (product.isComposite && product.lunchSteps?.length) {
+  if (product.isComposite) {
     tryAddProductToCart(productId);
-    return;
+    return true;
   }
 
   return false;

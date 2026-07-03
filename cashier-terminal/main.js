@@ -1,9 +1,10 @@
 import '../shared/styles.css';
 import '../shared/global.css';
+import '../shared/composite-lunch.css';
 import './style.css';
 
 import { fetchPosChannelSettings } from './services/channel-settings.js';
-import { loadPosCatalog } from './services/catalog.js';
+import { loadPosCatalog, buildPosCatalogLookup } from './services/catalog.js';
 import {
   ensurePosTerminalSession,
   waitForAuthReady,
@@ -18,6 +19,7 @@ import {
 } from './services/dev-demo.js';
 import { loadPosGuests, getDemoPosGuests } from './services/guests.js';
 import { loadPosPaymentMethods, getDemoPaymentMethods } from './services/payment-methods.js';
+import { loadPosDiscountSettings, getDemoDiscountSettings } from './services/discount-presets.js';
 import { applyScreenFormat } from './components/shell.js';
 import { renderModals } from './components/modals.js';
 import { state } from './core/state.js';
@@ -66,12 +68,14 @@ function revealViewport(viewport) {
  * @param {object} channel
  * @param {object[]} items
  * @param {object[]} categoryGroups
+ * @param {Map<string, object>} catalogById
  * @param {HTMLElement} viewport
  */
-async function mountApp(channel, items, categoryGroups, viewport) {
+async function mountApp(channel, items, categoryGroups, catalogById, viewport) {
   state.channel = channel;
   state.items = items;
   state.categoryGroups = categoryGroups;
+  state.catalogById = catalogById instanceof Map ? catalogById : buildPosCatalogLookup(items);
 
   const maintenance = shouldShowSalesChannelMaintenance(channel);
   if (channel.status === SALES_CHANNEL_STATUS.HIDDEN || maintenance) {
@@ -97,14 +101,16 @@ async function boot(demoMode = isDemoModeActive()) {
     let channel;
     let items;
     let categoryGroups;
+    let catalogById;
 
     if (demoMode) {
       channel = getDemoChannel();
-      ({ items, categoryGroups } = getDemoCatalog());
+      ({ items, categoryGroups, catalogById } = getDemoCatalog());
       const { clients, groupsById } = getDemoPosGuests();
       state.crmClients = clients;
       state.crmGroupsById = Object.fromEntries(groupsById);
       state.paymentMethods = getDemoPaymentMethods();
+      state.discountSettings = getDemoDiscountSettings();
     } else {
       await ensurePosTerminalSession();
       if (seq !== bootSeq) return;
@@ -112,7 +118,7 @@ async function boot(demoMode = isDemoModeActive()) {
       channel = await fetchPosChannelSettings();
       if (seq !== bootSeq) return;
 
-      ({ items, categoryGroups } = await loadPosCatalog());
+      ({ items, categoryGroups, catalogById } = await loadPosCatalog());
       if (seq !== bootSeq) return;
 
       try {
@@ -132,6 +138,14 @@ async function boot(demoMode = isDemoModeActive()) {
       } catch (payErr) {
         console.warn('[cashier-terminal] payment methods', payErr);
         state.paymentMethods = getDemoPaymentMethods();
+      }
+
+      try {
+        state.discountSettings = await loadPosDiscountSettings();
+        if (seq !== bootSeq) return;
+      } catch (discountErr) {
+        console.warn('[cashier-terminal] discount settings', discountErr);
+        state.discountSettings = getDemoDiscountSettings();
       }
 
       if (!items.some(i => i.honestSignMarked)) {
@@ -157,6 +171,8 @@ async function boot(demoMode = isDemoModeActive()) {
           visibleInPos: true,
         });
       }
+
+      catalogById = buildPosCatalogLookup(items);
     }
 
     if (seq !== bootSeq) return;
@@ -185,7 +201,7 @@ async function boot(demoMode = isDemoModeActive()) {
       state.savedCart = null;
     }
 
-    await mountApp(channel, items, categoryGroups, viewport);
+    await mountApp(channel, items, categoryGroups, catalogById, viewport);
     revealViewport(viewport);
   } catch (err) {
     if (seq !== bootSeq) return;
@@ -272,6 +288,18 @@ function renderBootError(err) {
 /** @param {HTMLElement} viewport */
 async function showSales(viewport) {
   currentPage?.destroy?.();
+
+  if (!isDemoModeActive()) {
+    try {
+      const { items, categoryGroups, catalogById } = await loadPosCatalog();
+      state.items = items;
+      state.categoryGroups = categoryGroups;
+      state.catalogById = catalogById;
+    } catch (err) {
+      console.warn('[cashier-terminal] catalog refresh', err);
+    }
+  }
+
   viewport.classList.remove('ct-viewport--booting');
 
   if (state.savedCart) {

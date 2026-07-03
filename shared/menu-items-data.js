@@ -1,7 +1,8 @@
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase.js';
 import { COL } from './schema.js';
 import { normalizeCatalogItem } from './composite-meals.js';
+import { buildPosCatalog } from './pos-catalog.js';
 
 /**
  * Menu items visible in the web portal (personal account).
@@ -36,11 +37,15 @@ export async function fetchKioskMenuItems() {
  * @returns {Promise<Array<import('./schema.js').MenuItemDoc & { id: string }>>}
  */
 export async function fetchPosMenuItems() {
-  const snap = await getDocs(query(
-    collection(db, COL.ITEMS),
-    where('isAvailable', '==', true),
-  ));
-  return snap.docs
-    .map(d => normalizeCatalogItem({ id: d.id, ...d.data() }))
-    .filter(item => item.visibleInPos !== false);
+  const [itemsSnap, menuSnap] = await Promise.all([
+    getDocs(query(
+      collection(db, COL.ITEMS),
+      where('isAvailable', '==', true),
+    )),
+    getDoc(doc(db, COL.SETTINGS, 'menu')),
+  ]);
+
+  const menuData = menuSnap.exists() ? menuSnap.data() : {};
+  const rawItems = itemsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return buildPosCatalog(rawItems, menuData.categoryGroups || []).items;
 }

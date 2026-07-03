@@ -82,8 +82,13 @@ export function isItemVisibleInKiosk(item) {
 }
 
 /** @param {object} item */
+export function isItemVisibleInPos(item) {
+  return item?.visibleInPos !== false;
+}
+
+/** @param {object} item */
 export function isItemVisibleSomewhere(item) {
-  return isItemVisibleInWeb(item) || isItemVisibleInKiosk(item);
+  return isItemVisibleInWeb(item) || isItemVisibleInKiosk(item) || isItemVisibleInPos(item);
 }
 
 /**

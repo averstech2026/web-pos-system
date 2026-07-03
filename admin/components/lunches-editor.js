@@ -1,14 +1,22 @@
 import {
+  COMPOSITE_SET_MODES,
   formatLunchPrice,
   normalizeCompositeLunch,
   parseLunchPrice,
+  resolveCompositeSetMode,
   resolveInheritedLunchAllergens,
-  resolveStepItemNames,
 } from '../../shared/composite-meals.js';
 import { formatAvailabilityRuleShort } from '../../shared/availability-rules.js';
-import { channelFlagsFromMode, resolveChannelMode } from '../services/products-data.js';
+import {
+  resolveSalesChannelMode,
+  SALES_POINT_MODES,
+  salesChannelFlagsFromMode,
+} from '../../shared/sales-channel-modes.js';
 import { deleteLunch, saveLunch } from '../services/lunches-data.js';
-import { openLunchStepProductsPickerModal } from './lunch-step-products-picker-modal.js';
+import {
+  bindProductCatalogMultiSelect,
+  renderProductCatalogMultiSelect,
+} from './product-catalog-select.js';
 import { showToast } from '../utils/toast.js';
 import { productThumbHtml } from '../utils/product-image.js';
 import { renderChannelAvailabilityGrid } from '../utils/admin-form.js';
@@ -21,13 +29,6 @@ import {
 
 const REMOVE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>`;
 
-const LUNCH_SALES_POINT_MODES = [
-  { id: 'everywhere', label: 'Везде' },
-  { id: 'kiosk', label: 'Киоск' },
-  { id: 'web', label: 'Веб' },
-  { id: 'hidden', label: 'Нигде' },
-];
-
 /**
  * @param {HTMLElement} host
  * @param {object} p
@@ -36,6 +37,7 @@ const LUNCH_SALES_POINT_MODES = [
  * @param {import('../../shared/availability-rules.js').AvailabilityRuleDoc[]} p.availabilityRules
  * @param {Array<{ id: string, name: string }>} p.paymentMethods
  * @param {import('../../shared/menu-catalog.js').ModifierGroup[]} [p.modifierGroups]
+ * @param {import('../../shared/menu-catalog.js').CategoryGroup[]} [p.categoryGroups]
  * @param {Array<{ id: string, name: string }>} [p.allergens]
  * @param {() => void|Promise<void>} [p.onSaved]
  */
@@ -45,16 +47,21 @@ export function createLunchesEditor(host, {
   availabilityRules,
   paymentMethods,
   modifierGroups = [],
+  categoryGroups = [],
   allergens = [],
   onSaved,
 }) {
+  const groupNames = categoryGroups.map(g => g.name).filter(Boolean);
   /** @type {import('../../shared/composite-meals.js').CompositeLunchItem[]} */
   let lunches = initialLunches.map(l => normalizeCompositeLunch({
     ...l,
     lunchSteps: (l.lunchSteps || []).map(s => ({ ...s, itemIds: [...(s.itemIds || [])] })),
+    fixedItems: (l.fixedItems || []).map(entry => ({ ...entry })),
     allowedPaymentMethods: [...(l.allowedPaymentMethods || [])],
-  }));
+  }, groupNames));
   const rulesMap = new Map(availabilityRules.map(r => [r.id, r]));
+  /** @type {Map<string, { readSelectedIds: () => string[], destroy?: () => void }>} */
+  const multiSelectControllers = new Map();
   /** @type {string|null} */
   let selectedId = lunches[0]?.id || null;
 
@@ -63,7 +70,7 @@ export function createLunchesEditor(host, {
 
   function snapshot() {
     return JSON.stringify(
-      lunches.map(l => normalizeCompositeLunch(l)).sort((a, b) => a.id.localeCompare(b.id)),
+      lunches.map(l => normalizeCompositeLunch(l, groupNames)).sort((a, b) => a.id.localeCompare(b.id)),
     );
   }
 
@@ -115,18 +122,42 @@ export function createLunchesEditor(host, {
     const name = panel.querySelector('[data-field="name"]')?.value.trim() || '';
     const price = parseLunchPrice(panel.querySelector('[data-field="price"]')?.value);
     const channelMode = panel.querySelector('[data-lnc-channel-mode].period-tab--active')?.dataset.lncChannelMode || 'everywhere';
-    const { visibleInWeb, visibleInKiosk, isAvailable } = channelFlagsFromMode(channelMode);
+    const { visibleInWeb, visibleInKiosk, visibleInPos, isAvailable } = salesChannelFlagsFromMode(channelMode);
     const availabilityRuleId = panel.querySelector('[data-field="schedule-id"]')?.value || null;
     const allowedPaymentMethods = [...panel.querySelectorAll('[data-payment-method]:checked')]
       .map(el => el.dataset.paymentMethod);
     const modifierGroupIds = readModifierGroupIds(panel);
+    const category = panel.querySelector('[data-field="category"]')?.value.trim() || '';
+    const compositionEnabled = panel.querySelector('[data-field="composition-enabled"]')?.checked !== false;
+    const compositeMode = panel.querySelector('[data-composite-mode].period-tab--active')?.dataset.compositeMode
+      || COMPOSITE_SET_MODES.STEPS;
 
     const stepBlocks = [...panel.querySelectorAll('[data-step-block]')];
-    const lunchSteps = stepBlocks.map(block => ({
-      id: block.dataset.stepId || '',
-      name: block.querySelector('[data-field="step-name"]')?.value.trim() || '',
-      itemIds: [...block.querySelectorAll('[data-step-item]')].map(el => el.dataset.stepItem),
-    }));
+    const lunchSteps = stepBlocks.map(block => {
+      const stepId = block.dataset.stepId || '';
+      const fieldKey = `step_${stepId}`;
+      const controller = multiSelectControllers.get(fieldKey);
+      const itemIds = controller?.readSelectedIds()
+        || [...block.querySelectorAll('[data-cgms-tag]')].map(el => el.dataset.cgmsTag).filter(Boolean);
+      const minPick = Math.max(1, parseInt(block.querySelector('[data-field="step-min"]')?.value, 10) || 1);
+      const maxPick = Math.max(minPick, parseInt(block.querySelector('[data-field="step-max"]')?.value, 10) || 1);
+      return {
+        id: stepId,
+        name: block.querySelector('[data-field="step-name"]')?.value.trim() || '',
+        itemIds,
+        minPick,
+        maxPick,
+      };
+    });
+
+    const fixedFieldKey = selectedId ? `fixed_${selectedId}` : '';
+    const fixedController = fixedFieldKey ? multiSelectControllers.get(fixedFieldKey) : null;
+    const fixedItemIds = fixedController?.readSelectedIds()
+      || (fixedFieldKey
+        ? [...panel.querySelector(`[data-pcs-field="${CSS.escape(fixedFieldKey)}"]`)?.querySelectorAll('[data-cgms-tag]') || []]
+          .map(el => el.dataset.cgmsTag).filter(Boolean)
+        : []);
+    const fixedItems = fixedItemIds.map(itemId => ({ itemId, quantity: 1 }));
 
     lunches = lunches.map(l => (
       l.id === selectedId
@@ -134,14 +165,19 @@ export function createLunchesEditor(host, {
           ...l,
           name,
           price,
+          category,
           isAvailable,
           visibleInKiosk,
           visibleInWeb,
+          visibleInPos,
           availabilityRuleId: availabilityRuleId || null,
           allowedPaymentMethods,
           modifierGroupIds,
-          lunchSteps,
-        })
+          compositionEnabled,
+          compositeMode: compositionEnabled ? compositeMode : COMPOSITE_SET_MODES.STEPS,
+          lunchSteps: compositionEnabled && compositeMode === COMPOSITE_SET_MODES.STEPS ? lunchSteps : l.lunchSteps,
+          fixedItems: compositionEnabled && compositeMode === COMPOSITE_SET_MODES.FIXED ? fixedItems : l.fixedItems,
+        }, groupNames)
         : l
     ));
   }
@@ -152,7 +188,7 @@ export function createLunchesEditor(host, {
   }
 
   function isLunchHidden(lunch) {
-    return resolveChannelMode(lunch.visibleInWeb, lunch.visibleInKiosk) === 'hidden';
+    return resolveSalesChannelMode(lunch.visibleInWeb, lunch.visibleInKiosk, lunch.visibleInPos) === 'hidden';
   }
 
   function isLunchDeprioritized(lunch) {
@@ -160,26 +196,53 @@ export function createLunchesEditor(host, {
   }
 
   function channelBadgeHtml(channel, lunch) {
-    const isWeb = channel === 'web';
-    const active = isWeb
-      ? lunch.visibleInWeb !== false
-      : lunch.visibleInKiosk === true;
-    const letter = isWeb ? 'W' : 'K';
-    const channelLabel = isWeb ? 'Веб' : 'Киоск';
+    const config = {
+      web: {
+        active: lunch.visibleInWeb !== false,
+        letter: 'W',
+        label: 'Веб',
+        className: 'cgr-channel-badge--web',
+      },
+      kiosk: {
+        active: lunch.visibleInKiosk === true,
+        letter: 'K',
+        label: 'Киоск',
+        className: 'cgr-channel-badge--kiosk',
+      },
+      pos: {
+        active: lunch.visibleInPos === true,
+        letter: 'P',
+        label: 'Касса',
+        className: 'cgr-channel-badge--pos',
+      },
+    }[channel];
+
     const classes = [
       'cgr-channel-badge',
-      isWeb ? 'cgr-channel-badge--web' : 'cgr-channel-badge--kiosk',
-      active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
+      config.className,
+      config.active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
     ].join(' ');
 
-    return `<span class="${classes}" aria-label="${escAttr(active ? `${channelLabel}, активен` : `${channelLabel}, неактивен`)}">${letter}</span>`;
+    return `<span class="${classes}" aria-label="${escAttr(config.active ? `${config.label}, активен` : `${config.label}, неактивен`)}">${config.letter}</span>`;
   }
 
   function channelIndicatorsHtml(lunch) {
-    return `${channelBadgeHtml('web', lunch)}${channelBadgeHtml('kiosk', lunch)}`;
+    return `${channelBadgeHtml('web', lunch)}${channelBadgeHtml('kiosk', lunch)}${channelBadgeHtml('pos', lunch)}`;
   }
 
   function lunchListMainMeta(lunch) {
+    const mode = resolveCompositeSetMode(lunch);
+    if (mode === COMPOSITE_SET_MODES.FIXED) {
+      const count = lunch.fixedItems?.length || 0;
+      const mod10 = count % 10;
+      const mod100 = count % 100;
+      const itemsWord = mod10 === 1 && mod100 !== 11
+        ? 'товар'
+        : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+          ? 'товара'
+          : 'товаров';
+      return `${esc(lunch.category || '—')} · ${formatLunchPrice(lunch.price)} · фикс. ${count} ${itemsWord}`;
+    }
     const steps = lunch.lunchSteps?.length || 0;
     const mod10 = steps % 10;
     const mod100 = steps % 100;
@@ -188,7 +251,7 @@ export function createLunchesEditor(host, {
       : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
         ? 'шага'
         : 'шагов';
-    return `${formatLunchPrice(lunch.price)} · ${steps} ${stepsWord}`;
+    return `${esc(lunch.category || '—')} · ${formatLunchPrice(lunch.price)} · ${steps} ${stepsWord}`;
   }
 
   function listRowMetaHtml(lunch) {
@@ -206,7 +269,7 @@ export function createLunchesEditor(host, {
       <div class="admin-field-block lnc-allergens-block" id="lnc-allergens-section">
         <span class="admin-field-label">Аллергены</span>
         <p class="sch-fieldset__hint lnc-allergens-hint">
-          Наследуются автоматически из блюд в шагах (объединение без дублей). Обновляются при сохранении ланча.
+          Наследуются автоматически из блюд в составе (объединение без дублей). Обновляются при сохранении.
         </p>
         ${labels.length
           ? `<div class="lnc-allergens-list">${labels.map(name => `<span class="lnc-allergen-tag">${esc(name)}</span>`).join('')}</div>`
@@ -245,40 +308,27 @@ export function createLunchesEditor(host, {
     `;
   }
 
-  function renderStepProducts(step) {
-    if (!step.itemIds?.length) {
-      return '<p class="lnc-step-empty">Нет привязанных блюд. Добавьте товары из базы.</p>';
-    }
-    const names = resolveStepItemNames(catalogItems, step.itemIds);
-    return step.itemIds.map((id, index) => `
-      <span class="lnc-step-tag" data-step-item="${escAttr(id)}">
-        <span class="lnc-step-tag__name">${esc(names[index] || '—')}</span>
-        <button
-          type="button"
-          class="lnc-step-tag__remove btn-press"
-          data-action="remove-step-item"
-          data-step-id="${escAttr(step.id)}"
-          data-item-id="${escAttr(id)}"
-          title="Убрать из шага"
-          aria-label="Убрать товар из шага"
-        >${REMOVE_ICON}</button>
-      </span>
-    `).join('');
+  function renderFixedSetSection(lunch) {
+    const selectedIds = (lunch.fixedItems || []).map(entry => entry.itemId).filter(Boolean);
+
+    return `
+      <div class="lnc-composite-panel" data-composite-panel="fixed">
+        ${renderProductCatalogMultiSelect({
+          fieldKey: `fixed_${lunch.id}`,
+          label: 'Состав набора',
+          items: catalogItems,
+          selectedIds,
+          placeholder: 'Поиск и добавление товаров...',
+        })}
+      </div>
+    `;
   }
 
   function renderStepBlock(step, index) {
     return `
       <div class="lnc-step-card" data-step-block data-step-id="${escAttr(step.id)}">
-        <div class="lnc-step-head">
-          <label class="lnc-step-index">Шаг ${index + 1}</label>
-          <input
-            type="text"
-            class="admin-field-input lnc-step-name-input"
-            data-field="step-name"
-            value="${escAttr(step.name)}"
-            maxlength="80"
-            placeholder="Например: Первое блюдо"
-          />
+        <div class="lnc-step-card-head">
+          <span class="lnc-step-index">Шаг ${index + 1}</span>
           <button
             type="button"
             class="lnc-step-remove btn-press"
@@ -288,27 +338,62 @@ export function createLunchesEditor(host, {
             aria-label="Удалить шаг"
           >${REMOVE_ICON}</button>
         </div>
-        <div class="lnc-step-products-list" data-step-products="${escAttr(step.id)}">
-          ${renderStepProducts(step)}
+        <div class="admin-field-block">
+          <label class="admin-field-label" for="lnc-step-name-${escAttr(step.id)}">Название шага</label>
+          <input
+            id="lnc-step-name-${escAttr(step.id)}"
+            type="text"
+            class="admin-field-input"
+            data-field="step-name"
+            value="${escAttr(step.name)}"
+            maxlength="80"
+            placeholder="Шаг 1: Комплексный обед"
+          />
         </div>
-        <button
-          type="button"
-          class="btn btn-primary btn-press products-create-btn lnc-pick-products-btn"
-          data-action="pick-step-products"
-          data-step-id="${escAttr(step.id)}"
-        >+ Добавить товары из базы</button>
+        <div class="lnc-step-limits">
+          <div class="admin-field-block lnc-step-limit">
+            <label class="admin-field-label" for="lnc-step-min-${escAttr(step.id)}">Мин. позиций для выбора</label>
+            <input
+              id="lnc-step-min-${escAttr(step.id)}"
+              type="number"
+              class="admin-field-input"
+              data-field="step-min"
+              min="1"
+              step="1"
+              value="${Math.max(1, Number(step.minPick) || 1)}"
+            />
+          </div>
+          <div class="admin-field-block lnc-step-limit">
+            <label class="admin-field-label" for="lnc-step-max-${escAttr(step.id)}">Макс. позиций для выбора</label>
+            <input
+              id="lnc-step-max-${escAttr(step.id)}"
+              type="number"
+              class="admin-field-input"
+              data-field="step-max"
+              min="1"
+              step="1"
+              value="${Math.max(1, Number(step.maxPick) || 1)}"
+            />
+          </div>
+        </div>
+        ${renderProductCatalogMultiSelect({
+          fieldKey: `step_${step.id}`,
+          label: 'Доступные товары для шага',
+          items: catalogItems,
+          selectedIds: step.itemIds || [],
+          placeholder: 'Поиск и добавление товаров...',
+        })}
       </div>
     `;
   }
 
-  function renderCompositionSection(lunch) {
+  function renderStepsSection(lunch) {
     const steps = lunch.lunchSteps?.length
       ? lunch.lunchSteps
-      : [{ id: `step_${Date.now()}`, name: 'Первое блюдо', itemIds: [] }];
+      : [{ id: `step_${Date.now()}`, name: 'Шаг 1: Комплексный обед', itemIds: [], minPick: 1, maxPick: 1 }];
 
     return `
-      <div class="sch-fieldset lnc-composition-fieldset">
-        <span class="sch-fieldset__legend">Состав обеда</span>
+      <div class="lnc-composite-panel" data-composite-panel="steps">
         <div class="lnc-steps" id="lnc-steps">
           ${steps.map((s, i) => renderStepBlock(s, i)).join('')}
         </div>
@@ -320,12 +405,83 @@ export function createLunchesEditor(host, {
     `;
   }
 
+  function renderCompositeSection(lunch) {
+    const compositionEnabled = lunch.compositionEnabled !== false;
+    const mode = resolveCompositeSetMode(lunch);
+    const fixedActive = mode === COMPOSITE_SET_MODES.FIXED;
+
+    return `
+      <div class="sch-fieldset lnc-composite-section" id="lnc-composite-section" data-mode="${mode}">
+        <span class="sch-fieldset__legend">Составной товар / Комплекс</span>
+        <label class="admin-pill-check lnc-composite-toggle">
+          <input
+            type="checkbox"
+            class="admin-pill-check__input"
+            data-field="composition-enabled"
+            ${compositionEnabled ? 'checked' : ''}
+          />
+          <span class="admin-pill-check__box" aria-hidden="true"></span>
+          <span class="admin-pill-check__label">Включить составной набор</span>
+        </label>
+        <div class="lnc-composite-body ${compositionEnabled ? '' : 'lnc-composite-body--hidden'}" id="lnc-composite-body">
+          <div class="period-tabs lnc-composite-mode-tabs" role="tablist" aria-label="Тип состава">
+            <button
+              type="button"
+              class="period-tab ${fixedActive ? 'period-tab--active' : ''}"
+              data-composite-mode="${COMPOSITE_SET_MODES.FIXED}"
+              role="tab"
+              aria-selected="${fixedActive ? 'true' : 'false'}"
+            >Фиксированный набор</button>
+            <button
+              type="button"
+              class="period-tab ${!fixedActive ? 'period-tab--active' : ''}"
+              data-composite-mode="${COMPOSITE_SET_MODES.STEPS}"
+              role="tab"
+              aria-selected="${!fixedActive ? 'true' : 'false'}"
+            >Набор по шагам</button>
+          </div>
+          ${renderFixedSetSection(lunch)}
+          ${renderStepsSection(lunch)}
+        </div>
+        <p class="sch-fieldset__hint lnc-composite-hint">
+          ${fixedActive
+            ? 'Товары добавляются в заказ автоматически одной кнопкой на кассе.'
+            : 'Кассир выбирает блюда по шагам в модальном окне (как на терминале).'}
+        </p>
+      </div>
+    `;
+  }
+
+  function renderCategorySection(lunch) {
+    const selected = lunch.category || '';
+    const options = [...new Set([...groupNames, selected].filter(Boolean))];
+    if (!options.length) {
+      return `
+        <div class="admin-field-block">
+          <span class="admin-field-label">Группа товаров</span>
+          <p class="sch-fieldset__hint">Сначала создайте группу в разделе «Группы товаров».</p>
+        </div>
+      `;
+    }
+    return `
+      <div class="admin-field-block">
+        <label class="admin-field-label" for="lnc-category">Группа товаров</label>
+        <select id="lnc-category" class="admin-field-input" data-field="category">
+          ${options.map(name => `
+            <option value="${escAttr(name)}" ${name === selected ? 'selected' : ''}>${esc(name)}</option>
+          `).join('')}
+        </select>
+        <p class="sch-fieldset__hint">Ланч отображается в этой группе на кассе, киоске и в личном кабинете — как обычный товар.</p>
+      </div>
+    `;
+  }
+
   function renderSalesPointSection(lunch) {
-    const mode = resolveChannelMode(lunch.visibleInWeb, lunch.visibleInKiosk);
+    const mode = resolveSalesChannelMode(lunch.visibleInWeb, lunch.visibleInKiosk, lunch.visibleInPos);
     return renderChannelAvailabilityGrid({
       id: 'lnc-sales-point-section',
       mode,
-      modes: LUNCH_SALES_POINT_MODES,
+      modes: SALES_POINT_MODES,
       modeDataAttr: 'data-lnc-channel-mode',
       ariaLabel: 'Точки продаж',
       fieldLabel: 'Точки продаж',
@@ -416,6 +572,8 @@ export function createLunchesEditor(host, {
               />
             </div>
 
+            ${renderCategorySection(lunch)}
+
             ${renderSalesPointSection(lunch)}
 
             ${renderModifierGroupsField({
@@ -437,7 +595,7 @@ export function createLunchesEditor(host, {
               />
             </div>
 
-            ${renderCompositionSection(lunch)}
+            ${renderCompositeSection(lunch)}
             ${renderInheritedAllergensSection(lunch)}
             ${renderScheduleSection(lunch)}
             ${renderPaymentsSection(lunch)}
@@ -548,9 +706,38 @@ export function createLunchesEditor(host, {
       }
       names.add(key);
 
+      if (!lunch.category?.trim()) {
+        showError(`Выберите группу товаров для ланча «${lunch.name}»`);
+        return false;
+      }
+
       if (!lunch.price || lunch.price <= 0) {
         showError(`Укажите стоимость ланча «${lunch.name}»`);
         return false;
+      }
+
+      if (!lunch.compositionEnabled && lunch.compositionEnabled !== undefined) {
+        showError(`Включите составной набор для ланча «${lunch.name}»`);
+        return false;
+      }
+
+      const mode = resolveCompositeSetMode(lunch);
+      if (mode === COMPOSITE_SET_MODES.FIXED) {
+        if (!lunch.fixedItems?.length) {
+          showError(`Добавьте хотя бы один товар в фиксированный набор «${lunch.name}»`);
+          return false;
+        }
+        for (const entry of lunch.fixedItems) {
+          if (!entry.itemId) {
+            showError(`Выберите товар во всех строках фиксированного набора «${lunch.name}»`);
+            return false;
+          }
+          if (!entry.quantity || entry.quantity < 1) {
+            showError(`Укажите количество для каждого товара в «${lunch.name}»`);
+            return false;
+          }
+        }
+        continue;
       }
 
       if (!lunch.lunchSteps?.length) {
@@ -567,6 +754,12 @@ export function createLunchesEditor(host, {
           showError(`Добавьте блюда в шаг «${step.name}»`);
           return false;
         }
+        const minPick = Math.max(1, Number(step.minPick) || 1);
+        const maxPick = Math.max(minPick, Number(step.maxPick) || 1);
+        if (maxPick > step.itemIds.length) {
+          showError(`В шаге «${step.name}» макс. позиций не может превышать число доступных товаров`);
+          return false;
+        }
       }
     }
 
@@ -574,7 +767,7 @@ export function createLunchesEditor(host, {
   }
 
   async function persistOne(lunch) {
-    const normalized = normalizeCompositeLunch(lunch);
+    const normalized = normalizeCompositeLunch(lunch, groupNames);
     if (!validateLunches([normalized])) return false;
 
     const btn = host.querySelector('#lnc-detail-save');
@@ -611,12 +804,37 @@ export function createLunchesEditor(host, {
     render();
   }
 
-  function refreshStepProducts(stepId) {
-    const lunch = selectedLunch();
-    const step = lunch?.lunchSteps?.find(s => s.id === stepId);
-    const container = host.querySelector(`[data-step-products="${CSS.escape(stepId)}"]`);
-    if (!step || !container) return;
-    container.innerHTML = renderStepProducts(step);
+  function bindCompositionControls() {
+    const panel = host.querySelector('#lnc-detail-panel');
+    if (!panel) return;
+
+    multiSelectControllers.forEach(c => c.destroy?.());
+    multiSelectControllers.clear();
+
+    panel.querySelectorAll('[data-pcs-field]').forEach(fieldEl => {
+      const fieldKey = fieldEl.dataset.pcsField || '';
+      if (!fieldKey) return;
+      const controller = bindProductCatalogMultiSelect(panel, {
+        fieldKey,
+        items: catalogItems,
+        onChange: () => {
+          syncPanelToState();
+          refreshCompositionUi();
+        },
+      });
+      multiSelectControllers.set(fieldKey, controller);
+    });
+  }
+
+  function updateCompositeModeUi(mode) {
+    const section = host.querySelector('#lnc-composite-section');
+    if (section) section.dataset.mode = mode;
+    const hint = host.querySelector('.lnc-composite-hint');
+    if (hint) {
+      hint.textContent = mode === COMPOSITE_SET_MODES.FIXED
+        ? 'Товары добавляются в заказ автоматически одной кнопкой на кассе.'
+        : 'Кассир выбирает блюда по шагам в модальном окне (как на терминале).';
+    }
   }
 
   function renumberSteps() {
@@ -642,12 +860,23 @@ export function createLunchesEditor(host, {
             id: draftId,
             name: 'Новый комплексный обед',
             price: 350,
+            category: groupNames[0] || '',
             isAvailable: true,
             visibleInWeb: true,
             visibleInKiosk: true,
-            lunchSteps: [{ id: `step_${Date.now()}`, name: 'Первое блюдо', itemIds: [] }],
+            visibleInPos: true,
+            compositeMode: COMPOSITE_SET_MODES.STEPS,
+            compositionEnabled: true,
+            lunchSteps: [{
+              id: `step_${Date.now()}`,
+              name: 'Шаг 1: Комплексный обед',
+              itemIds: [],
+              minPick: 1,
+              maxPick: 1,
+            }],
+            fixedItems: [],
             allowedPaymentMethods: paymentMethods.map(m => m.id),
-          });
+          }, groupNames);
           lunches = [...lunches, draft];
           selectedId = draftId;
           render();
@@ -702,7 +931,32 @@ export function createLunchesEditor(host, {
     });
 
     panel?.addEventListener('change', e => {
-      if (e.target.matches('[data-field="schedule-id"], [data-payment-method], [data-modifier-group-id]')) {
+      if (e.target.matches('[data-field="schedule-id"], [data-field="category"], [data-payment-method], [data-modifier-group-id], [data-field="composition-enabled"]')) {
+        if (e.target.matches('[data-field="composition-enabled"]')) {
+          const body = panel.querySelector('#lnc-composite-body');
+          body?.classList.toggle('lnc-composite-body--hidden', !e.target.checked);
+        }
+        syncPanelToState();
+        if (selectedId) updateListRow(selectedId);
+      }
+    });
+
+    panel?.querySelectorAll('[data-composite-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        panel.querySelectorAll('[data-composite-mode]').forEach(b => {
+          const active = b === btn;
+          b.classList.toggle('period-tab--active', active);
+          b.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        const mode = btn.dataset.compositeMode || COMPOSITE_SET_MODES.STEPS;
+        updateCompositeModeUi(mode);
+        syncPanelToState();
+        if (selectedId) updateListRow(selectedId);
+      });
+    });
+
+    panel?.addEventListener('input', e => {
+      if (e.target.matches('[data-field="step-name"], [data-field="step-min"], [data-field="step-max"]')) {
         syncPanelToState();
         if (selectedId) updateListRow(selectedId);
       }
@@ -716,8 +970,10 @@ export function createLunchesEditor(host, {
         if (!lunch) return;
         const step = {
           id: uniqueStepId(lunch, `шаг_${(lunch.lunchSteps?.length || 0) + 1}`),
-          name: `Шаг ${(lunch.lunchSteps?.length || 0) + 1}`,
+          name: `Шаг ${(lunch.lunchSteps?.length || 0) + 1}: Комплексный обед`,
           itemIds: [],
+          minPick: 1,
+          maxPick: 1,
         };
         lunches = lunches.map(l => (
           l.id === selectedId ? { ...l, lunchSteps: [...(l.lunchSteps || []), step] } : l
@@ -726,6 +982,7 @@ export function createLunchesEditor(host, {
           'beforeend',
           renderStepBlock(step, (lunch.lunchSteps?.length || 0)),
         );
+        bindCompositionControls();
         renumberSteps();
         refreshCompositionUi();
         return;
@@ -746,61 +1003,14 @@ export function createLunchesEditor(host, {
             : l
         ));
         host.querySelector(`[data-step-block][data-step-id="${CSS.escape(stepId)}"]`)?.remove();
+        multiSelectControllers.get(`step_${stepId}`)?.destroy?.();
+        multiSelectControllers.delete(`step_${stepId}`);
         renumberSteps();
-        refreshCompositionUi();
-        return;
-      }
-
-      const pickBtn = e.target.closest('[data-action="pick-step-products"]');
-      if (pickBtn) {
-        syncPanelToState();
-        const stepId = pickBtn.dataset.stepId;
-        const lunch = selectedLunch();
-        const step = lunch?.lunchSteps?.find(s => s.id === stepId);
-        if (!step) return;
-        openLunchStepProductsPickerModal({
-          stepName: step.name,
-          selectedIds: step.itemIds,
-          items: catalogItems,
-          onApplied: itemIds => {
-            lunches = lunches.map(l => (
-              l.id === selectedId
-                ? {
-                  ...l,
-                  lunchSteps: (l.lunchSteps || []).map(s => (
-                    s.id === stepId ? { ...s, itemIds } : s
-                  )),
-                }
-                : l
-            ));
-            refreshStepProducts(stepId);
-            refreshCompositionUi();
-          },
-        });
-        return;
-      }
-
-      const removeItemBtn = e.target.closest('[data-action="remove-step-item"]');
-      if (removeItemBtn) {
-        syncPanelToState();
-        const stepId = removeItemBtn.dataset.stepId;
-        const itemId = removeItemBtn.dataset.itemId;
-        lunches = lunches.map(l => (
-          l.id === selectedId
-            ? {
-              ...l,
-              lunchSteps: (l.lunchSteps || []).map(s => (
-                s.id === stepId
-                  ? { ...s, itemIds: (s.itemIds || []).filter(id => id !== itemId) }
-                  : s
-              )),
-            }
-            : l
-        ));
-        refreshStepProducts(stepId);
         refreshCompositionUi();
       }
     });
+
+    bindCompositionControls();
 
     host.querySelector('#lnc-delete-confirm')?.addEventListener('change', e => {
       const deleteBtn = host.querySelector('#lnc-detail-delete');

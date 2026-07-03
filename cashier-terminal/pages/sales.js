@@ -4,7 +4,7 @@ import { renderCatalogSearchZone, bindCatalogSearchZone } from '../components/ca
 import { renderModals, openProduct } from '../components/modals.js';
 import { TOOL_ICONS } from '../components/toolbar-icons.js';
 import {
-  formatMoney, formatMoneyShort, esc, escAttr,
+  formatMoney, formatMoneyShort, formatMoneyRubHtml, totalsAmountSizeClass, esc, escAttr,
 } from '../core/format.js';
 import {
   state, resetReceipt, getTotal, getSubtotal, getDiscountAmount,
@@ -12,9 +12,11 @@ import {
 import {
   ensureDesignPreview, isDesignPreviewActive, resolveDisplayTotals, PREVIEW_CATALOG_TILES,
 } from '../core/demo-preview.js';
+import { renderPosReceiptLineHtml } from '../components/receipt-lines.js';
 import { renderPosGuestReceiptRow } from '../services/guests.js';
 import { ensureCurrentPosOrder } from '../services/orders.js';
 import { resolvePosPaymentMethodButtons } from '../services/payment-methods.js';
+import { resolvePosDiscountPresets } from '../services/discount-presets.js';
 import { POS_CATALOG_DISPLAY } from '../../shared/pos-channel.js';
 
 const GRID_COLS = 4;
@@ -68,6 +70,12 @@ export class SalesPage {
   isLineSelected(id) {
     if (state.multiSelectMode) return state.selectedLineIds.has(id);
     return state.selectedLineId === id;
+  }
+
+  clearLineSelection() {
+    state.selectedLineId = null;
+    state.selectedLineIds = new Set();
+    state.multiSelectMode = false;
   }
 
   toggleMultiSelect() {
@@ -177,9 +185,7 @@ export class SalesPage {
 
   catalogStatusText() {
     const selected = state.receiptLines.find(l => l.id === state.selectedLineId);
-    if (selected?.name) return selected.name;
-    const last = state.receiptLines[state.receiptLines.length - 1];
-    return last?.name || '';
+    return selected?.name || '';
   }
 
   renderReceiptList() {
@@ -215,23 +221,21 @@ export class SalesPage {
           ${guestRow}
           ${lines.map((line, idx) => {
             const selected = this.isLineSelected(line.id);
-            const lineTotal = line.price * line.quantity * (1 - (line.discountPct || 0) / 100);
-            return `
-              <div class="ct-receipt-row ${selected ? 'ct-receipt-row--selected' : ''}" data-line-id="${escAttr(line.id)}">
-                <span class="ct-receipt-index">${idx + 1}</span>
-                <span class="ct-receipt-name-wrap">
-                  <span class="ct-receipt-name">${esc(line.name)}</span>
-                  ${line.honestSignCode ? '<span class="ct-receipt-badge ct-receipt-badge--hz" title="Марка Честный Знак">ЧЗ</span>' : ''}
-                </span>
-                <div class="ct-receipt-qty">
-                  <button type="button" class="ct-qty-btn btn-press" data-action="line-minus" data-id="${escAttr(line.id)}">${TOOL_ICONS.minus}</button>
-                  <span class="ct-qty-value">${line.quantity}</span>
-                  <button type="button" class="ct-qty-btn btn-press" data-action="line-plus" data-id="${escAttr(line.id)}">${TOOL_ICONS.plus}</button>
-                </div>
-                <button type="button" class="ct-receipt-delete btn-press" data-action="line-delete" data-id="${escAttr(line.id)}" aria-label="Удалить">${TOOL_ICONS.trash}</button>
-                <span class="ct-receipt-price">${formatMoneyShort(lineTotal)}</span>
-              </div>
-            `;
+            const lineDiscountPct = line.discountPct > 0 ? line.discountPct : 0;
+            const badgePct = lineDiscountPct || (state.receiptDiscountPct > 0 ? state.receiptDiscountPct : 0);
+            const lineTotal = line.price * line.quantity * (1 - lineDiscountPct / 100);
+            const discountBadge = badgePct > 0
+              ? `<span class="ct-receipt-badge ct-receipt-badge--discount" title="Скидка ${badgePct}%">−${esc(String(badgePct).replace('.', ','))}%</span>`
+              : '';
+            return renderPosReceiptLineHtml({
+              line,
+              index: idx,
+              selected,
+              discountBadge,
+              lineTotal,
+              catalogItems: state.items,
+              catalogById: state.catalogById,
+            });
           }).join('')}
         </div>
         <div class="ct-receipt-scroll-float ct-receipt-scroll-float--hidden" aria-hidden="true">
@@ -270,24 +274,24 @@ export class SalesPage {
         <div class="ct-totals-board">
           <div class="ct-totals-cell">
             <em class="ct-totals-label">Получено:</em>
-            <strong class="ct-totals-amount">${formatMoney(received)} Р</strong>
+            <strong class="ct-totals-amount">${formatMoneyRubHtml(received)}</strong>
           </div>
           <div class="ct-totals-cell">
             <em class="ct-totals-label">Скидка %:</em>
-            <strong class="ct-totals-amount">${formatMoney(discount)} Р</strong>
+            <strong class="ct-totals-amount">${formatMoneyRubHtml(discount)}</strong>
           </div>
           <div class="ct-totals-cell">
             <em class="ct-totals-label">Без скидки:</em>
-            <strong class="ct-totals-amount">${formatMoney(subtotal)} Р</strong>
+            <strong class="ct-totals-amount${totalsAmountSizeClass(subtotal)}">${formatMoneyRubHtml(subtotal)}</strong>
           </div>
           <div class="ct-totals-cell ct-totals-cell--pay">
             <div class="ct-totals-pay-row">
               <em class="ct-totals-label">Итого:</em>
-              <strong class="ct-totals-amount">${formatMoney(total)} Р</strong>
+              <strong class="ct-totals-amount${totalsAmountSizeClass(total)}">${formatMoneyRubHtml(total)}</strong>
             </div>
             <div class="ct-totals-pay-row ct-totals-pay-row--main">
               <em class="ct-totals-label">К ОПЛАТЕ:</em>
-              <strong class="ct-totals-amount ct-totals-amount--main">${formatMoney(total)} Р</strong>
+              <strong class="ct-totals-amount ct-totals-amount--main">${formatMoneyRubHtml(total)}</strong>
             </div>
           </div>
         </div>
@@ -488,11 +492,26 @@ export class SalesPage {
       });
     });
 
+    root.querySelectorAll('[data-receipt-scroll]').forEach(list => {
+      list.addEventListener('click', e => {
+        if (e.target.closest('[data-line-id]')) return;
+        if (e.target.closest('button')) return;
+        this.clearLineSelection();
+        this.render();
+      });
+    });
+
     root.querySelectorAll('[data-action="line-minus"]').forEach(btn => {
       btn.addEventListener('click', () => this.adjustLine(btn.dataset.id, -1));
     });
     root.querySelectorAll('[data-action="line-plus"]').forEach(btn => {
       btn.addEventListener('click', () => this.adjustLine(btn.dataset.id, 1));
+    });
+    root.querySelectorAll('[data-action="line-qty-input"]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        this.openQuantityModal(btn.dataset.id);
+      });
     });
     root.querySelectorAll('[data-action="line-delete"]').forEach(btn => {
       btn.addEventListener('click', () => this.deleteLine(btn.dataset.id));
@@ -504,14 +523,9 @@ export class SalesPage {
     });
 
     root.querySelector('[data-action="qty-input"]')?.addEventListener('click', () => {
-      if (!state.selectedLineId) return;
-      const line = state.receiptLines.find(l => l.id === state.selectedLineId);
-      state.modal = 'quantity';
-      state.modalData = {
-        value: String(line?.quantity ?? 1),
-        productName: line?.name || 'Товар',
-      };
-      this.render();
+      if (!state.receiptLines.length) return;
+      const lineId = state.selectedLineId || state.receiptLines[0]?.id;
+      if (lineId) this.openQuantityModal(lineId);
     });
 
     root.querySelector('[data-action="qty-minus"]')?.addEventListener('click', () => {
@@ -528,8 +542,15 @@ export class SalesPage {
     });
 
     root.querySelector('[data-action="discount"]')?.addEventListener('click', () => {
+      const selected = state.receiptLines.find(l => l.id === state.selectedLineId);
+      const value = String(selected?.discountPct || state.receiptDiscountPct || 0);
+      const presets = resolvePosDiscountPresets(state.discountSettings, state.cashier);
+      const matchedPreset = presets.find(p => String(p.percent) === value);
       state.modal = 'discount';
-      state.modalData = { value: String(state.receiptDiscountPct || '') };
+      state.modalData = {
+        value,
+        preset: matchedPreset ? String(matchedPreset.percent) : '',
+      };
       this.render();
     });
 
@@ -709,6 +730,21 @@ export class SalesPage {
     float.querySelector('[data-action="receipt-scroll-down"]')?.addEventListener('click', () => {
       list.scrollBy({ top: 64, behavior: 'smooth' });
     });
+  }
+
+  /** @param {string} lineId */
+  openQuantityModal(lineId) {
+    const line = state.receiptLines.find(l => l.id === lineId);
+    if (!line) return;
+    state.selectedLineId = line.id;
+    state.multiSelectMode = false;
+    state.selectedLineIds = new Set();
+    state.modal = 'quantity';
+    state.modalData = {
+      value: String(line.quantity),
+      productName: line.name,
+    };
+    this.render();
   }
 
   /** @param {string} id @param {number} delta */

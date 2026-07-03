@@ -114,7 +114,7 @@ export function honestSignCategoryLabel(categoryId) {
 /** @param {string} [categoryName] @param {string|null} [storedColor] */
 export function resolveCategoryColor(categoryName, storedColor) {
   const color = String(storedColor || '').trim();
-  if (/^#[0-9A-Fa-f]{6}$/.test(color)) return color;
+  if (/^#[0-9A-Fa-f]{6}$/.test(color)) return color.toLowerCase();
   return DEFAULT_CATEGORY_COLORS[categoryName] || '#C5CED6';
 }
 

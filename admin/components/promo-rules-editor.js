@@ -11,13 +11,14 @@ import {
 } from '../../shared/promo-rules.js';
 import { formatAvailabilityRuleShort } from '../../shared/availability-rules.js';
 import { bindProductPickerFields, renderProductPickerField } from './product-picker-field.js';
+import { bindCategoryGroupMultiSelect, renderCategoryGroupMultiSelect } from './category-group-multi-select.js';
 import { deletePromoRule, savePromoRule } from '../services/promo-rules-data.js';
 import { promoThumbHtml } from '../utils/product-image.js';
 import {
-  channelFlagsFromMode,
-  ITEM_CHANNEL_MODES,
-  resolveChannelMode,
-} from '../services/products-data.js';
+  resolveSalesChannelMode,
+  SALES_POINT_MODES,
+  salesChannelFlagsFromMode,
+} from '../../shared/sales-channel-modes.js';
 import { showToast } from '../utils/toast.js';
 import { runWithUnsavedGuard, bindAvrDetailCancel, renderAvrDetailStickyHead } from '../utils/avr-unsaved-changes.js';
 import { renderChannelAvailabilityGrid } from '../utils/admin-form.js';
@@ -52,10 +53,13 @@ export function createPromoRulesEditor(host, {
   /** @type {string} */
   let baselineJson = '';
 
+  function promoSnapshot() {
+    return promos.map(p => normalizePromoRuleDoc(p, p.id)).sort((a, b) => a.id.localeCompare(b.id));
+  }
+
   function snapshot() {
-    return JSON.stringify(
-      promos.map(p => normalizePromoRuleDoc(p, p.id)).sort((a, b) => a.id.localeCompare(b.id)),
-    );
+    syncPanelToState();
+    return JSON.stringify({ promos: promoSnapshot() });
   }
 
   function commitBaseline() {
@@ -69,7 +73,8 @@ export function createPromoRulesEditor(host, {
   }
 
   function discardChanges() {
-    promos = JSON.parse(baselineJson);
+    const parsed = JSON.parse(baselineJson);
+    promos = parsed.promos.map(p => normalizePromoRuleDoc(p, p.id));
     isNew = false;
     if (selectedId && !promos.some(p => p.id === selectedId)) {
       selectedId = promos[0]?.id || null;
@@ -100,9 +105,13 @@ export function createPromoRulesEditor(host, {
     return active?.dataset.promoChannelMode || 'everywhere';
   }
 
+  /** @type {Map<string, { readSelectedIds: () => string[] }>} */
+  const groupPickerReaders = new Map();
+
   function syncPanelToState() {
     const panel = host.querySelector('#prm-detail-panel');
-    if (!selectedId || !panel) return;
+    const promo = selectedPromo();
+    if (!promo || !panel) return;
 
     const triggerType = panel.querySelector('[data-field="trigger-type"]')?.value || 'happy_hour';
     const actionType = panel.querySelector('[data-field="action-type"]')?.value || 'discount_percent';
@@ -120,7 +129,7 @@ export function createPromoRulesEditor(host, {
       if (targetType === 'item') {
         conditions.requiredItemId = panel.querySelector('[data-field="required-item"]')?.value || '';
       } else {
-        conditions.requiredGroupId = panel.querySelector('[data-field="required-group"]')?.value || '';
+        conditions.requiredGroupIds = groupPickerReaders.get('required-group')?.readSelectedIds() || [];
       }
     }
 
@@ -150,20 +159,21 @@ export function createPromoRulesEditor(host, {
         type: 'discount_percent',
         value: Number(panel.querySelector('[data-field="discount-value"]')?.value) || 0,
         target: discountTarget === 'group' ? 'group' : 'cart',
-        targetGroupId: discountTarget === 'group'
-          ? (panel.querySelector('[data-field="discount-group"]')?.value || null)
-          : null,
+        targetGroupIds: discountTarget === 'group'
+          ? (groupPickerReaders.get('discount-group')?.readSelectedIds() || [])
+          : [],
       };
     }
 
-    const { visibleInWeb, visibleInKiosk } = channelFlagsFromMode(readChannelModeFromPanel(panel));
+    const { visibleInWeb, visibleInKiosk, visibleInPos } = salesChannelFlagsFromMode(readChannelModeFromPanel(panel));
     const current = promos.find(p => p.id === selectedId);
 
     const draft = normalizePromoRuleDoc({
-      id: selectedId,
+      id: promo.id,
       name: panel.querySelector('[data-field="name"]')?.value.trim() || '',
       visibleInWeb,
       visibleInKiosk,
+      visibleInPos,
       webOrder: current?.webOrder,
       kioskOrder: current?.kioskOrder,
       availabilityRuleId: panel.querySelector('[data-field="availability-rule"]')?.value || null,
@@ -171,9 +181,9 @@ export function createPromoRulesEditor(host, {
       conditions,
       action,
       targetClientGroups: triggerType === 'client_segment' ? readClientGroups(panel) : [],
-    }, selectedId);
+    }, promo.id);
 
-    promos = promos.map(p => (p.id === selectedId ? sanitizePromoRuleFields(draft) : p));
+    promos = promos.map(p => (p.id === promo.id ? sanitizePromoRuleFields(draft) : p));
   }
 
   function revealClass(visible) {
@@ -191,15 +201,14 @@ export function createPromoRulesEditor(host, {
     `;
   }
 
-  function renderGroupOptions(selectedId, placeholder = 'Выберите группу') {
-    return `
-      <option value="">${esc(placeholder)}</option>
-      ${categoryGroups.map(g => `
-        <option value="${escAttr(g.id)}" ${g.id === selectedId ? 'selected' : ''}>
-          ${esc(g.name)}
-        </option>
-      `).join('')}
-    `;
+  function renderGroupMultiSelect(fieldName, label, selectedIds, placeholder = 'Поиск группы товаров...') {
+    return renderCategoryGroupMultiSelect({
+      fieldName,
+      label,
+      groups: categoryGroups,
+      selectedIds,
+      placeholder,
+    });
   }
 
   function renderClientGroupChips(selected = []) {
@@ -217,13 +226,14 @@ export function createPromoRulesEditor(host, {
   }
 
   function renderVisibilitySection(promo) {
-    const mode = resolveChannelMode(promo.visibleInWeb, promo.visibleInKiosk);
+    const mode = resolveSalesChannelMode(promo.visibleInWeb, promo.visibleInKiosk, promo.visibleInPos);
     return renderChannelAvailabilityGrid({
       id: 'prm-visibility-section',
       mode,
-      modes: ITEM_CHANNEL_MODES,
+      modes: SALES_POINT_MODES,
       modeDataAttr: 'data-promo-channel-mode',
-      ariaLabel: 'Доступность акции',
+      ariaLabel: 'Точки продаж',
+      fieldLabel: 'Точки продаж',
       showOrderFields: false,
     });
   }
@@ -232,7 +242,7 @@ export function createPromoRulesEditor(host, {
     const promo = selectedPromo();
     const panel = host.querySelector('#prm-detail-panel');
     if (!promo || !panel) return;
-    const mode = resolveChannelMode(promo.visibleInWeb, promo.visibleInKiosk);
+    const mode = resolveSalesChannelMode(promo.visibleInWeb, promo.visibleInKiosk, promo.visibleInPos);
     panel.querySelectorAll('[data-promo-channel-mode]').forEach(btn => {
       const active = btn.dataset.promoChannelMode === mode;
       btn.classList.toggle('period-tab--active', active);
@@ -241,24 +251,39 @@ export function createPromoRulesEditor(host, {
   }
 
   function channelBadgeHtml(channel, promo) {
-    const isWeb = channel === 'web';
-    const active = isWeb
-      ? promo.visibleInWeb !== false
-      : promo.visibleInKiosk === true;
-    const letter = isWeb ? 'W' : 'K';
-    const channelLabel = isWeb ? 'Веб' : 'Киоск';
+    const config = {
+      web: {
+        active: promo.visibleInWeb !== false,
+        letter: 'W',
+        label: 'Веб',
+        className: 'cgr-channel-badge--web',
+      },
+      kiosk: {
+        active: promo.visibleInKiosk === true,
+        letter: 'K',
+        label: 'Киоск',
+        className: 'cgr-channel-badge--kiosk',
+      },
+      pos: {
+        active: promo.visibleInPos === true,
+        letter: 'P',
+        label: 'Касса',
+        className: 'cgr-channel-badge--pos',
+      },
+    }[channel];
+
     const classes = [
       'cgr-channel-badge',
-      isWeb ? 'cgr-channel-badge--web' : 'cgr-channel-badge--kiosk',
-      active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
+      config.className,
+      config.active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
     ].join(' ');
-    const ariaLabel = active ? `${channelLabel}, активен` : `${channelLabel}, неактивен`;
+    const ariaLabel = config.active ? `${config.label}, активен` : `${config.label}, неактивен`;
 
-    return `<span class="${classes}" aria-label="${escAttr(ariaLabel)}">${letter}</span>`;
+    return `<span class="${classes}" aria-label="${escAttr(ariaLabel)}">${config.letter}</span>`;
   }
 
   function channelIndicatorsHtml(promo) {
-    return `${channelBadgeHtml('web', promo)}${channelBadgeHtml('kiosk', promo)}`;
+    return `${channelBadgeHtml('web', promo)}${channelBadgeHtml('kiosk', promo)}${channelBadgeHtml('pos', promo)}`;
   }
 
   function promoScheduleStatus(promo) {
@@ -289,30 +314,52 @@ export function createPromoRulesEditor(host, {
   function renderHiddenPromosDivider(count) {
     if (count <= 0) return '';
     return `
-      <li class="cgr-list-divider" aria-hidden="true">
+      <li class="cgr-list-divider mkt-registry-divider" aria-hidden="true">
         <span class="cgr-list-divider-text">— Скрытые акции (${count}) —</span>
       </li>
     `;
   }
 
-  function renderListItemsHtml() {
+  function renderGroupHeader(title, hint) {
+    return `
+      <li class="sch-list-group-head" aria-hidden="true">
+        <span class="sch-list-group-title">${esc(title)}</span>
+        <span class="sch-list-group-hint">${esc(hint)}</span>
+      </li>
+    `;
+  }
+
+  function renderListHtml() {
     const { active, inactive } = partitionPromosForList();
-    return [
-      ...active.map(p => renderListRow(p)),
-      renderHiddenPromosDivider(inactive.length),
-      ...inactive.map(p => renderListRow(p)),
-    ].join('');
+    const parts = [];
+
+    if (promos.length) {
+      parts.push(renderGroupHeader('Акции', 'Временные кампании, комбо и условия'));
+      parts.push(...active.map(p => renderListRow(p)));
+      parts.push(renderHiddenPromosDivider(inactive.length));
+      parts.push(...inactive.map(p => renderListRow(p)));
+    }
+
+    if (!parts.length) {
+      return '<li class="avr-list-empty mkt-list-empty">Нет акций. Нажмите «+ Добавить».</li>';
+    }
+
+    return parts.join('');
   }
 
   function refreshListOrder() {
     const list = host.querySelector('#prm-list');
     if (!list) return;
-    list.innerHTML = renderListItemsHtml();
+    list.innerHTML = renderListHtml();
+  }
+
+  async function saveAllDirty() {
+    return save();
   }
 
   function renderConditionBlock(promo) {
     const trigger = promo.triggerType;
-    const qtyTarget = promo.conditions.requiredGroupId && !promo.conditions.requiredItemId
+    const qtyTarget = promo.conditions.requiredGroupIds?.length && !promo.conditions.requiredItemId
       ? 'group'
       : 'item';
 
@@ -365,12 +412,11 @@ export function createPromoRulesEditor(host, {
                 </div>
                 <div class="${revealClass(qtyTarget === 'group')}" data-qty-group-field>
                   <div class="prm-reveal-inner">
-                    <label class="form-group">
-                      <span class="avr-field-label">Группа</span>
-                      <select data-field="required-group" class="avr-select">
-                        ${renderGroupOptions(promo.conditions.requiredGroupId || '')}
-                      </select>
-                    </label>
+                    ${renderGroupMultiSelect(
+                      'required-group',
+                      'Группы',
+                      promo.conditions.requiredGroupIds || [],
+                    )}
                   </div>
                 </div>
                 <label class="form-group">
@@ -443,15 +489,11 @@ export function createPromoRulesEditor(host, {
                 </label>
                 <div class="${revealClass(discountTarget === 'group')}" data-discount-group-field>
                   <div class="prm-reveal-inner">
-                    <label class="form-group">
-                      <span class="avr-field-label">Группа для скидки</span>
-                      <select data-field="discount-group" class="avr-select">
-                        ${renderGroupOptions(
-                          promo.action.type === 'discount_percent' ? (promo.action.targetGroupId || '') : '',
-                          'Выберите группу',
-                        )}
-                      </select>
-                    </label>
+                    ${renderGroupMultiSelect(
+                      'discount-group',
+                      'Группы для скидки',
+                      promo.action.type === 'discount_percent' ? (promo.action.targetGroupIds || []) : [],
+                    )}
                   </div>
                 </div>
               </div>
@@ -576,44 +618,50 @@ export function createPromoRulesEditor(host, {
       <div class="avr-detail-empty">
         <span class="avr-detail-empty-icon" aria-hidden="true">🎁</span>
         <p class="avr-detail-empty-title">Выберите акцию</p>
-        <p class="avr-detail-empty-hint">Создайте новую акцию или выберите существующую из списка слева.</p>
+        <p class="avr-detail-empty-hint">Выберите акцию из списка слева или нажмите «+ Добавить».</p>
       </div>
     `;
   }
 
   function renderListRow(promo) {
-    const active = promo.id === selectedId;
+    const active = selectedId === promo.id;
     const deprioritized = isPromoDeprioritized(promo);
     return `
-      <li class="avr-row avr-row--thumb ${active ? 'avr-row--active' : ''} ${deprioritized ? 'cgr-row--hidden' : ''}" data-id="${escAttr(promo.id)}">
-        <button type="button" class="avr-row-main btn-press cgr-row-main" data-action="select" aria-pressed="${active}">
-          <span class="cgr-row-left">
-            <span class="avr-row-thumb">${promoThumbHtml()}</span>
-            <span class="avr-row-info">
-              <span class="avr-row-name">${esc(promo.name)}</span>
-              <span class="avr-row-meta">${listRowMetaHtml(promo)}</span>
+      <li class="avr-row avr-row--thumb sch-row mkt-row ${active ? 'avr-row--active' : ''} ${deprioritized ? 'cgr-row--hidden sch-row--inactive' : ''}" data-id="${escAttr(promo.id)}">
+        <div class="avr-row-main sch-row-main cgr-row-main">
+          <button type="button" class="sch-row-select btn-press" data-action="select" aria-pressed="${active}">
+            <span class="sch-row-left">
+              <span class="sch-row-icon mkt-row-icon mkt-row-icon--promo" aria-hidden="true">${promoThumbHtml()}</span>
+              <span class="avr-row-info">
+                <span class="avr-row-name">${esc(promo.name)}</span>
+                <span class="avr-row-meta">${listRowMetaHtml(promo)}</span>
+              </span>
             </span>
-          </span>
-          <span class="cgr-row-indicators">${channelIndicatorsHtml(promo)}</span>
-        </button>
+          </button>
+          <span class="cgr-row-indicators sch-row-indicators">${channelIndicatorsHtml(promo)}</span>
+        </div>
       </li>
     `;
   }
 
-  function render() {
+  function renderDetailAside() {
     const promo = selectedPromo();
+    if (promo) return renderDetailPanel(promo);
+    return renderDetailEmpty();
+  }
+
+  function render() {
     host.innerHTML = `
-      <div class="avr-layout prm-layout">
+      <div class="avr-layout prm-layout sch-layout">
         <div class="avr-master">
           <div class="avr-master-head">
             <h2 class="avr-master-title">Акции (${promos.length})</h2>
-            <button type="button" class="btn btn-primary btn-press products-create-btn" id="prm-create-btn">+ Новая акция</button>
+            <button type="button" class="btn btn-primary btn-press products-create-btn" id="prm-create">+ Добавить</button>
           </div>
-          <ul class="avr-list" id="prm-list">${renderListItemsHtml()}</ul>
-          ${!promos.length ? '<p class="avr-list-empty">Нет акций. Создайте первую.</p>' : ''}
+          <ul class="avr-list" id="prm-list">${renderListHtml()}</ul>
         </div>
         <aside class="avr-detail" aria-label="Редактор акции">
-          ${promo ? renderDetailPanel(promo) : renderDetailEmpty()}
+          ${renderDetailAside()}
         </aside>
       </div>
     `;
@@ -650,10 +698,6 @@ export function createPromoRulesEditor(host, {
   function updateDiscountGroupVisibility(panel) {
     const target = panel.querySelector('[data-field="discount-target"]')?.value || 'cart';
     setReveal(panel.querySelector('[data-discount-group-field]'), target === 'group');
-    if (target !== 'group') {
-      const groupSelect = panel.querySelector('[data-field="discount-group"]');
-      if (groupSelect) groupSelect.value = '';
-    }
     syncPanelToState();
   }
 
@@ -685,21 +729,31 @@ export function createPromoRulesEditor(host, {
       return;
     }
 
-    const row = host.querySelector(`.avr-row[data-id="${id}"]`);
+    const row = host.querySelector(`.avr-row[data-id="${CSS.escape(id)}"]`);
     const promo = promos.find(p => p.id === id);
     if (!row || !promo) return;
 
-    const nameEl = row.querySelector('.avr-row-name');
-    if (nameEl) nameEl.textContent = promo.name;
-
-    row.querySelector('.avr-row-meta')?.replaceChildren();
+    row.querySelector('.avr-row-name')?.replaceChildren(document.createTextNode(promo.name));
     const metaEl = row.querySelector('.avr-row-meta');
     if (metaEl) metaEl.innerHTML = listRowMetaHtml(promo);
 
-    const indicators = row.querySelector('.cgr-row-indicators');
+    const indicators = row.querySelector('.sch-row-indicators');
     if (indicators) indicators.innerHTML = channelIndicatorsHtml(promo);
 
     row.classList.toggle('cgr-row--hidden', isPromoDeprioritized(promo));
+    row.classList.toggle('sch-row--inactive', isPromoDeprioritized(promo));
+  }
+
+  function bindGroupPickers(panel) {
+    groupPickerReaders.clear();
+    for (const fieldName of ['required-group', 'discount-group']) {
+      const reader = bindCategoryGroupMultiSelect(panel, {
+        fieldName,
+        groups: categoryGroups,
+        onChange: panelChange,
+      });
+      groupPickerReaders.set(fieldName, reader);
+    }
   }
 
   function bindPanelEvents() {
@@ -707,14 +761,15 @@ export function createPromoRulesEditor(host, {
     if (!panel) return;
 
     bindProductPickerFields(panel, items, panelChange);
+    bindGroupPickers(panel);
 
     panel.querySelectorAll('[data-promo-channel-mode]').forEach(btn => {
       btn.addEventListener('click', e => {
         e.preventDefault();
         if (!selectedId) return;
-        const { visibleInWeb, visibleInKiosk } = channelFlagsFromMode(btn.dataset.promoChannelMode);
+        const { visibleInWeb, visibleInKiosk, visibleInPos } = salesChannelFlagsFromMode(btn.dataset.promoChannelMode);
         promos = promos.map(p => (
-          p.id === selectedId ? { ...p, visibleInWeb, visibleInKiosk } : p
+          p.id === selectedId ? { ...p, visibleInWeb, visibleInKiosk, visibleInPos } : p
         ));
         syncPromoChannelTabs();
         updateListRow(selectedId, { resort: true });
@@ -782,37 +837,39 @@ export function createPromoRulesEditor(host, {
     });
   }
 
+  function createEntry() {
+    runWithUnsavedGuard({
+      isDirty,
+      discard: discardChanges,
+      save: saveAllDirty,
+      proceed: () => {
+        const draft = createDefaultPromoRule(`draft-${Date.now()}`);
+        promos.push(draft);
+        selectedId = draft.id;
+        isNew = true;
+        render();
+        requestAnimationFrame(() => {
+          host.querySelector('[data-field="name"]')?.focus();
+          host.querySelector('[data-field="name"]')?.select();
+        });
+      },
+    });
+  }
+
   function bindEvents() {
     bindPanelEvents();
 
-    host.querySelector('#prm-create-btn')?.addEventListener('click', () => {
-      runWithUnsavedGuard({
-        isDirty,
-        discard: discardChanges,
-        save,
-        proceed: () => {
-          const draft = createDefaultPromoRule(`draft-${Date.now()}`);
-          promos.push(draft);
-          selectedId = draft.id;
-          isNew = true;
-          render();
-          requestAnimationFrame(() => {
-            host.querySelector('[data-field="name"]')?.focus();
-            host.querySelector('[data-field="name"]')?.select();
-          });
-        },
-      });
-    });
+    host.querySelector('#prm-create')?.addEventListener('click', () => createEntry());
 
     host.querySelector('#prm-list')?.addEventListener('click', e => {
-      const btn = e.target.closest('[data-action="select"]');
-      if (!btn) return;
-      const id = btn.closest('.avr-row')?.dataset.id;
+      const selectBtn = e.target.closest('[data-action="select"]');
+      if (!selectBtn) return;
+      const id = selectBtn.closest('.avr-row')?.dataset.id;
       if (!id || id === selectedId) return;
       runWithUnsavedGuard({
         isDirty,
         discard: discardChanges,
-        save,
+        save: saveAllDirty,
         proceed: () => {
           selectedId = id;
           isNew = false;
@@ -825,7 +882,7 @@ export function createPromoRulesEditor(host, {
     bindAvrDetailCancel(host, 'prm-detail-cancel', {
       isDirty,
       discard: discardChanges,
-      save: () => save(),
+      save: saveAllDirty,
       onClose: closeDetailPanel,
     });
     host.querySelector('#prm-delete-confirm')?.addEventListener('change', e => {
@@ -913,8 +970,11 @@ export function createPromoRulesEditor(host, {
   }
 
   render();
-  return { destroy, isDirty };
+  return { destroy, isDirty, createEntry };
 }
+
+/** @deprecated Use createPromoRulesEditor */
+export const createMarketingRegistryEditor = createPromoRulesEditor;
 
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

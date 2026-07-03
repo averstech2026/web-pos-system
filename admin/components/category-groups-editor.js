@@ -6,10 +6,12 @@ import {
 import {
   batchSetItemCategories,
   setItemAvailability,
-  channelFlagsFromMode,
-  ITEM_CHANNEL_MODES,
-  resolveChannelMode,
 } from '../services/products-data.js';
+import {
+  resolveSalesChannelMode,
+  SALES_POINT_MODES,
+  salesChannelFlagsFromMode,
+} from '../../shared/sales-channel-modes.js';
 import { openItemFormModal } from './item-form-modal.js';
 import { openGroupProductsPickerModal } from './group-products-picker-modal.js';
 import { productThumbHtml } from '../utils/product-image.js';
@@ -66,12 +68,21 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   let baselineGroupsJson = '';
   /** @type {string} */
   let baselineItemsJson = '';
-  /** @type {'web'|'kiosk'} */
+  /** @type {'web'|'kiosk'|'pos'} */
   let listSortChannel = 'kiosk';
+
+  function canonicalGroupForSnapshot(g) {
+    const normalized = normalizeCategoryGroup(g);
+    return {
+      ...normalized,
+      color: String(normalized.color || '').toLowerCase(),
+      modifierGroupIds: [...normalized.modifierGroupIds].sort(),
+    };
+  }
 
   function groupsSnapshot(gs) {
     return JSON.stringify(
-      gs.map(g => normalizeCategoryGroup(g)).sort((a, b) => a.id.localeCompare(b.id)),
+      gs.map(canonicalGroupForSnapshot).sort((a, b) => a.id.localeCompare(b.id)),
     );
   }
 
@@ -96,8 +107,15 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   }
 
   function isDirty() {
-    syncSidebarToState();
-    return groupsSnapshot(groups) !== baselineGroupsJson
+    const panel = host.querySelector('#cgr-detail-panel');
+    const effectiveGroups = selectedId && panel
+      ? groups.map(g => {
+        if (g.id !== selectedId) return g;
+        return readGroupFromPanel(panel, selectedId) || g;
+      })
+      : groups;
+
+    return groupsSnapshot(effectiveGroups) !== baselineGroupsJson
       || itemsSnapshot(items) !== baselineItemsJson;
   }
 
@@ -178,7 +196,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   }
 
   function isGroupHidden(group) {
-    return resolveChannelMode(group.visibleInWeb, group.visibleInKiosk) === 'hidden';
+    return resolveSalesChannelMode(group.visibleInWeb, group.visibleInKiosk, group.visibleInPos) === 'hidden';
   }
 
   function groupScheduleStatus(group) {
@@ -191,32 +209,49 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
   }
 
   function channelBadgeHtml(channel, group) {
-    const isWeb = channel === 'web';
-    const active = isWeb
-      ? group.visibleInWeb !== false
-      : group.visibleInKiosk === true;
-    const order = isWeb ? Number(group.webOrder) || 0 : Number(group.kioskOrder) || 0;
-    const letter = isWeb ? 'W' : 'K';
-    const channelLabel = isWeb ? 'Веб' : 'Киоск';
+    const config = {
+      web: {
+        active: group.visibleInWeb !== false,
+        order: Number(group.webOrder) || 0,
+        letter: 'W',
+        label: 'Веб',
+        className: 'cgr-channel-badge--web',
+      },
+      kiosk: {
+        active: group.visibleInKiosk === true,
+        order: Number(group.kioskOrder) || 0,
+        letter: 'K',
+        label: 'Киоск',
+        className: 'cgr-channel-badge--kiosk',
+      },
+      pos: {
+        active: group.visibleInPos !== false,
+        order: Number(group.posOrder) || 0,
+        letter: 'P',
+        label: 'Касса',
+        className: 'cgr-channel-badge--pos',
+      },
+    }[channel];
+
     const classes = [
       'cgr-channel-badge',
-      isWeb ? 'cgr-channel-badge--web' : 'cgr-channel-badge--kiosk',
-      active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
+      config.className,
+      config.active ? 'cgr-channel-badge--active' : 'cgr-channel-badge--inactive',
     ].join(' ');
-    const indexPart = active && order > 0
-      ? `<span class="cgr-channel-badge-num">${order}</span>`
+    const indexPart = config.active && config.order > 0
+      ? `<span class="cgr-channel-badge-num">${config.order}</span>`
       : '';
-    const ariaLabel = active && order > 0
-      ? `${channelLabel}, порядок ${order}`
-      : active
-        ? `${channelLabel}, активен`
-        : `${channelLabel}, неактивен`;
+    const ariaLabel = config.active && config.order > 0
+      ? `${config.label}, порядок ${config.order}`
+      : config.active
+        ? `${config.label}, активен`
+        : `${config.label}, неактивен`;
 
-    return `<span class="${classes}" aria-label="${escAttr(ariaLabel)}">${letter}${indexPart}</span>`;
+    return `<span class="${classes}" aria-label="${escAttr(ariaLabel)}">${config.letter}${indexPart}</span>`;
   }
 
   function channelIndicatorsHtml(group) {
-    return `${channelBadgeHtml('web', group)}${channelBadgeHtml('kiosk', group)}`;
+    return `${channelBadgeHtml('web', group)}${channelBadgeHtml('kiosk', group)}${channelBadgeHtml('pos', group)}`;
   }
 
   function listRowMetaHtml(group) {
@@ -234,43 +269,56 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     return active?.dataset.groupChannelMode || 'everywhere';
   }
 
-  function syncSidebarToState() {
-    const panel = host.querySelector('#cgr-detail-panel');
-    if (!selectedId || !panel) return;
+  function readGroupFromPanel(panel, groupId) {
+    const existing = groups.find(g => g.id === groupId);
+    if (!panel || !groupId || !existing) return null;
 
     const ruleSelect = panel.querySelector('[data-field="availability-rule-id"]');
     const ruleId = ruleSelect?.value || null;
-    const { visibleInWeb, visibleInKiosk } = channelFlagsFromMode(readChannelModeFromPanel(panel));
+    const { visibleInWeb, visibleInKiosk, visibleInPos } = salesChannelFlagsFromMode(readChannelModeFromPanel(panel));
+    const rawColor = panel.querySelector('[data-field="color"]')?.value?.trim();
 
-    const updated = normalizeCategoryGroup({
-      ...groups.find(g => g.id === selectedId),
-      id: selectedId,
+    return normalizeCategoryGroup({
+      ...existing,
+      id: groupId,
       name: panel.querySelector('[data-field="name"]')?.value.trim() || '',
       imageUrl: panel.querySelector('[data-field="image-url"]')?.value.trim() || null,
-      color: panel.querySelector('[data-field="color"]')?.value || null,
+      color: rawColor ? rawColor.toLowerCase() : null,
       availabilityRuleId: ruleId || null,
       visibleInWeb,
       visibleInKiosk,
+      visibleInPos,
       webOrder: readOrderField(panel, 'web-order'),
       kioskOrder: readOrderField(panel, 'kiosk-order'),
+      posOrder: readOrderField(panel, 'pos-order'),
       modifierGroupIds: readModifierGroupIds(panel),
     });
+  }
 
+  function syncSidebarToState() {
+    const panel = host.querySelector('#cgr-detail-panel');
+    if (!selectedId || !panel) return;
+    const updated = readGroupFromPanel(panel, selectedId);
+    if (!updated) return;
     groups = groups.map(g => (g.id === selectedId ? updated : g));
   }
 
   function renderVisibilitySection(group) {
-    const mode = resolveChannelMode(group.visibleInWeb, group.visibleInKiosk);
+    const mode = resolveSalesChannelMode(group.visibleInWeb, group.visibleInKiosk, group.visibleInPos);
     return renderChannelAvailabilityGrid({
       id: 'cgr-visibility-section',
       mode,
-      modes: ITEM_CHANNEL_MODES,
+      modes: SALES_POINT_MODES,
       webOrder: group.webOrder,
       kioskOrder: group.kioskOrder,
+      posOrder: group.posOrder,
       modeDataAttr: 'data-group-channel-mode',
       ariaLabel: 'Доступность группы',
+      fieldLabel: 'Доступность',
       webOrderId: 'cgr-web-order',
       kioskOrderId: 'cgr-kiosk-order',
+      posOrderId: 'cgr-pos-order',
+      showPosOrderField: true,
     });
   }
 
@@ -278,7 +326,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
     const group = selectedGroup();
     const panel = host.querySelector('#cgr-detail-panel');
     if (!group || !panel) return;
-    const mode = resolveChannelMode(group.visibleInWeb, group.visibleInKiosk);
+    const mode = resolveSalesChannelMode(group.visibleInWeb, group.visibleInKiosk, group.visibleInPos);
     panel.querySelectorAll('[data-group-channel-mode]').forEach(btn => {
       const active = btn.dataset.groupChannelMode === mode;
       btn.classList.toggle('period-tab--active', active);
@@ -356,6 +404,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
             ${item.isAvailable !== false ? 'checked' : ''}
           />
           <span class="cgr-product-capsule__name">${esc(item.name || '—')}</span>
+          ${item.isComposite ? '<span class="cgr-product-capsule__badge">Составной</span>' : ''}
           ${item.isAvailable === false ? '<span class="cgr-product-capsule__badge">Скрыт</span>' : ''}
         </label>
         <button
@@ -440,6 +489,8 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
               />
             </div>
 
+            ${renderVisibilitySection(group)}
+
             <div class="admin-field-block">
               <label class="admin-field-label" for="cgr-group-color">Цвет плитки на кассе</label>
               <div class="cgr-color-row">
@@ -472,8 +523,6 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
                 </div>
               </div>
             </div>
-
-            ${renderVisibilitySection(group)}
 
             ${renderModifierGroupsField({
               selectedIds: group.modifierGroupIds,
@@ -544,6 +593,13 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
             role="radio"
             aria-checked="${listSortChannel === 'kiosk'}"
           >Киоск</button>
+          <button
+            type="button"
+            class="period-tab btn-press ${listSortChannel === 'pos' ? 'period-tab--active' : ''}"
+            data-cgr-list-sort="pos"
+            role="radio"
+            aria-checked="${listSortChannel === 'pos'}"
+          >Касса</button>
         </div>
       </div>
     `;
@@ -628,7 +684,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
       const btn = e.target.closest('[data-cgr-list-sort]');
       if (!btn) return;
       const channel = btn.dataset.cgrListSort;
-      if (channel !== 'web' && channel !== 'kiosk') return;
+      if (channel !== 'web' && channel !== 'kiosk' && channel !== 'pos') return;
       if (channel === listSortChannel) return;
       listSortChannel = channel;
       syncListSortTabs();
@@ -672,9 +728,9 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
       const modeBtn = e.target.closest('[data-group-channel-mode]');
       if (modeBtn && selectedId) {
         e.preventDefault();
-        const { visibleInWeb, visibleInKiosk } = channelFlagsFromMode(modeBtn.dataset.groupChannelMode);
+        const { visibleInWeb, visibleInKiosk, visibleInPos } = salesChannelFlagsFromMode(modeBtn.dataset.groupChannelMode);
         groups = groups.map(g => (
-          g.id === selectedId ? { ...g, visibleInWeb, visibleInKiosk } : g
+          g.id === selectedId ? { ...g, visibleInWeb, visibleInKiosk, visibleInPos } : g
         ));
         syncGroupChannelTabs();
         refreshListOrder();
@@ -704,7 +760,7 @@ export function createCategoryGroupsEditor(host, { categoryGroups, items: initia
         return;
       }
 
-      if (e.target.matches('[data-field="web-order"], [data-field="kiosk-order"]')) {
+      if (e.target.matches('[data-field="web-order"], [data-field="kiosk-order"], [data-field="pos-order"]')) {
         syncSidebarToState();
         updateListRowMeta(selectedId);
         refreshListOrder();

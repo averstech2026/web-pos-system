@@ -73,6 +73,7 @@ function buildReceiptItems() {
     name: line.name,
     price: line.price,
     quantity: line.quantity,
+    ...(line.lunchSelections?.length ? { lunchSelections: line.lunchSelections } : {}),
   }));
 }
 

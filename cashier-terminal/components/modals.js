@@ -2,6 +2,12 @@ import chestnyZnakLogoUrl from '../../shared/assets/chestny-znak-logo.png';
 import chestnyZnakQrUrl from '../../shared/assets/chestny-znak-qr.png';
 import milkBottleUrl from '../../shared/assets/milk-bottle.png';
 import bankTerminalUrl from '../../shared/assets/bank-terminal.png';
+import { openCompositeLunchModal } from '../../shared/composite-lunch-flow.js';
+import {
+  buildFixedSetLunchSelections,
+  COMPOSITE_SET_MODES,
+  resolveCompositeSetMode,
+} from '../../shared/composite-meals.js';
 import { POS_PAYMENT_TYPE_IDS } from '../../shared/pos-channel.js';
 import { slugFromCategoryName } from '../../shared/menu-catalog.js';
 import { resolveOrderCategoryGroupIds } from '../../shared/wallets.js';
@@ -16,6 +22,10 @@ import {
 } from '../services/guests.js';
 import { finalizePosOrderOnPayment } from '../services/orders.js';
 import { resolvePosPaymentMethodButtons } from '../services/payment-methods.js';
+import {
+  resolvePosDiscountPresets,
+  formatCashierDiscountLabel,
+} from '../services/discount-presets.js';
 import { markServiceMessageRead, resetServiceMessagesUnread } from '../services/service-messages.js';
 
 function renderModalShell({ title, widthClass = '', head = '', body = '', foot = '', barClass = 'ct-modal-bar--default' }) {
@@ -734,6 +744,43 @@ function renderCustomerSearchModal() {
   });
 }
 
+/** @param {string|number} rawValue */
+function applyQuantityFromModal(rawValue) {
+  const qty = parseFloat(String(rawValue || '0').replace(',', '.'));
+  applyQuantityToSelection(Number.isFinite(qty) ? Math.max(0.01, qty) : 1);
+  state.modal = null;
+  state.modalData = {};
+  window.dispatchEvent(new CustomEvent('ct:rerender'));
+}
+
+function resolveReceiptActionTargetLineIds() {
+  if (state.multiSelectMode && state.selectedLineIds.size) {
+    return [...state.selectedLineIds];
+  }
+  if (state.selectedLineId) return [state.selectedLineId];
+  if (state.receiptLines.length) return state.receiptLines.map(line => line.id);
+  return [];
+}
+
+/** @param {string|number} rawValue */
+function applyDiscountFromModal(rawValue) {
+  const pct = parseFloat(String(rawValue || '0').replace(',', '.'));
+  const discount = Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 0;
+  const targetIds = resolveReceiptActionTargetLineIds();
+
+  if (targetIds.length) {
+    state.receiptLines = state.receiptLines.map(line =>
+      (targetIds.includes(line.id) ? { ...line, discountPct: discount } : line));
+    state.receiptDiscountPct = 0;
+  } else {
+    state.receiptDiscountPct = discount;
+  }
+
+  state.modal = null;
+  state.modalData = {};
+  window.dispatchEvent(new CustomEvent('ct:rerender'));
+}
+
 /** @param {HTMLElement|null|undefined} qtyInput @param {{ armReplace?: () => void }|null|undefined} numpadControl */
 function resetQtyInput(qtyInput, numpadControl, layer) {
   state.modalData.value = '0';
@@ -773,11 +820,7 @@ function bindQuantityModalHandlers(layer) {
       });
     },
     onEnter: () => {
-      const qty = parseFloat((state.modalData.value || '0').replace(',', '.'));
-      applyQuantityToSelection(Number.isFinite(qty) ? Math.max(0.01, qty) : 1);
-      state.modal = null;
-      state.modalData = {};
-      window.dispatchEvent(new CustomEvent('ct:rerender'));
+      applyQuantityFromModal(state.modalData.value || '0');
     },
     onCancel: () => {
       state.modal = null;
@@ -794,17 +837,7 @@ function bindQuantityModalHandlers(layer) {
 
   layer.querySelectorAll('[data-qty-preset]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const preset = btn.dataset.qtyPreset || '';
-      state.modalData.preset = preset;
-      state.modalData.value = preset;
-      qtyNumpadControl.setValue(preset, { replaceOnNextInput: true });
-      qtyInput.value = preset;
-      disarmPaymentAmountInput(qtyInput);
-      layer.querySelector('[data-action="qty-clear"]')
-        ?.classList.toggle('ct-payment-amount-clear--hidden', !preset || preset === '0');
-      layer.querySelectorAll('[data-qty-preset]').forEach(item => {
-        item.classList.toggle('ct-qty-preset-card--active', item === btn);
-      });
+      applyQuantityFromModal(btn.dataset.qtyPreset || '');
     });
   });
 }
@@ -869,10 +902,14 @@ function renderPriceListModal() {
 /** @param {HTMLElement|null|undefined} discountInput @param {{ setValue?: (v: string, opts?: object) => void, armReplace?: () => void }|null|undefined} numpadControl @param {HTMLElement} layer */
 function resetDiscountInput(discountInput, numpadControl, layer) {
   state.modalData.value = '0';
+  state.modalData.preset = '';
   numpadControl?.setValue('0', { replaceOnNextInput: true });
   if (discountInput) discountInput.value = '0';
   layer.querySelector('[data-action="discount-clear"]')
     ?.classList.add('ct-payment-amount-clear--hidden');
+  layer.querySelectorAll('[data-discount-preset]').forEach(btn => {
+    btn.classList.remove('ct-qty-preset-card--active');
+  });
   armPaymentAmountInput(discountInput, numpadControl);
 }
 
@@ -887,16 +924,21 @@ function bindDiscountModalHandlers(layer) {
     onChange: (val) => {
       state.modalData.value = val;
       discountInput.value = val;
+      if (state.modalData.preset && val !== state.modalData.preset) {
+        state.modalData.preset = '';
+      }
       disarmPaymentAmountInput(discountInput);
       layer.querySelector('[data-action="discount-clear"]')
         ?.classList.toggle('ct-payment-amount-clear--hidden', !val || val === '0');
+      layer.querySelectorAll('[data-discount-preset]').forEach(btn => {
+        btn.classList.toggle(
+          'ct-qty-preset-card--active',
+          Boolean(state.modalData.preset) && btn.dataset.discountPreset === state.modalData.preset,
+        );
+      });
     },
     onEnter: () => {
-      const pct = parseFloat((state.modalData.value || '0').replace(',', '.'));
-      state.receiptDiscountPct = Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 0;
-      state.modal = null;
-      state.modalData = {};
-      window.dispatchEvent(new CustomEvent('ct:rerender'));
+      applyDiscountFromModal(state.modalData.value || '0');
     },
     onCancel: () => {
       state.modal = null;
@@ -910,15 +952,44 @@ function bindDiscountModalHandlers(layer) {
   layer.querySelector('[data-action="discount-clear"]')?.addEventListener('click', () => {
     resetDiscountInput(discountInput, discountNumpadControl, layer);
   });
+
+  layer.querySelectorAll('[data-discount-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyDiscountFromModal(btn.dataset.discountPreset || '');
+    });
+  });
 }
 
 function renderDiscountModal() {
   const raw = state.modalData.value ?? String(state.receiptDiscountPct ?? '');
   const value = raw === '' ? '0' : raw;
   const showClear = value && value !== '0';
+  const presets = resolvePosDiscountPresets(state.discountSettings, state.cashier);
+  const activePreset = state.modalData.preset || '';
+  const hasPresets = presets.length > 0;
+  const presetsHtml = hasPresets
+    ? `
+          <aside class="ct-qty-presets-panel" aria-label="Быстрый выбор скидки">
+            <span class="ct-qty-presets-label">Быстрый выбор</span>
+            <div class="ct-qty-presets">
+              ${presets.map(preset => {
+                const key = String(preset.percent);
+                return `
+                <button type="button"
+                        class="ct-qty-preset-card btn-press ${activePreset === key ? 'ct-qty-preset-card--active' : ''}"
+                        data-discount-preset="${escAttr(key)}"
+                        title="${escAttr(formatCashierDiscountLabel(preset))}">
+                  ${esc(key)}%
+                </button>
+              `;
+              }).join('')}
+            </div>
+          </aside>
+        `
+    : '';
 
   return `
-    <div class="ct-modal ct-modal--discount">
+    <div class="ct-modal ct-modal--discount ${hasPresets ? 'ct-modal--discount-wide' : ''}">
       <div class="ct-modal-bar ct-modal-bar--pay ct-discount-header">Скидка %</div>
       <div class="ct-discount-body ct-keypad-body">
         <div class="ct-discount-top-row ct-keypad-top-row">
@@ -929,10 +1000,11 @@ function renderDiscountModal() {
             </button>
           </div>
         </div>
-        <div class="ct-discount-keypad-row">
+        <div class="ct-discount-keypad-row ${hasPresets ? 'ct-discount-keypad-row--with-presets' : ''}">
           <div class="ct-discount-numpad-wrap ct-keypad-numpad-wrap">
             ${renderNumpad({ value, showDot: false, enterLabel: 'ВВОД', layout: 'payment' })}
           </div>
+          ${presetsHtml}
         </div>
       </div>
     </div>
@@ -1249,13 +1321,25 @@ function bindModalHandlers(layer) {
   });
 }
 
-/** @param {object} product @param {string} [honestSignCode] */
-export function addProductToReceipt(product, honestSignCode) {
+/** @param {object} product @param {string} [honestSignCode] @param {import('../../shared/composite-order-display.js').LunchSelection[]} [lunchSelections] */
+export function addProductToReceipt(product, honestSignCode, lunchSelections) {
   const price = state.priceCategory === 'employees'
     ? Math.round(product.price * 0.85)
     : product.price;
 
-  const existing = state.receiptLines.find(l => l.productId === product.id && !product.honestSignMarked);
+  const isComposite = Boolean(
+    product.isComposite
+    && (
+      product.lunchSteps?.length
+      || (resolveCompositeSetMode(product) === COMPOSITE_SET_MODES.FIXED && product.fixedItems?.length)
+    ),
+  );
+  const existing = state.receiptLines.find(l =>
+    l.productId === product.id
+    && !product.honestSignMarked
+    && !isComposite
+    && !lunchSelections?.length,
+  );
   if (existing && !honestSignCode) {
     existing.quantity += 1;
     state.selectedLineId = existing.id;
@@ -1273,6 +1357,7 @@ export function addProductToReceipt(product, honestSignCode) {
     kitchenStatus: 'Кухня',
     honestSignCode: honestSignCode || undefined,
     honestSignMarked: Boolean(honestSignCode),
+    ...(lunchSelections?.length ? { lunchSelections } : {}),
   };
   state.receiptLines.push(line);
   state.selectedLineId = line.id;
@@ -1280,11 +1365,11 @@ export function addProductToReceipt(product, honestSignCode) {
 
 /** @param {number} qty */
 function applyQuantityToSelection(qty) {
-  const id = state.selectedLineId;
-  if (!id) return;
+  const targetIds = resolveReceiptActionTargetLineIds();
+  if (!targetIds.length) return;
+  const idSet = new Set(targetIds);
   state.receiptLines = state.receiptLines.map(line =>
-    line.id === id ? { ...line, quantity: qty } : line,
-  );
+    (idSet.has(line.id) ? { ...line, quantity: qty } : line));
 }
 
 export function openProduct(product) {
@@ -1292,6 +1377,30 @@ export function openProduct(product) {
     state.pendingProduct = product;
     state.modal = 'honest_sign';
     return;
+  }
+  if (product.isComposite) {
+    const mode = resolveCompositeSetMode(product);
+    if (mode === COMPOSITE_SET_MODES.FIXED && product.fixedItems?.length) {
+      addProductToReceipt(
+        product,
+        undefined,
+        buildFixedSetLunchSelections(product, state.items, state.catalogById),
+      );
+      window.dispatchEvent(new CustomEvent('ct:rerender'));
+      return;
+    }
+    if (product.lunchSteps?.length) {
+      openCompositeLunchModal({
+        lunch: product,
+        catalogItems: state.items.filter(item => !item.isComposite),
+        variant: 'pos',
+        onConfirm: selections => {
+          addProductToReceipt(product, undefined, selections);
+          window.dispatchEvent(new CustomEvent('ct:rerender'));
+        },
+      });
+      return;
+    }
   }
   addProductToReceipt(product);
 }

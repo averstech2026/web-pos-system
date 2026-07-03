@@ -22,6 +22,7 @@ import {
   fetchAllItems,
   filterItems,
   isItemVisibleInKiosk,
+  isItemVisibleInPos,
   isItemVisibleInWeb,
 } from '../services/products-data.js';
 import { fmtCount, fmtMoney } from '../utils/format.js';
@@ -29,7 +30,7 @@ import { productThumbHtml } from '../utils/product-image.js';
 import { showToast } from '../utils/toast.js';
 import { resolveItemNutrition } from '../../shared/demo-nutrition.js';
 import { formatAvailabilityRuleShort, buildGroupsByName, matchesScheduleFilter } from '../../shared/availability-rules.js';
-import { resolveEffectiveItemAllergens } from '../../shared/composite-meals.js';
+import { formatCompositeLunchDescription, resolveEffectiveItemAllergens } from '../../shared/composite-meals.js';
 import { fetchActiveAvailabilityRules } from '../services/availability-rules-data.js';
 import { renderFiltersResetBtn, syncFiltersResetBtn } from '../utils/filter-panel.js';
 
@@ -571,6 +572,7 @@ export class ProductsPage {
               <th class="products-th-num">Ккал</th>
               <th class="products-th-channel">В Вебе</th>
               <th class="products-th-channel">На Киоске</th>
+              <th class="products-th-channel">На Кассе</th>
               <th class="products-th-archived">В архиве</th>
             </tr>
           </thead>
@@ -595,10 +597,14 @@ export class ProductsPage {
     const nutrition = resolveItemNutrition(item);
     const visibleInWeb = isItemVisibleInWeb(item);
     const visibleInKiosk = isItemVisibleInKiosk(item);
+    const visibleInPos = isItemVisibleInPos(item);
     const archived = item.isArchived === true;
     const allergenText = this.allergenLabels(resolveEffectiveItemAllergens(item, this.items));
     const rule = item.availabilityRuleId ? this.rulesMap.get(item.availabilityRuleId) : null;
     const scheduleText = rule ? formatAvailabilityRuleShort(rule) : '';
+    const description = item.isComposite
+      ? (formatCompositeLunchDescription(item, this.items) || item.description || '')
+      : (item.description || '');
 
     return `
       <tr class="orders-row products-row ${archived ? 'products-row--archived' : ''} ${this.selectedIds.has(item.id) ? 'products-row--selected' : ''}" data-item-id="${item.id}" tabindex="0">
@@ -613,9 +619,11 @@ export class ProductsPage {
         </td>
         <td class="products-td-photo">${productThumbHtml(item)}</td>
         <td class="products-td-name">
-          <span class="orders-client">${esc(item.name || '—')}</span>
-          ${item.isComposite ? '<span class="products-composite-badge">Составной</span>' : ''}
-          ${item.description ? `<span class="products-desc">${esc(item.description)}</span>` : ''}
+          <div class="products-name-cell">
+            <span class="orders-client">${esc(item.name || '—')}</span>
+            ${item.isComposite ? '<span class="products-composite-badge">Составной</span>' : ''}
+          </div>
+          ${description ? `<span class="products-desc">${esc(description)}</span>` : ''}
           ${scheduleText ? `<span class="products-avail-schedule">🕐 ${esc(scheduleText)}</span>` : ''}
           ${allergenText ? `<span class="products-allergens">⚠ ${esc(allergenText)}</span>` : ''}
         </td>
@@ -624,6 +632,7 @@ export class ProductsPage {
         <td class="products-td-num">${nutrition?.kcal ?? '—'}</td>
         <td class="products-td-channel">${this.renderChannelStatus(visibleInWeb, 'Личный кабинет')}</td>
         <td class="products-td-channel">${this.renderChannelStatus(visibleInKiosk, 'Киоск')}</td>
+        <td class="products-td-channel">${this.renderChannelStatus(visibleInPos, 'Касса')}</td>
         <td class="products-td-archived">
           <span class="products-archived-flag ${archived ? 'products-archived-flag--yes' : ''}">${archived ? 'Да' : 'Нет'}</span>
         </td>

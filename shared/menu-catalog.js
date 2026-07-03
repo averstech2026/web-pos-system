@@ -81,6 +81,12 @@ export function normalizeCategoryGroup(raw, fallbackName = '') {
   }
   const name = String(raw?.name || fallbackName || '').trim();
   const ruleId = raw?.availabilityRuleId || null;
+  let visibleInPos = raw?.visibleInPos !== undefined
+    ? raw.visibleInPos !== false
+    : DEFAULT_GROUP_VISIBLE_IN_POS;
+  if (raw?.visibleInPos === undefined && raw?.visibleInKiosk === true && raw?.visibleInWeb === false) {
+    visibleInPos = false;
+  }
 
   return {
     id: String(raw?.id || slugFromCategoryName(name)).trim() || slugFromCategoryName(name),
@@ -89,7 +95,7 @@ export function normalizeCategoryGroup(raw, fallbackName = '') {
     availabilityRuleId: ruleId,
     visibleInWeb: raw?.visibleInWeb !== false,
     visibleInKiosk: raw?.visibleInKiosk === true,
-    visibleInPos: raw?.visibleInPos !== false,
+    visibleInPos,
     color: resolveCategoryColor(name, raw?.color),
     webOrder: normalizeGroupOrderIndex(raw?.webOrder, 0),
     kioskOrder: normalizeGroupOrderIndex(raw?.kioskOrder, 0),
@@ -273,7 +279,7 @@ export function formatModifierPriceDelta(delta) {
 
 /** @param {unknown} ids */
 export function normalizeModifierGroupIds(ids) {
-  return [...new Set((ids || []).map(id => String(id).trim()).filter(Boolean))];
+  return [...new Set((ids || []).map(id => String(id).trim()).filter(Boolean))].sort();
 }
 
 /**

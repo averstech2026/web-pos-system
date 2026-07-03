@@ -1,6 +1,6 @@
 import { DEMO_SERVICE_MESSAGES } from '../services/service-messages.js';
 
-/** @typedef {{ id: string, productId: string, name: string, price: number, quantity: number, priceCategory: string, discountPct: number, honestSignCode?: string, honestSignMarked?: boolean, kitchenStatus: string }} ReceiptLine */
+/** @typedef {{ id: string, productId: string, name: string, price: number, quantity: number, priceCategory: string, discountPct: number, honestSignCode?: string, honestSignMarked?: boolean, kitchenStatus: string, lunchSelections?: import('../../shared/composite-order-display.js').LunchSelection[] }} ReceiptLine */
 
 /** @type {{
  *   screen: string,
@@ -10,6 +10,7 @@ import { DEMO_SERVICE_MESSAGES } from '../services/service-messages.js';
  *   channel: object|null,
  *   items: object[],
  *   categoryGroups: object[],
+ *   catalogById: Map<string, object>,
  *   receiptLines: ReceiptLine[],
  *   selectedLineIds: Set<string>,
  *   selectedLineId: string|null,
@@ -41,6 +42,7 @@ export const state = {
   channel: null,
   items: [],
   categoryGroups: [],
+  catalogById: new Map(),
   receiptLines: [],
   selectedLineIds: new Set(),
   selectedLineId: null,
@@ -67,6 +69,7 @@ export const state = {
   crmClients: [],
   crmGroupsById: {},
   paymentMethods: [],
+  discountSettings: null,
 };
 
 export function resetReceipt() {

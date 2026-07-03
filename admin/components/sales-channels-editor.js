@@ -542,17 +542,19 @@ export function createSalesChannelsEditor(host, {
           `).join('')}
         </select>
 
-        <label class="admin-pill-check">
-          <input type="checkbox" class="admin-pill-check__input" data-field="show-product-photos" ${channel.showProductPhotos ? 'checked' : ''} />
-          <span class="admin-pill-check__box" aria-hidden="true"></span>
-          <span class="admin-pill-check__label">Показывать фото товаров</span>
-        </label>
+        <div class="sch-checkbox-group">
+          <label class="admin-pill-check">
+            <input type="checkbox" class="admin-pill-check__input" data-field="show-product-photos" ${channel.showProductPhotos ? 'checked' : ''} />
+            <span class="admin-pill-check__box" aria-hidden="true"></span>
+            <span class="admin-pill-check__label">Показывать фото товаров</span>
+          </label>
 
-        <label class="admin-pill-check">
-          <input type="checkbox" class="admin-pill-check__input" data-field="show-queue-number" ${channel.showQueueNumber ? 'checked' : ''} />
-          <span class="admin-pill-check__box" aria-hidden="true"></span>
-          <span class="admin-pill-check__label">Показывать номер в электронной очереди на чеке</span>
-        </label>
+          <label class="admin-pill-check">
+            <input type="checkbox" class="admin-pill-check__input" data-field="show-queue-number" ${channel.showQueueNumber ? 'checked' : ''} />
+            <span class="admin-pill-check__box" aria-hidden="true"></span>
+            <span class="admin-pill-check__label">Показывать номер в электронной очереди на чеке</span>
+          </label>
+        </div>
 
         <span class="admin-field-label">Разрешённые типы платежей</span>
         <div class="lnc-sales-points">

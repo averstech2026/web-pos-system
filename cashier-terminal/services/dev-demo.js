@@ -1,4 +1,5 @@
 import { normalizeSalesChannel, SALES_CHANNEL_IDS, SALES_CHANNEL_STATUS } from '../../shared/sales-channels.js';
+import { buildPosCatalogLookup } from './catalog.js';
 import {
   POS_CATALOG_DISPLAY,
   DEFAULT_POS_POINT_NAME,
@@ -40,7 +41,7 @@ export function getDemoChannel() {
   }, SALES_CHANNEL_IDS.POS);
 }
 
-/** @returns {{ items: object[], categoryGroups: object[] }} */
+/** @returns {{ items: object[], categoryGroups: object[], catalogById: Map<string, object> }} */
 export function getDemoCatalog() {
   const categoryGroups = [
     { name: 'Вторые блюда', color: '#6BA3C7', visibleInPos: true, posOrder: 1 },
@@ -86,5 +87,5 @@ export function getDemoCatalog() {
     },
   ];
 
-  return { items, categoryGroups };
+  return { items, categoryGroups, catalogById: buildPosCatalogLookup(items) };
 }

@@ -40,7 +40,7 @@ export class MarketingPage {
       this.renderShell();
     } catch (err) {
       console.error('[marketing]', err);
-      this.error = err.message || 'Не удалось загрузить акции';
+      this.error = err.message || 'Не удалось загрузить данные';
       this.loading = false;
       this.renderShell();
     }
@@ -48,15 +48,15 @@ export class MarketingPage {
 
   renderShell() {
     const bodyHtml = this.loading
-      ? '<div class="admin-loading">Загрузка акций…</div>'
+      ? '<div class="admin-loading">Загрузка…</div>'
       : this.error
         ? `<div class="admin-error card">${this.error}</div>`
-        : '<div class="avr-page prm-page card" id="prm-editor-host"></div>';
+        : '<div class="avr-page prm-page" id="prm-editor-host"></div>';
 
     this.container.innerHTML = renderAdminShell({
       active: 'marketing',
-      title: 'Конструктор акций',
-      subtitle: 'Конструктор акций: условия, расписания и поощрения',
+      title: 'Акции',
+      subtitle: 'Временные кампании, комбо и условия поощрения',
       bodyHtml,
     });
 
