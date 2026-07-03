@@ -1,8 +1,11 @@
 import '../shared/styles.css';
 import '../shared/global.css';
+import '../shared/demo-preset.css';
 import '../shared/composite-lunch.css';
 import './style.css';
 
+import { initDemoPreset } from '../shared/demo-preset.js';
+import logoUrl from '../shared/assets/logo-ifcm-tech.png';
 import { fetchPosChannelSettings } from './services/channel-settings.js';
 import { loadPosCatalog, buildPosCatalogLookup } from './services/catalog.js';
 import {
@@ -28,6 +31,8 @@ import { POS_OPERATION_MODE } from '../shared/pos-channel.js';
 import { shouldShowSalesChannelMaintenance } from '../shared/sales-channel-availability.js';
 
 const app = document.getElementById('app');
+
+initDemoPreset({ applyTheme: false, fallbackLogoUrl: logoUrl });
 
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedStaffAuth, STAFF_DEMO_PASSWORD }) => {

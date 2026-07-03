@@ -9,6 +9,7 @@ import {
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { COL } from '../../shared/schema.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 export class ProfilePage {
   constructor(container, navigate) {
@@ -43,7 +44,7 @@ export class ProfilePage {
             <span class="subpage-title">Профиль</span>
           </div>
           <div class="lk-header-right">
-            <img class="header-logo" src="${logoUrl}" alt="iFCM TECH" />
+            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'header-logo' })}
           </div>
         </header>
 

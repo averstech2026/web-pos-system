@@ -4,15 +4,17 @@ import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../../shared/schema.js';
 import { STAFF_DEMO_PASSWORD } from '../../shared/seed.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { getServiceUserEmail } from '../../shared/demo-preset.js';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 const STAFF_ROLES = [ROLES.COOK, ROLES.ADMIN, ROLES.MANAGER];
-const DEMO_EMAIL = 'cook@ifcm.demo';
+const DEFAULT_DEMO_EMAIL = 'cook@ifcm.demo';
 const DEMO_PASSWORD = STAFF_DEMO_PASSWORD;
 
 function authErrorMessage(err) {
   const code = err?.code;
   const map = {
-    'auth/invalid-credential': `Неверный email или пароль. Демо: cook@ifcm.demo / ${STAFF_DEMO_PASSWORD}`,
+    'auth/invalid-credential': `Неверный email или пароль. Демо: ${getServiceUserEmail('cook', DEFAULT_DEMO_EMAIL)} / ${STAFF_DEMO_PASSWORD}`,
     'auth/wrong-password': `Неверный пароль. Демо-пароль: ${STAFF_DEMO_PASSWORD}`,
     'auth/user-not-found': 'Пользователь не найден.',
     'auth/too-many-requests': 'Слишком много попыток. Подождите минуту.',
@@ -29,10 +31,12 @@ export class AuthPage {
   }
 
   render() {
+    const demoEmail = getServiceUserEmail('cook', DEFAULT_DEMO_EMAIL);
+
     this.container.innerHTML = `
       <div class="kt-auth-wrap">
         <div class="kt-auth-logo">
-          <img src="${logoUrl}" alt="iFCM TECH" />
+          ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH' })}
           <div class="kt-auth-sub">Кухонный терминал</div>
         </div>
 
@@ -43,7 +47,7 @@ export class AuthPage {
             <div class="form-group">
               <label for="kt-email">Email</label>
               <input id="kt-email" type="email" autocomplete="username"
-                     placeholder="cook@ifcm.demo" />
+                     placeholder="${demoEmail}" />
             </div>
             <div class="form-group">
               <label for="kt-pass">Пароль</label>
@@ -60,7 +64,7 @@ export class AuthPage {
         <p class="kt-auth-hint">
           Демо:
           <button type="button" class="kt-auth-demo-btn" id="kt-demo-fill" aria-label="Заполнить демо-данные">
-            <code>${DEMO_EMAIL}</code> / <code>${DEMO_PASSWORD}</code>
+            <code>${demoEmail}</code> / <code>${DEMO_PASSWORD}</code>
           </button>
         </p>
       </div>
@@ -71,7 +75,7 @@ export class AuthPage {
       if (e.key === 'Enter') this.submit();
     });
     document.getElementById('kt-demo-fill')?.addEventListener('click', () => {
-      document.getElementById('kt-email').value = DEMO_EMAIL;
+      document.getElementById('kt-email').value = demoEmail;
       document.getElementById('kt-pass').value = DEMO_PASSWORD;
       const errEl = document.getElementById('kt-auth-error');
       errEl.hidden = true;

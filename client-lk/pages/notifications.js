@@ -6,6 +6,7 @@ import {
 import { COL, NOTIF_TYPE, createNotificationDoc } from '../../shared/schema.js';
 import { fmtDateTime } from '../utils/format.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 const NOTIF_ICON = {
   [NOTIF_TYPE.ORDER]: '📦',
@@ -66,7 +67,7 @@ export class NotificationsPage {
           </div>
           <div class="lk-header-right">
             <button class="header-btn header-btn-text btn-press" id="btn-mark-read">Прочитать все</button>
-            <img class="header-logo" src="${logoUrl}" alt="iFCM TECH" />
+            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'header-logo' })}
           </div>
         </header>
 

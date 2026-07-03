@@ -11,6 +11,7 @@ import { qrDataUrl } from '../utils/qr.js';
 import { openOrderDetailModal } from '../components/order-detail.js';
 import { bindScrollFade } from '../utils/scroll-fade.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 import { fetchMarketingBannersForLk } from '../services/marketing-banners-data.js';
 import { fetchAllAvailabilityRules } from '../services/availability-rules-data.js';
 import { getStoredLocationId } from '../../shared/marketing-banners.js';
@@ -108,7 +109,7 @@ export class HomePage {
               🔔
               <span class="notif-badge" id="notif-badge" style="display:none"></span>
             </button>
-            <img class="header-logo" src="${logoUrl}" alt="iFCM TECH" />
+            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'header-logo' })}
           </div>
         </header>
 

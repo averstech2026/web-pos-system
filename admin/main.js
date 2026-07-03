@@ -1,12 +1,18 @@
 import '../shared/styles.css';
 import '../shared/global.css';
+import '../shared/demo-preset.css';
 import '../shared/composite-lunch.css';
 import './style.css';
+
+import { initDemoPreset } from '../shared/demo-preset.js';
+import logoUrl from '../shared/assets/logo-ifcm-tech.png';
 
 import { auth, db } from '../shared/firebase.js';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../shared/schema.js';
+
+initDemoPreset({ applyTheme: true, fallbackLogoUrl: logoUrl });
 
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedStaffAuth, patchDemoItemCategories, seedValidatorDemo }) => {
@@ -92,6 +98,7 @@ async function renderRoute(path) {
     '/sales-channels': () => import('./pages/sales-channels.js').then(m => m.SalesChannelsPage),
     '/reports': () => import('./pages/reports.js').then(m => m.ReportsPage),
     '/validation-rules': () => import('./pages/validation-rules.js').then(m => m.ValidationRulesPage),
+    '/preset-constructor': () => import('./pages/preset-constructor.js').then(m => m.PresetConstructorPage),
   };
 
   const loader = routes[path] || routes['/dashboard'];

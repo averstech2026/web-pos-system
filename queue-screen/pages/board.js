@@ -5,6 +5,7 @@ import {
 import { COL, ORDER_STATUS } from '../../shared/schema.js';
 import { ensureQueueSession } from '../services/auth.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 export class QueueBoard {
   constructor(container) {
@@ -133,7 +134,7 @@ export class QueueBoard {
       <div class="qs-shell">
         <header class="qs-header">
           <div class="qs-brand">
-            <img class="qs-logo" src="${logoUrl}" alt="iFCM TECH" />
+            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'qs-logo' })}
             <div class="qs-brand-text">
               <span class="qs-brand-title">Экран очереди</span>
               <span class="qs-brand-sub">Следите за номером заказа</span>

@@ -1,6 +1,7 @@
 import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 import { fmtClock, fmtDateLong } from '../utils/format.js';
 
 /**
@@ -14,7 +15,7 @@ export function renderDeliveryShell({ title, countHtml = '', bodyHtml }) {
     <div class="dt-shell">
       <div class="dt-top-fixed">
         <header class="dt-header">
-          <img class="dt-logo" src="${logoUrl}" alt="iFCM TECH" />
+          ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'dt-logo' })}
           <h1 class="dt-title">${title}</h1>
           <div class="dt-clock">
             <span class="dt-clock-time" id="dt-clock-time">${fmtClock()}</span>

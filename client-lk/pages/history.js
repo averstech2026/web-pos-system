@@ -7,6 +7,7 @@ import { cancelUnpaidOrder } from '../../shared/orders.js';
 import { fmtDate, fmtDateTime, fmtMoney, orderStatusIcon, orderTotal } from '../utils/format.js';
 import { openOrderDetailModal } from '../components/order-detail.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 export class HistoryPage {
   constructor(container, navigate) {
@@ -31,7 +32,7 @@ export class HistoryPage {
             <span class="subpage-title">История заказов</span>
           </div>
           <div class="lk-header-right">
-            <img class="header-logo" src="${logoUrl}" alt="iFCM TECH" />
+            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'header-logo' })}
           </div>
         </header>
 

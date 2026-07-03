@@ -1,0 +1,38 @@
+/* White-label demo preset — theme + logo utilities */
+
+:root {
+  --theme-primary: #1E1B4B;
+}
+
+.h-10 { height: 2.5rem; }
+.w-auto { width: auto; }
+.object-contain { object-fit: contain; }
+.max-w-\[200px\] { max-width: 200px; }
+
+.brand-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  max-width: 200px;
+  height: 2.5rem;
+}
+
+.brand-logo-img {
+  height: 2.5rem;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
+  display: block;
+}
+
+.admin-sidebar .brand-logo-wrap .brand-logo-img.brand-logo--custom,
+.admin-sidebar .brand-logo-wrap.brand-logo--custom .brand-logo-img {
+  filter: none;
+}
+
+/* Kiosk Tailwind navy aliases */
+.kiosk-app .bg-navy { background-color: var(--theme-primary) !important; }
+.kiosk-app .text-navy { color: var(--theme-primary) !important; }
+.kiosk-app .border-navy { border-color: var(--theme-primary) !important; }
+.kiosk-app .fill-navy { fill: var(--theme-primary) !important; }

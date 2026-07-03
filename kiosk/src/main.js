@@ -10,6 +10,9 @@ import { bindKioskEvents } from './ui/events.js';
 import { loadKioskCatalog } from './services/catalog.js';
 import { ensureKioskSession } from './services/auth.js';
 import { renderKioskMaintenanceIfNeeded } from './services/sales-channel.js';
+import { initDemoPreset } from '@shared/demo-preset.js';
+
+initDemoPreset({ applyTheme: true });
 
 if (import.meta.env.DEV) {
   import('@shared/seed.js').then(({ seedStaffAuth, STAFF_DEMO_PASSWORD }) => {

@@ -4,15 +4,18 @@ import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../../shared/schema.js';
 import { STAFF_DEMO_PASSWORD } from '../../shared/seed.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { getServiceUserEmail } from '../../shared/demo-preset.js';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 const ADMIN_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
-const DEMO_EMAIL = 'admin@ifcm.demo';
+const DEFAULT_DEMO_EMAIL = 'admin@ifcm.demo';
 const DEMO_PASSWORD = STAFF_DEMO_PASSWORD;
 
 function authErrorMessage(err) {
+  const demoEmail = getServiceUserEmail('admin', DEFAULT_DEMO_EMAIL);
   const code = err?.code;
   const map = {
-    'auth/invalid-credential': `Неверный email или пароль. Демо: admin@ifcm.demo / ${STAFF_DEMO_PASSWORD}`,
+    'auth/invalid-credential': `Неверный email или пароль. Демо: ${demoEmail} / ${STAFF_DEMO_PASSWORD}`,
     'auth/wrong-password': `Неверный пароль. Демо-пароль: ${STAFF_DEMO_PASSWORD}`,
     'auth/user-not-found': 'Пользователь не найден.',
     'auth/too-many-requests': 'Слишком много попыток. Подождите минуту.',
@@ -29,10 +32,12 @@ export class AuthPage {
   }
 
   render() {
+    const demoEmail = getServiceUserEmail('admin', DEFAULT_DEMO_EMAIL);
+
     this.container.innerHTML = `
       <div class="admin-auth-wrap">
         <div class="admin-auth-logo">
-          <img src="${logoUrl}" alt="iFCM TECH" />
+          ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'admin-auth-logo-img' })}
           <div class="admin-auth-sub">Админ-панель</div>
         </div>
 
@@ -43,7 +48,7 @@ export class AuthPage {
             <div class="form-group">
               <label for="admin-email">Email</label>
               <input id="admin-email" type="email" autocomplete="username"
-                     placeholder="admin@ifcm.demo" />
+                     placeholder="${demoEmail}" />
             </div>
             <div class="form-group">
               <label for="admin-pass">Пароль</label>
@@ -60,7 +65,7 @@ export class AuthPage {
         <p class="admin-auth-hint">
           Демо:
           <button type="button" class="admin-auth-demo-btn btn-press" id="admin-demo-fill">
-            <code>${DEMO_EMAIL}</code> / <code>${DEMO_PASSWORD}</code>
+            <code>${demoEmail}</code> / <code>${DEMO_PASSWORD}</code>
           </button>
         </p>
       </div>
@@ -71,7 +76,7 @@ export class AuthPage {
       if (e.key === 'Enter') this.submit();
     });
     document.getElementById('admin-demo-fill')?.addEventListener('click', () => {
-      document.getElementById('admin-email').value = DEMO_EMAIL;
+      document.getElementById('admin-email').value = demoEmail;
       document.getElementById('admin-pass').value = DEMO_PASSWORD;
       document.getElementById('admin-auth-error').hidden = true;
     });

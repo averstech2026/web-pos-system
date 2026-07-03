@@ -1,4 +1,5 @@
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 import {
   POS_SOFTWARE_VERSION,
   POS_SUPPORT_PHONE,
@@ -68,7 +69,7 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
           <div class="ct-clock" data-live-clock>${formatClock()}</div>
           <div class="ct-date" data-live-date>${formatDateLong()}</div>
         </div>
-        <img class="ct-logo" src="${logoUrl}" alt="AVERS TECHNOLOGY" />
+        ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'AVERS TECHNOLOGY', extraClass: 'ct-logo' })}
       </div>
     </div>
   `;
@@ -100,7 +101,7 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
     `;
   }
 
-  const brandHtml = `<img class="ct-logo" src="${logoUrl}" alt="AVERS TECHNOLOGY" />`;
+  const brandHtml = renderBrandLogo({ fallbackUrl: logoUrl, alt: 'AVERS TECHNOLOGY', extraClass: 'ct-logo' });
   const headerClass = isAuth ? 'ct-header--auth' : '';
   const unreadCount = getUnreadServiceMessageCount(state.serviceMessages);
   const supportBadgeHtml = unreadCount > 0

@@ -1,12 +1,17 @@
 import '../shared/styles.css';
 import '../shared/global.css';
+import '../shared/demo-preset.css';
 import '../shared/sales-channel-maintenance.css';
 import '../shared/composite-lunch.css';
 import './style.css';
 
+import { initDemoPreset } from '../shared/demo-preset.js';
+import logoUrl from '../shared/assets/logo-ifcm-tech.png';
 import { auth } from '../shared/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import { renderWebChannelMaintenanceIfNeeded } from './services/sales-channel-guard.js';
+
+initDemoPreset({ applyTheme: true, fallbackLogoUrl: logoUrl });
 
 // ── Dev helpers ───────────────────────────────────────────
 // In the browser console run: await seed()  or  await updateItemImages()

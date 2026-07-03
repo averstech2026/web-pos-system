@@ -1,11 +1,16 @@
 import '../shared/styles.css';
 import '../shared/global.css';
+import '../shared/demo-preset.css';
 import './style.css';
 
+import { initDemoPreset } from '../shared/demo-preset.js';
+import logoUrl from '../shared/assets/logo-ifcm-tech.png';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../shared/firebase.js';
 import { ensureQueueSession, QUEUE_TERMINAL_EMAIL, QUEUE_TERMINAL_PASSWORD } from './services/auth.js';
 import { QueueBoard } from './pages/board.js';
+
+initDemoPreset({ applyTheme: true, fallbackLogoUrl: logoUrl });
 
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedStaffAuth }) => {

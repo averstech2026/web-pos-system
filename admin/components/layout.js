@@ -1,6 +1,7 @@
 import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 /** @typedef {'dashboard' | 'orders' | 'products' | 'groups' | 'modifiers' | 'lunches' | 'allergens' | 'data-import' | 'schedules' | 'calendar' | 'marketing' | 'discounts' | 'marketing-banners' | 'payments' | 'sales-channels' | 'users' | 'crm-groups' | 'work-shifts' | 'crm-loyalty' | 'crm-wallets' | 'reports' | 'validation-rules'} AdminSection */
 
@@ -115,7 +116,7 @@ export function renderAdminShell({ active, title, subtitle = '', bodyHtml, toolb
       <aside class="admin-sidebar" id="admin-sidebar">
         <div class="admin-sidebar-head">
           <a class="admin-sidebar-brand" href="#/dashboard" data-path="/dashboard">
-            <img class="admin-sidebar-logo" src="${logoUrl}" alt="iFCM TECH" />
+            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'admin-sidebar-logo' })}
           </a>
           <button
             type="button"

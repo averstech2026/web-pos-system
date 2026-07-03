@@ -1,6 +1,7 @@
 import { auth } from '../../shared/firebase.js';
 import { signOut } from 'firebase/auth';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 import { fmtClock, fmtDateLong } from '../utils/format.js';
 
 /**
@@ -15,7 +16,7 @@ export function renderKitchenShell({ title, activeTab, toolbarHtml = '', toolbar
     <div class="kt-shell">
       <div class="kt-top-fixed">
         <header class="kt-header">
-          <img class="kt-logo" src="${logoUrl}" alt="iFCM TECH" />
+          ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'kt-logo' })}
           <h1 class="kt-title">${title}</h1>
           <div class="kt-clock">
             <span class="kt-clock-time" id="kt-clock-time">${fmtClock()}</span>
