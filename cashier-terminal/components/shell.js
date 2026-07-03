@@ -11,10 +11,10 @@ import { state } from '../core/state.js';
 const SUPPORT_ICON = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke="currentColor" stroke-width="2"/></svg>`;
 
 const CASHIER_AVATAR = `<svg viewBox="0 0 40 40" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="20" cy="20" r="20" fill="#f5b8d4"/>
+  <circle cx="20" cy="20" r="20" fill="#a8dfc0"/>
   <circle cx="20" cy="15" r="7" fill="#fff"/>
   <path d="M7 36c2.2-7.5 7-12 13-12s10.8 4.5 13 12" fill="#fff"/>
-  <ellipse cx="20" cy="38" rx="14" ry="3" fill="#e8a0c0" opacity="0.35"/>
+  <ellipse cx="20" cy="38" rx="14" ry="3" fill="#7fb896" opacity="0.35"/>
 </svg>`;
 
 /**
@@ -33,10 +33,10 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
     if (isSales) {
       billInfoHtml = `
         <div class="ct-bill-info">
-          <div data-live-bill-title>Заказ № ${esc(header.orderNumber)} / ${esc(header.pointName)}</div>
-          <div class="ct-bill-sub" data-live-bill-sub>
-            Создан: <span data-live-order-created>${esc(header.createdAtLabel)}</span>
+          <div class="ct-bill-line" data-live-bill-line>
+            Заказ № ${esc(header.orderNumber)} / Создан: <span data-live-order-created>${esc(header.createdAtLabel)}</span> / ${esc(header.pointName)}
           </div>
+          <div class="ct-bill-support">Техподдержка 24/7: ${esc(POS_SUPPORT_PHONE)}</div>
         </div>
       `;
     } else if (isAuth) {
@@ -52,19 +52,50 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
     ? `
       <div class="ct-cashier-avatar" aria-hidden="true">${CASHIER_AVATAR}</div>
       <div class="ct-header-center-text">
-        <div class="ct-header-title" data-live-cashier-line>${esc(header.stationName)} | ${esc(header.cashierLogin)}</div>
+        <div class="ct-header-title ct-header-cashier">
+          <div data-live-cashier-station>${esc(header.stationName)} |</div>
+          <div data-live-cashier-login>${esc(header.cashierLogin)}</div>
+        </div>
       </div>
     `
     : `<div class="ct-header-title" data-live-station-name>${esc(header?.stationName || state.channel?.stationName || 'Касса')}</div>`;
 
-  const metaHtml = `
-    <div class="ct-header-meta">
-      <span>Техподдержка 24/7: ${esc(POS_SUPPORT_PHONE)}</span>
-      <span>Версия: ${esc(POS_SOFTWARE_VERSION)}</span>
+  const salesRightHtml = `
+    <div class="ct-header-right ct-header-right--sales">
+      <div class="ct-header-right-main">
+        <div class="ct-clock-wrap">
+          <div class="ct-clock" data-live-clock>${formatClock()}</div>
+          <div class="ct-date" data-live-date>${formatDateLong()}</div>
+        </div>
+        <img class="ct-logo" src="${logoUrl}" alt="AVERS TECHNOLOGY" />
+      </div>
     </div>
   `;
 
-  const headerClass = isSales ? 'ct-header--sales' : isAuth ? 'ct-header--auth' : '';
+  if (isSales) {
+    return `
+      <header class="ct-header ct-header--sales">
+        <div class="ct-header-top ct-header-top--sales">
+          <div class="ct-header-left">
+            <button type="button" class="ct-support-btn btn-press" title="Техподдержка">
+              ${SUPPORT_ICON}
+              <span class="ct-support-badge">1</span>
+            </button>
+            ${billInfoHtml}
+          </div>
+          <div class="ct-header-catalog-col">
+            <div class="ct-header-center">
+              ${centerHtml}
+            </div>
+            ${salesRightHtml}
+          </div>
+        </div>
+      </header>
+    `;
+  }
+
+  const brandHtml = `<img class="ct-logo" src="${logoUrl}" alt="AVERS TECHNOLOGY" />`;
+  const headerClass = isAuth ? 'ct-header--auth' : '';
 
   return `
     <header class="ct-header ${headerClass}">
@@ -84,10 +115,9 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
             <div class="ct-clock" data-live-clock>${formatClock()}</div>
             <div class="ct-date" data-live-date>${formatDateLong()}</div>
           </div>
-          <img class="ct-logo" src="${logoUrl}" alt="AVERS TECHNOLOGY" />
+          ${brandHtml}
         </div>
       </div>
-      ${isSales ? metaHtml : ''}
     </header>
   `;
 }
@@ -129,11 +159,8 @@ export function bindLiveClock(root) {
 
     const header = getPosHeaderContext();
 
-    root.querySelectorAll('[data-live-bill-title]').forEach(el => {
-      el.textContent = `Заказ № ${header.orderNumber} / ${header.pointName}`;
-    });
-    root.querySelectorAll('[data-live-bill-sub]').forEach(el => {
-      el.innerHTML = `Создан: <span data-live-order-created>${esc(header.createdAtLabel)}</span>`;
+    root.querySelectorAll('[data-live-bill-line]').forEach(el => {
+      el.innerHTML = `Заказ № ${esc(header.orderNumber)} / Создан: <span data-live-order-created>${esc(header.createdAtLabel)}</span> / ${esc(header.pointName)}`;
     });
     root.querySelectorAll('[data-live-point-name]').forEach(el => {
       el.textContent = header.pointName;
@@ -141,8 +168,11 @@ export function bindLiveClock(root) {
     root.querySelectorAll('[data-live-station-name]').forEach(el => {
       el.textContent = header.stationName;
     });
-    root.querySelectorAll('[data-live-cashier-line]').forEach(el => {
-      el.textContent = `${header.stationName} | ${header.cashierLogin}`;
+    root.querySelectorAll('[data-live-cashier-station]').forEach(el => {
+      el.textContent = `${header.stationName} |`;
+    });
+    root.querySelectorAll('[data-live-cashier-login]').forEach(el => {
+      el.textContent = header.cashierLogin;
     });
   };
   tick();

@@ -45,8 +45,12 @@ export function renderNumpad({
   }
 
   if (layout === 'payment') {
+    const dotBtn = showDot
+      ? '<button type="button" class="ct-numpad-key btn-press" data-numpad=".">.</button>'
+      : '';
+    const layoutModifier = showDot ? '' : ' ct-numpad--payment-layout--no-dot';
     return `
-      <div class="ct-numpad ct-numpad--payment-layout">
+      <div class="ct-numpad ct-numpad--payment-layout${layoutModifier}">
         <div class="ct-numpad-grid">
           ${AUTH_KEYS.slice(0, 3).map(k => `
             <button type="button" class="ct-numpad-key btn-press" data-numpad="${escAttr(k)}">${k}</button>
@@ -59,7 +63,7 @@ export function renderNumpad({
           ${AUTH_KEYS.slice(6, 9).map(k => `
             <button type="button" class="ct-numpad-key btn-press" data-numpad="${escAttr(k)}">${k}</button>
           `).join('')}
-          <button type="button" class="ct-numpad-key btn-press" data-numpad=".">.</button>
+          ${dotBtn}
           <button type="button" class="ct-numpad-key btn-press" data-numpad="0">0</button>
           <button type="button" class="ct-numpad-key ct-numpad-cancel btn-press" data-numpad="cancel">ОТМЕНА</button>
         </div>
@@ -115,17 +119,40 @@ export function renderNumpad({
  * @param {(val: string) => void} handlers.onChange
  * @param {() => void} [handlers.onEnter]
  * @param {() => void} [handlers.onCancel]
+ * @param {boolean} [handlers.replaceOnNextInput] When true, the next digit replaces the whole value.
  */
-export function bindNumpad(numpadRoot, { onChange, onEnter, onCancel }) {
+export function bindNumpad(numpadRoot, {
+  onChange,
+  onEnter,
+  onCancel,
+  replaceOnNextInput = false,
+} = {}) {
   let value = numpadRoot.querySelector('[data-numpad-value]')?.value || '';
+  let replaceNext = Boolean(replaceOnNextInput);
 
   const emit = () => onChange(value);
+
+  const hasDecimalSeparator = () => value.includes('.') || value.includes(',');
+
+  const applyDigit = (key) => {
+    if (replaceNext) {
+      replaceNext = false;
+      value = key === '.' ? '0.' : key;
+      emit();
+      return;
+    }
+    if (key === '.' && hasDecimalSeparator()) return;
+    if (value.length >= 12) return;
+    value += key;
+    emit();
+  };
 
   numpadRoot.addEventListener('click', e => {
     const btn = e.target.closest('[data-numpad]');
     if (!btn) return;
     const key = btn.dataset.numpad;
     if (key === 'back') {
+      replaceNext = false;
       value = value.slice(0, -1);
       emit();
       return;
@@ -138,19 +165,23 @@ export function bindNumpad(numpadRoot, { onChange, onEnter, onCancel }) {
       onEnter?.();
       return;
     }
-    if (key === '.' && value.includes('.')) return;
-    if (value.length >= 12) return;
-    value += key;
-    emit();
+    if (key === '.' || (key >= '0' && key <= '9')) {
+      applyDigit(key);
+    }
   });
 
   return {
     getValue: () => value,
-    setValue: (v) => {
+    setValue: (v, { replaceOnNextInput: replace = false } = {}) => {
       value = v;
+      replaceNext = replace;
       const hidden = numpadRoot.querySelector('[data-numpad-value]');
       if (hidden) hidden.value = v;
       emit();
     },
+    armReplace: () => {
+      replaceNext = true;
+    },
+    isReplacePending: () => replaceNext,
   };
 }

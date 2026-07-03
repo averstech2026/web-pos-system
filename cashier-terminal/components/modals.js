@@ -8,6 +8,7 @@ import { resolveOrderCategoryGroupIds } from '../../shared/wallets.js';
 import { formatMoney, esc, escAttr } from '../core/format.js';
 import { state, getTotal, getSubtotal, getDiscountAmount, getPaymentRemaining, getReceivedTotal, nextLineId } from '../core/state.js';
 import { renderNumpad, bindNumpad } from './numpad.js';
+import { renderGuestSearchZone, bindGuestSearchZone } from './search-keyboard.js';
 import {
   filterClientsForPicker,
   crmUserToGuest,
@@ -296,18 +297,36 @@ function updatePaymentChangeDisplay(layer) {
   if (changeWidget) changeWidget.classList.toggle('ct-payment-change-widget--due', change > 0);
 }
 
-/** @param {HTMLElement|null|undefined} layer @param {{ setValue?: (v: string) => void }|null|undefined} numpadControl */
-function resetPaymentInput(layer, numpadControl) {
+/** @param {HTMLElement|null|undefined} layer @param {{ setValue?: (v: string, opts?: object) => void, armReplace?: () => void }|null|undefined} numpadControl @param {HTMLElement|null|undefined} [paymentAmount] */
+function resetPaymentInput(layer, numpadControl, paymentAmount) {
   if (numpadControl?.setValue) {
-    numpadControl.setValue('');
+    numpadControl.setValue('', { replaceOnNextInput: true });
+    armPaymentAmountInput(paymentAmount, numpadControl);
     return;
   }
   state.modalData.received = '';
-  const paymentAmount = layer?.querySelector('[data-payment-amount]');
+  const amountEl = paymentAmount || layer?.querySelector('[data-payment-amount]');
   const hidden = layer?.querySelector('.ct-modal--payment [data-numpad-value]');
-  if (paymentAmount) paymentAmount.value = '';
+  if (amountEl) amountEl.value = '';
   if (hidden) hidden.value = '';
   updatePaymentChangeDisplay(layer);
+  armPaymentAmountInput(amountEl, numpadControl);
+}
+
+/** @param {HTMLElement|null|undefined} paymentAmount @param {{ armReplace?: () => void, isReplacePending?: () => boolean }|null|undefined} numpadControl */
+function armPaymentAmountInput(paymentAmount, numpadControl) {
+  numpadControl?.armReplace?.();
+  if (!paymentAmount) return;
+  paymentAmount.classList.add('ct-payment-amount--armed');
+  requestAnimationFrame(() => {
+    paymentAmount.focus({ preventScroll: true });
+    paymentAmount.select();
+  });
+}
+
+/** @param {HTMLElement|null|undefined} paymentAmount */
+function disarmPaymentAmountInput(paymentAmount) {
+  paymentAmount?.classList.remove('ct-payment-amount--armed');
 }
 
 function renderStandardPayMethod(method, selectedId) {
@@ -524,44 +543,88 @@ function renderGuestDetailsModal() {
   });
 }
 
-const GUEST_SEARCH_ICON = `<svg class="ct-modal-shell-search__icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.8"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`;
+function renderGuestPickerWalletHtml(wallets) {
+  if (!wallets?.length) {
+    return '<span class="ct-guest-picker-row__wallet-empty">—</span>';
+  }
 
-function renderCustomerSearchModal() {
-  const query = state.modalData.search || '';
+  return wallets.map(wallet => `
+    <span class="ct-guest-picker-row__wallet">
+      <span class="ct-guest-picker-row__wallet-name">${esc(wallet.name)}</span>
+      <span class="ct-guest-picker-row__wallet-balance">${formatMoney(wallet.balance)} ₽</span>
+    </span>
+  `).join('');
+}
+
+function buildGuestPickerListHtml(query = state.modalData.search || '') {
   const groupsById = state.crmGroupsById || {};
   const clients = filterClientsForPicker(state.crmClients || [], groupsById, query);
   const selectedId = state.guest?.id || state.modalData.selectedId;
 
-  const listHtml = clients.length
-    ? clients.map(({ user, displayName, tag, identifier }) => `
-        <button type="button"
-                class="ct-guest-picker-card btn-press ${user.id === selectedId ? 'ct-guest-picker-card--active' : ''}"
-                data-guest-id="${escAttr(user.id)}">
-          ${identifier ? `<span class="ct-guest-picker-card__meta">${esc(identifier)}</span>` : ''}
-          <span class="ct-guest-picker-card__name">${esc(displayName)}</span>
-          ${tag ? `<span class="ct-guest-picker-card__badge">${esc(tag)}</span>` : ''}
-        </button>
-      `).join('')
-    : `<p class="ct-guest-picker-empty">
-        Нет клиентов с правилами валидации.
-        Создайте клиента в CRM, назначьте группу и добавьте правило для этой группы.
-      </p>`;
+  if (!clients.length) {
+    return query.trim()
+      ? '<p class="ct-guest-picker-empty">Клиенты не найдены</p>'
+      : `<p class="ct-guest-picker-empty">
+          Нет клиентов с правилами валидации.
+          Создайте клиента в CRM, назначьте группу и добавьте правило для этой группы.
+        </p>`;
+  }
+
+  return `
+    <div class="ct-guest-picker-list-head" aria-hidden="true">
+      <span class="ct-guest-picker-list-col ct-guest-picker-list-col--name">ФИО</span>
+      <span class="ct-guest-picker-list-col ct-guest-picker-list-col--group">Группа</span>
+      <span class="ct-guest-picker-list-col ct-guest-picker-list-col--wallets">Кошельки</span>
+    </div>
+    ${clients.map(({ user, displayName, tag, identifier, wallets }) => `
+      <button type="button"
+              class="ct-guest-picker-row btn-press ${user.id === selectedId ? 'ct-guest-picker-row--active' : ''}"
+              data-guest-id="${escAttr(user.id)}">
+        <span class="ct-guest-picker-list-col ct-guest-picker-list-col--name">
+          ${identifier ? `<span class="ct-guest-picker-row__meta">${esc(identifier)}</span>` : ''}
+          <span class="ct-guest-picker-row__name">${esc(displayName)}</span>
+        </span>
+        <span class="ct-guest-picker-list-col ct-guest-picker-list-col--group">
+          <span class="ct-guest-picker-row__group">${tag ? esc(tag) : '—'}</span>
+        </span>
+        <span class="ct-guest-picker-list-col ct-guest-picker-list-col--wallets">
+          <span class="ct-guest-picker-row__wallets">${renderGuestPickerWalletHtml(wallets)}</span>
+        </span>
+      </button>
+    `).join('')}
+  `;
+}
+
+/** @param {HTMLElement} layer @param {(guestId: string) => void} selectGuestById */
+function refreshGuestPickerList(layer, selectGuestById) {
+  const listEl = layer.querySelector('.ct-guest-picker-list');
+  if (!listEl) return;
+  listEl.innerHTML = buildGuestPickerListHtml();
+  bindGuestPickerRows(layer, selectGuestById);
+}
+
+/** @param {HTMLElement} layer */
+function bindGuestPickerRows(layer, selectGuestById) {
+  layer.querySelectorAll('[data-guest-id]').forEach(btn => {
+    btn.addEventListener('click', () => selectGuestById(btn.dataset.guestId));
+  });
+}
+
+function renderCustomerSearchModal() {
+  const query = state.modalData.search || '';
+  const keyboardOpen = state.modalData.guestKeyboardOpen !== false;
+  const keyboardLayout = state.modalData.guestKeyboardLayout || 'jcuken';
+  const listHtml = buildGuestPickerListHtml(query);
 
   return renderModalShell({
     title: 'Выбор клиента',
     widthClass: 'ct-modal--shell ct-modal--guest-picker',
-    head: `
-      <label class="ct-modal-shell-search ct-modal-shell-search--guest">
-        <span class="ct-modal-shell-search__label">Поиск</span>
-        <span class="ct-modal-shell-search__field">
-          <span class="ct-modal-shell-search__icon">${GUEST_SEARCH_ICON}</span>
-          <input type="text" data-guest-search value="${escAttr(query)}" placeholder="Имя, карта, телефон…" />
-        </span>
-      </label>
-    `,
     body: `
-      <div class="ct-guest-picker-panel">
-        <div class="ct-guest-picker-grid">${listHtml}</div>
+      <div class="ct-guest-picker-layout">
+        <div class="ct-guest-picker-panel">
+          <div class="ct-guest-picker-list">${listHtml}</div>
+        </div>
+        ${renderGuestSearchZone({ query, keyboardOpen, layout: keyboardLayout })}
       </div>
     `,
     foot: `
@@ -573,28 +636,120 @@ function renderCustomerSearchModal() {
   });
 }
 
+/** @param {HTMLElement|null|undefined} qtyInput @param {{ armReplace?: () => void }|null|undefined} numpadControl */
+function resetQtyInput(qtyInput, numpadControl, layer) {
+  state.modalData.value = '0';
+  state.modalData.preset = '';
+  numpadControl?.setValue('0', { replaceOnNextInput: true });
+  if (qtyInput) qtyInput.value = '0';
+  layer?.querySelector('[data-action="qty-clear"]')
+    ?.classList.add('ct-payment-amount-clear--hidden');
+  layer?.querySelectorAll('[data-qty-preset]').forEach(btn => {
+    btn.classList.remove('ct-qty-preset-card--active');
+  });
+  armPaymentAmountInput(qtyInput, numpadControl);
+}
+
+/** @param {HTMLElement} layer */
+function bindQuantityModalHandlers(layer) {
+  const qtyInput = layer.querySelector('[data-qty-value]');
+  const numpad = layer.querySelector('.ct-modal--quantity .ct-numpad');
+  if (!numpad || !qtyInput) return;
+
+  const qtyNumpadControl = bindNumpad(numpad, {
+    replaceOnNextInput: true,
+    onChange: (val) => {
+      state.modalData.value = val;
+      qtyInput.value = val;
+      if (state.modalData.preset && val !== state.modalData.preset) {
+        state.modalData.preset = '';
+      }
+      disarmPaymentAmountInput(qtyInput);
+      layer.querySelector('[data-action="qty-clear"]')
+        ?.classList.toggle('ct-payment-amount-clear--hidden', !val || val === '0');
+      layer.querySelectorAll('[data-qty-preset]').forEach(btn => {
+        btn.classList.toggle(
+          'ct-qty-preset-card--active',
+          Boolean(state.modalData.preset) && btn.dataset.qtyPreset === state.modalData.preset,
+        );
+      });
+    },
+    onEnter: () => {
+      const qty = parseFloat((state.modalData.value || '0').replace(',', '.'));
+      applyQuantityToSelection(Number.isFinite(qty) ? Math.max(0.01, qty) : 1);
+      state.modal = null;
+      state.modalData = {};
+      window.dispatchEvent(new CustomEvent('ct:rerender'));
+    },
+    onCancel: () => {
+      state.modal = null;
+      state.modalData = {};
+      window.dispatchEvent(new CustomEvent('ct:rerender'));
+    },
+  });
+
+  armPaymentAmountInput(qtyInput, qtyNumpadControl);
+
+  layer.querySelector('[data-action="qty-clear"]')?.addEventListener('click', () => {
+    resetQtyInput(qtyInput, qtyNumpadControl, layer);
+  });
+
+  layer.querySelectorAll('[data-qty-preset]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = btn.dataset.qtyPreset || '';
+      state.modalData.preset = preset;
+      state.modalData.value = preset;
+      qtyNumpadControl.setValue(preset, { replaceOnNextInput: true });
+      qtyInput.value = preset;
+      disarmPaymentAmountInput(qtyInput);
+      layer.querySelector('[data-action="qty-clear"]')
+        ?.classList.toggle('ct-payment-amount-clear--hidden', !preset || preset === '0');
+      layer.querySelectorAll('[data-qty-preset]').forEach(item => {
+        item.classList.toggle('ct-qty-preset-card--active', item === btn);
+      });
+    });
+  });
+}
+
 function renderQuantityModal() {
   const value = state.modalData.value || '1';
   const presets = ['0,25', '0,33', '0,5', '1,5'];
   const active = state.modalData.preset || '';
+  const productName = state.modalData.productName
+    || state.receiptLines.find(l => l.id === state.selectedLineId)?.name
+    || 'Товар';
+  const showClear = value && value !== '0';
 
-  return renderModalShell({
-    title: 'Ввод количества',
-    widthClass: 'ct-modal--shell-medium',
-    head: `<input class="ct-modal-shell-input" data-qty-value value="${escAttr(value)}" readonly />`,
-    body: `
-      <div class="ct-qty-main">
-        ${renderModalNumpad(value)}
-        <div class="ct-qty-presets">
-          <div class="ct-qty-presets-label">Порция</div>
-          ${presets.map(p => `
-            <button type="button" class="ct-qty-preset btn-press ${active === p ? 'ct-qty-preset--active' : ''}" data-qty-preset="${escAttr(p)}">${p}</button>
-          `).join('')}
+  return `
+    <div class="ct-modal ct-modal--quantity">
+      <div class="ct-modal-bar ct-modal-bar--pay ct-qty-header">
+        Ввод количества: <span class="ct-qty-header__product">${esc(productName)}</span>
+      </div>
+      <div class="ct-qty-body">
+        <div class="ct-qty-top-row">
+          <div class="ct-qty-amount-wrap">
+            <input class="ct-payment-amount ct-qty-amount" data-qty-value value="${escAttr(value)}" readonly />
+            <button type="button" class="ct-payment-amount-clear btn-press ${showClear ? '' : 'ct-payment-amount-clear--hidden'}" data-action="qty-clear" aria-label="Очистить количество">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="ct-qty-keypad-row">
+          <div class="ct-qty-numpad-wrap">
+            ${renderNumpad({ value, showDot: true, enterLabel: 'ВВОД', layout: 'payment' })}
+          </div>
+          <aside class="ct-qty-presets-panel" aria-label="Быстрый выбор порции">
+            <span class="ct-qty-presets-label">Быстрый выбор</span>
+            <div class="ct-qty-presets">
+              ${presets.map(p => `
+                <button type="button" class="ct-qty-preset-card btn-press ${active === p ? 'ct-qty-preset-card--active' : ''}" data-qty-preset="${escAttr(p)}">${esc(p)}</button>
+              `).join('')}
+            </div>
+          </aside>
         </div>
       </div>
-    `,
-    foot: renderModalCloseBtn('Закрыть'),
-  });
+    </div>
+  `;
 }
 
 function renderPriceListModal() {
@@ -613,15 +768,77 @@ function renderPriceListModal() {
   });
 }
 
-function renderDiscountModal() {
-  const value = state.modalData.value || String(state.receiptDiscountPct || '');
-  return renderModalShell({
-    title: 'Скидка %',
-    widthClass: 'ct-modal--shell-medium',
-    head: `<input class="ct-modal-shell-input" data-discount-value value="${escAttr(value)}" readonly />`,
-    body: renderModalNumpad(value, { showDot: false, enterLabel: 'OK' }),
-    foot: renderModalCloseBtn('Закрыть'),
+/** @param {HTMLElement|null|undefined} discountInput @param {{ setValue?: (v: string, opts?: object) => void, armReplace?: () => void }|null|undefined} numpadControl @param {HTMLElement} layer */
+function resetDiscountInput(discountInput, numpadControl, layer) {
+  state.modalData.value = '0';
+  numpadControl?.setValue('0', { replaceOnNextInput: true });
+  if (discountInput) discountInput.value = '0';
+  layer.querySelector('[data-action="discount-clear"]')
+    ?.classList.add('ct-payment-amount-clear--hidden');
+  armPaymentAmountInput(discountInput, numpadControl);
+}
+
+/** @param {HTMLElement} layer */
+function bindDiscountModalHandlers(layer) {
+  const discountInput = layer.querySelector('[data-discount-value]');
+  const numpad = layer.querySelector('.ct-modal--discount .ct-numpad');
+  if (!numpad || !discountInput) return;
+
+  const discountNumpadControl = bindNumpad(numpad, {
+    replaceOnNextInput: true,
+    onChange: (val) => {
+      state.modalData.value = val;
+      discountInput.value = val;
+      disarmPaymentAmountInput(discountInput);
+      layer.querySelector('[data-action="discount-clear"]')
+        ?.classList.toggle('ct-payment-amount-clear--hidden', !val || val === '0');
+    },
+    onEnter: () => {
+      const pct = parseFloat((state.modalData.value || '0').replace(',', '.'));
+      state.receiptDiscountPct = Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 0;
+      state.modal = null;
+      state.modalData = {};
+      window.dispatchEvent(new CustomEvent('ct:rerender'));
+    },
+    onCancel: () => {
+      state.modal = null;
+      state.modalData = {};
+      window.dispatchEvent(new CustomEvent('ct:rerender'));
+    },
   });
+
+  armPaymentAmountInput(discountInput, discountNumpadControl);
+
+  layer.querySelector('[data-action="discount-clear"]')?.addEventListener('click', () => {
+    resetDiscountInput(discountInput, discountNumpadControl, layer);
+  });
+}
+
+function renderDiscountModal() {
+  const raw = state.modalData.value ?? String(state.receiptDiscountPct ?? '');
+  const value = raw === '' ? '0' : raw;
+  const showClear = value && value !== '0';
+
+  return `
+    <div class="ct-modal ct-modal--discount">
+      <div class="ct-modal-bar ct-modal-bar--pay ct-discount-header">Скидка %</div>
+      <div class="ct-discount-body">
+        <div class="ct-discount-top-row">
+          <div class="ct-discount-amount-wrap">
+            <input class="ct-payment-amount ct-discount-amount" data-discount-value value="${escAttr(value)}" readonly />
+            <button type="button" class="ct-payment-amount-clear btn-press ${showClear ? '' : 'ct-payment-amount-clear--hidden'}" data-action="discount-clear" aria-label="Очистить скидку">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="ct-discount-keypad-row">
+          <div class="ct-discount-numpad-wrap">
+            ${renderNumpad({ value, showDot: false, enterLabel: 'ВВОД', layout: 'payment' })}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 const PAYMENTS_EMPTY_ICON = `<svg class="ct-payments-empty__icon" viewBox="0 0 48 48" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -831,14 +1048,28 @@ function bindModalHandlers(layer) {
     window.dispatchEvent(new CustomEvent('ct:rerender'));
   }
 
-  layer.querySelectorAll('[data-guest-id]').forEach(btn => {
-    btn.addEventListener('click', () => selectGuestById(btn.dataset.guestId));
-  });
+  bindGuestPickerRows(layer, selectGuestById);
 
-  layer.querySelector('[data-guest-search]')?.addEventListener('input', e => {
-    state.modalData.search = e.target.value;
-    window.dispatchEvent(new CustomEvent('ct:rerender'));
-  });
+  const guestSearchZone = layer.querySelector('[data-guest-search-zone]');
+  if (guestSearchZone) {
+    bindGuestSearchZone(guestSearchZone, {
+      onQueryChange: (next) => {
+        if (!state.modalData) state.modalData = {};
+        state.modalData.search = next;
+        refreshGuestPickerList(layer, selectGuestById);
+      },
+      onCollapseToggle: () => {
+        state.modalData.guestKeyboardOpen = state.modalData.guestKeyboardOpen === false;
+        const root = layer.parentElement;
+        if (root) renderModals(root);
+      },
+      onLayoutChange: (layout) => {
+        state.modalData.guestKeyboardLayout = layout;
+        const root = layer.parentElement;
+        if (root) renderModals(root);
+      },
+    });
+  }
 
   layer.querySelector('[data-action="clear-guest-modal"]')?.addEventListener('click', () => {
     state.guest = null;
@@ -849,7 +1080,7 @@ function bindModalHandlers(layer) {
 
   layer.querySelector('[data-action="change-guest-modal"]')?.addEventListener('click', () => {
     state.modal = 'customer_search';
-    state.modalData = { search: '', selectedId: state.guest?.id };
+    state.modalData = { search: '', selectedId: state.guest?.id, guestKeyboardOpen: true, guestKeyboardLayout: 'jcuken' };
     window.dispatchEvent(new CustomEvent('ct:rerender'));
   });
 
@@ -861,54 +1092,12 @@ function bindModalHandlers(layer) {
     });
   });
 
-  const qtyInput = layer.querySelector('[data-qty-value]');
-  const numpad = layer.querySelector('.ct-numpad');
-  if (numpad && qtyInput) {
-    bindNumpad(numpad, {
-      onChange: (val) => {
-        state.modalData.value = val;
-        qtyInput.value = val;
-      },
-      onEnter: () => {
-        const qty = parseFloat((state.modalData.value || '1').replace(',', '.'));
-        applyQuantityToSelection(Number.isFinite(qty) ? qty : 1);
-        state.modal = null;
-        state.modalData = {};
-        window.dispatchEvent(new CustomEvent('ct:rerender'));
-      },
-      onCancel: () => {
-        state.modal = null;
-        window.dispatchEvent(new CustomEvent('ct:rerender'));
-      },
-    });
-    layer.querySelectorAll('[data-qty-preset]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        state.modalData.preset = btn.dataset.qtyPreset;
-        state.modalData.value = btn.dataset.qtyPreset;
-        window.dispatchEvent(new CustomEvent('ct:rerender'));
-      });
-    });
+  if (state.modal === 'quantity') {
+    bindQuantityModalHandlers(layer);
   }
 
-  const discountNumpad = layer.querySelector('.ct-modal--shell .ct-numpad');
-  if (discountNumpad && state.modal === 'discount') {
-    const input = layer.querySelector('[data-discount-value]');
-    bindNumpad(discountNumpad, {
-      onChange: (val) => {
-        state.modalData.value = val;
-        if (input) input.value = val;
-      },
-      onEnter: () => {
-        const pct = parseFloat(state.modalData.value || '0');
-        state.receiptDiscountPct = Number.isFinite(pct) ? Math.min(100, Math.max(0, pct)) : 0;
-        state.modal = null;
-        window.dispatchEvent(new CustomEvent('ct:rerender'));
-      },
-      onCancel: () => {
-        state.modal = null;
-        window.dispatchEvent(new CustomEvent('ct:rerender'));
-      },
-    });
+  if (state.modal === 'discount') {
+    bindDiscountModalHandlers(layer);
   }
 
   layer.querySelectorAll('[data-pay-method]').forEach(btn => {
@@ -935,9 +1124,11 @@ function bindModalHandlers(layer) {
   let paymentNumpadControl = null;
   if (paymentNumpad && paymentAmount) {
     paymentNumpadControl = bindNumpad(paymentNumpad, {
+      replaceOnNextInput: true,
       onChange: (val) => {
         state.modalData.received = val;
         paymentAmount.value = val;
+        disarmPaymentAmountInput(paymentAmount);
         updatePaymentChangeDisplay(layer);
       },
       onEnter: () => submitPayment(),
@@ -948,10 +1139,11 @@ function bindModalHandlers(layer) {
         window.dispatchEvent(new CustomEvent('ct:rerender'));
       },
     });
+    armPaymentAmountInput(paymentAmount, paymentNumpadControl);
   }
 
   layer.querySelector('[data-action="payment-clear"]')?.addEventListener('click', () => {
-    resetPaymentInput(layer, paymentNumpadControl);
+    resetPaymentInput(layer, paymentNumpadControl, paymentAmount);
   });
 }
 
