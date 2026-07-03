@@ -8,7 +8,7 @@ const AUTH_KEYS = ['7', '8', '9', '4', '5', '6', '1', '2', '3', '0'];
  * @param {boolean} [opts.showDot]
  * @param {boolean} [opts.tallEnter]
  * @param {string} [opts.enterLabel]
- * @param {'auth'|'modal'|'payment'|'default'} [opts.layout]
+ * @param {'modal'|'payment'|'default'} [opts.layout]
  */
 export function renderNumpad({
   value = '',
@@ -64,29 +64,6 @@ export function renderNumpad({
             <button type="button" class="ct-numpad-key btn-press" data-numpad="${escAttr(k)}">${k}</button>
           `).join('')}
           ${dotBtn}
-          <button type="button" class="ct-numpad-key btn-press" data-numpad="0">0</button>
-          <button type="button" class="ct-numpad-key ct-numpad-cancel btn-press" data-numpad="cancel">ОТМЕНА</button>
-        </div>
-        <input type="hidden" data-numpad-value value="${escAttr(value)}" />
-      </div>
-    `;
-  }
-
-  if (layout === 'auth') {
-    return `
-      <div class="ct-numpad ct-numpad--auth-layout">
-        <div class="ct-numpad-grid">
-          ${AUTH_KEYS.slice(0, 3).map(k => `
-            <button type="button" class="ct-numpad-key btn-press" data-numpad="${escAttr(k)}">${k}</button>
-          `).join('')}
-          <button type="button" class="ct-numpad-key ct-numpad-back btn-press" data-numpad="back" aria-label="Стереть">←</button>
-          ${AUTH_KEYS.slice(3, 6).map(k => `
-            <button type="button" class="ct-numpad-key btn-press" data-numpad="${escAttr(k)}">${k}</button>
-          `).join('')}
-          <button type="button" class="ct-numpad-key ct-numpad-enter btn-press" data-numpad="enter">${esc(enterLabel)}</button>
-          ${AUTH_KEYS.slice(6, 9).map(k => `
-            <button type="button" class="ct-numpad-key btn-press" data-numpad="${escAttr(k)}">${k}</button>
-          `).join('')}
           <button type="button" class="ct-numpad-key btn-press" data-numpad="0">0</button>
           <button type="button" class="ct-numpad-key ct-numpad-cancel btn-press" data-numpad="cancel">ОТМЕНА</button>
         </div>

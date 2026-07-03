@@ -16,6 +16,7 @@ import {
 } from '../services/guests.js';
 import { finalizePosOrderOnPayment } from '../services/orders.js';
 import { resolvePosPaymentMethodButtons } from '../services/payment-methods.js';
+import { markServiceMessageRead, resetServiceMessagesUnread } from '../services/service-messages.js';
 
 function renderModalShell({ title, widthClass = '', head = '', body = '', foot = '', barClass = 'ct-modal-bar--default' }) {
   return `
@@ -85,6 +86,7 @@ export function renderModals(root) {
     price_list: renderPriceListModal,
     discount: renderDiscountModal,
     payments_log: renderPaymentsLogModal,
+    service_messages: renderServiceMessagesModal,
   }[state.modal]?.();
 
   existing.innerHTML = html || '';
@@ -439,8 +441,8 @@ function renderPaymentModal() {
       <div class="ct-modal-bar ct-modal-bar--pay ct-payment-header">${headerHtml}</div>
       <div class="ct-payment-body">
         <div class="ct-payment-top-row ${hasClientPanel ? 'ct-payment-top-row--with-client' : ''}">
-          <div class="ct-payment-amount-row">
-            <div class="ct-payment-amount-wrap">
+          <div class="ct-payment-amount-row ct-keypad-top-row">
+            <div class="ct-payment-amount-wrap ct-keypad-amount-wrap">
               <input class="ct-payment-amount" data-payment-amount value="${escAttr(received)}" readonly />
               <button type="button" class="ct-payment-amount-clear btn-press" data-action="payment-clear" aria-label="Очистить сумму">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -454,7 +456,7 @@ function renderPaymentModal() {
         </div>
 
         <div class="ct-payment-keypad-row ${hasClientPanel ? 'ct-payment-keypad-row--with-client' : ''}">
-          <div class="ct-payment-numpad-wrap">
+          <div class="ct-payment-numpad-wrap ct-keypad-numpad-wrap">
             ${renderNumpad({ value: received, showDot: true, enterLabel: 'ОПЛАТИТЬ', layout: 'payment' })}
           </div>
           <div class="ct-payment-right-col ${hasClientPanel ? 'ct-payment-right-col--with-client' : ''}">
@@ -610,6 +612,102 @@ function bindGuestPickerRows(layer, selectGuestById) {
   });
 }
 
+const SERVICE_MSG_ICON_CRITICAL = `<svg class="ct-service-msg-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>`;
+
+const SERVICE_MSG_ICON_WARNING = `<svg class="ct-service-msg-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4.5 20.5 19H3.5L12 4.5z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 10v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17" r="1" fill="currentColor"/></svg>`;
+
+const SERVICE_MSG_ICON_INFO = `<svg class="ct-service-msg-icon-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18z" stroke="currentColor" stroke-width="2"/><path d="M8.5 12.5 11 15l4.5-5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+const SERVICE_MSG_MARK_READ_ICON = `<svg class="ct-service-msg-mark-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 12.5 10 16.5 18 8.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function renderServiceMessageIcon(type) {
+  if (type === 'critical') {
+    return `<span class="ct-service-msg-icon ct-service-msg-icon--critical" aria-hidden="true">${SERVICE_MSG_ICON_CRITICAL}</span>`;
+  }
+  if (type === 'warning') {
+    return `<span class="ct-service-msg-icon ct-service-msg-icon--warning" aria-hidden="true">${SERVICE_MSG_ICON_WARNING}</span>`;
+  }
+  return `<span class="ct-service-msg-icon ct-service-msg-icon--info" aria-hidden="true">${SERVICE_MSG_ICON_INFO}</span>`;
+}
+
+function renderServiceMessagesListHtml() {
+  return state.serviceMessages.map(msg => `
+    <div
+      class="ct-service-msg-row ${msg.unread ? 'ct-service-msg-row--unread' : 'ct-service-msg-row--read'}"
+      data-service-msg-id="${escAttr(msg.id)}"
+      role="button"
+      tabindex="0"
+    >
+      ${renderServiceMessageIcon(msg.type)}
+      <span class="ct-service-msg-text">${esc(msg.text)}</span>
+      ${msg.unread ? `
+        <button
+          type="button"
+          class="ct-service-msg-mark btn-press"
+          data-action="mark-service-msg-read"
+          data-msg-id="${escAttr(msg.id)}"
+          aria-label="Прочитано"
+        >${SERVICE_MSG_MARK_READ_ICON}</button>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
+function renderServiceMessagesModal() {
+  return renderModalShell({
+    title: 'Служебные сообщения',
+    widthClass: 'ct-modal--shell ct-modal--service-messages',
+    body: `<div class="ct-service-messages-list">${renderServiceMessagesListHtml()}</div>`,
+    foot: `
+      <div class="ct-service-messages-foot">
+        ${renderModalSecondaryBtn('Сброс', 'reset-service-messages-read')}
+        ${renderModalCloseBtn('ЗАКРЫТЬ')}
+      </div>
+    `,
+  });
+}
+
+/** @param {HTMLElement} layer */
+function bindServiceMessagesHandlers(layer) {
+  layer.querySelectorAll('[data-action="mark-service-msg-read"]').forEach(btn => {
+    const markRead = (e) => {
+      e?.stopPropagation?.();
+      e?.preventDefault?.();
+      if (markServiceMessageRead(state.serviceMessages, btn.dataset.msgId)) {
+        window.dispatchEvent(new CustomEvent('ct:rerender'));
+      }
+    };
+    btn.addEventListener('click', markRead);
+    btn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') markRead(e);
+    });
+  });
+
+  layer.querySelectorAll('[data-service-msg-id]').forEach(row => {
+    const markRowRead = () => {
+      if (markServiceMessageRead(state.serviceMessages, row.dataset.serviceMsgId)) {
+        window.dispatchEvent(new CustomEvent('ct:rerender'));
+      }
+    };
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('[data-action="mark-service-msg-read"]')) return;
+      markRowRead();
+    });
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        markRowRead();
+      }
+    });
+  });
+
+  layer.querySelector('[data-action="reset-service-messages-read"]')?.addEventListener('click', () => {
+    if (resetServiceMessagesUnread(state.serviceMessages)) {
+      window.dispatchEvent(new CustomEvent('ct:rerender'));
+    }
+  });
+}
+
 function renderCustomerSearchModal() {
   const query = state.modalData.search || '';
   const keyboardOpen = state.modalData.guestKeyboardOpen !== false;
@@ -725,9 +823,9 @@ function renderQuantityModal() {
       <div class="ct-modal-bar ct-modal-bar--pay ct-qty-header">
         Ввод количества: <span class="ct-qty-header__product">${esc(productName)}</span>
       </div>
-      <div class="ct-qty-body">
-        <div class="ct-qty-top-row">
-          <div class="ct-qty-amount-wrap">
+      <div class="ct-qty-body ct-keypad-body">
+        <div class="ct-qty-top-row ct-keypad-top-row">
+          <div class="ct-qty-amount-wrap ct-keypad-amount-wrap">
             <input class="ct-payment-amount ct-qty-amount" data-qty-value value="${escAttr(value)}" readonly />
             <button type="button" class="ct-payment-amount-clear btn-press ${showClear ? '' : 'ct-payment-amount-clear--hidden'}" data-action="qty-clear" aria-label="Очистить количество">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -735,7 +833,7 @@ function renderQuantityModal() {
           </div>
         </div>
         <div class="ct-qty-keypad-row">
-          <div class="ct-qty-numpad-wrap">
+          <div class="ct-qty-numpad-wrap ct-keypad-numpad-wrap">
             ${renderNumpad({ value, showDot: true, enterLabel: 'ВВОД', layout: 'payment' })}
           </div>
           <aside class="ct-qty-presets-panel" aria-label="Быстрый выбор порции">
@@ -822,9 +920,9 @@ function renderDiscountModal() {
   return `
     <div class="ct-modal ct-modal--discount">
       <div class="ct-modal-bar ct-modal-bar--pay ct-discount-header">Скидка %</div>
-      <div class="ct-discount-body">
-        <div class="ct-discount-top-row">
-          <div class="ct-discount-amount-wrap">
+      <div class="ct-discount-body ct-keypad-body">
+        <div class="ct-discount-top-row ct-keypad-top-row">
+          <div class="ct-discount-amount-wrap ct-keypad-amount-wrap">
             <input class="ct-payment-amount ct-discount-amount" data-discount-value value="${escAttr(value)}" readonly />
             <button type="button" class="ct-payment-amount-clear btn-press ${showClear ? '' : 'ct-payment-amount-clear--hidden'}" data-action="discount-clear" aria-label="Очистить скидку">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -832,7 +930,7 @@ function renderDiscountModal() {
           </div>
         </div>
         <div class="ct-discount-keypad-row">
-          <div class="ct-discount-numpad-wrap">
+          <div class="ct-discount-numpad-wrap ct-keypad-numpad-wrap">
             ${renderNumpad({ value, showDot: false, enterLabel: 'ВВОД', layout: 'payment' })}
           </div>
         </div>
@@ -1098,6 +1196,10 @@ function bindModalHandlers(layer) {
 
   if (state.modal === 'discount') {
     bindDiscountModalHandlers(layer);
+  }
+
+  if (state.modal === 'service_messages') {
+    bindServiceMessagesHandlers(layer);
   }
 
   layer.querySelectorAll('[data-pay-method]').forEach(btn => {

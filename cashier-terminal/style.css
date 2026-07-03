@@ -256,13 +256,16 @@ html, body {
   color: #1a1a1a;
   font-size: 9px;
   font-weight: 700;
-  width: 15px;
+  min-width: 15px;
   height: 15px;
-  border-radius: 50%;
+  padding: 0 3px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid #fff;
+  box-sizing: border-box;
+  line-height: 1;
 }
 
 .ct-bill-info {
@@ -484,6 +487,29 @@ html, body {
   flex-direction: column;
   min-height: 420px;
   padding-bottom: 24px;
+}
+
+.ct-auth-card--pin {
+  width: min(480px, 96%);
+  padding: 0;
+  min-height: 0;
+  text-align: left;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+}
+
+.ct-auth-card--pin .ct-auth-pin-header {
+  text-align: center;
+}
+
+.ct-auth-card--pin .ct-auth-switch {
+  text-align: center;
+  margin: 12px 0 0;
+}
+
+.ct-auth-card--pin .ct-numpad-key {
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 .ct-auth-card-body {
@@ -731,57 +757,7 @@ html, body {
   grid-row: span 2;
 }
 
-/* Auth PIN layout (reference keypad) */
-.ct-numpad--auth-layout .ct-numpad-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(4, 54px);
-  gap: 10px;
-  height: 246px;
-}
-
-.ct-numpad--auth-layout .ct-numpad-key {
-  border-radius: 14px;
-  height: 100%;
-  min-height: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  line-height: 1;
-}
-
-.ct-numpad--auth-layout [data-numpad="7"] { grid-column: 1; grid-row: 1; }
-.ct-numpad--auth-layout [data-numpad="8"] { grid-column: 2; grid-row: 1; }
-.ct-numpad--auth-layout [data-numpad="9"] { grid-column: 3; grid-row: 1; }
-.ct-numpad--auth-layout [data-numpad="back"] {
-  grid-column: 4;
-  grid-row: 1;
-  font-size: 30px;
-  line-height: 1;
-}
-.ct-numpad--auth-layout [data-numpad="4"] { grid-column: 1; grid-row: 2; }
-.ct-numpad--auth-layout [data-numpad="5"] { grid-column: 2; grid-row: 2; }
-.ct-numpad--auth-layout [data-numpad="6"] { grid-column: 3; grid-row: 2; }
-.ct-numpad--auth-layout [data-numpad="1"] { grid-column: 1; grid-row: 3; }
-.ct-numpad--auth-layout [data-numpad="2"] { grid-column: 2; grid-row: 3; }
-.ct-numpad--auth-layout [data-numpad="3"] { grid-column: 3; grid-row: 3; }
-.ct-numpad--auth-layout [data-numpad="0"] { grid-column: 1; grid-row: 4; }
-.ct-numpad--auth-layout [data-numpad="cancel"] {
-  grid-column: 2 / 4;
-  grid-row: 4;
-  font-size: 13px;
-  letter-spacing: 0.04em;
-}
-
-.ct-numpad--auth-layout [data-numpad="enter"] {
-  grid-column: 4;
-  grid-row: 2 / 5;
-  font-size: 15px;
-  letter-spacing: 0.04em;
-}
-
-/* Payment modal numpad — tall ОПЛАТИТЬ (reference) */
+/* Payment keypad layout — PIN, quantity, discount, payment */
 .ct-numpad--payment-layout .ct-numpad-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-template-rows: repeat(4, 54px);
@@ -834,6 +810,25 @@ html, body {
 .ct-numpad--payment-layout--no-dot [data-numpad="cancel"] {
   grid-column: 2 / 4;
   grid-row: 4;
+}
+
+.ct-numpad--payment-layout .ct-numpad-key:not(.ct-numpad-cancel):not(.ct-numpad-enter) {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.ct-numpad--payment-layout .ct-numpad-key:not(.ct-numpad-cancel):not(.ct-numpad-enter):hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.ct-numpad--payment-layout .ct-numpad-enter:active,
+.ct-numpad--payment-layout .ct-numpad-cancel:active,
+.ct-numpad--payment-layout .ct-numpad-key.btn-press:active:not(.ct-numpad-cancel):not(.ct-numpad-enter) {
+  transform: scale(0.96);
 }
 
 /* Modal numpad — horizontal enter/cancel (not tall) */
@@ -2143,6 +2138,14 @@ html, body {
   letter-spacing: -0.01em;
 }
 
+.ct-modal-bar--auth {
+  background: var(--ct-modal-accent, #7a9eb8);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
 .ct-payment-header {
   white-space: nowrap;
 }
@@ -2506,14 +2509,54 @@ html, body {
   text-transform: none;
 }
 
-/* Payment modal (reference) */
+/* Keypad screens — shared shell (PIN, quantity, discount, payment) */
+.ct-auth-card--pin,
+.ct-modal--discount {
+  width: min(472px, 96%);
+}
+
+.ct-modal--quantity,
 .ct-modal--payment {
   width: min(640px, 96%);
+}
+
+.ct-auth-card--pin,
+.ct-modal--quantity,
+.ct-modal--discount,
+.ct-modal--payment {
   background: #fff;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.ct-keypad-body,
+.ct-qty-body,
+.ct-discount-body {
+  padding: 14px 16px 16px;
+}
+
+.ct-keypad-top-row,
+.ct-qty-top-row,
+.ct-discount-top-row {
+  margin-bottom: 14px;
+}
+
+.ct-keypad-amount-wrap,
+.ct-qty-amount-wrap,
+.ct-discount-amount-wrap,
+.ct-payment-amount-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.ct-keypad-numpad-wrap,
+.ct-qty-numpad-wrap,
+.ct-discount-numpad-wrap,
+.ct-payment-numpad-wrap {
+  min-width: 0;
+  width: 100%;
 }
 
 .ct-modal--payment-with-client {
@@ -2543,6 +2586,32 @@ html, body {
   margin-bottom: 14px;
 }
 
+.ct-payment-top-row .ct-payment-amount-row.ct-keypad-top-row {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  min-height: 0;
+}
+
+.ct-payment-top-row .ct-payment-amount-wrap {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.ct-payment-top-row .ct-payment-amount {
+  flex: 1;
+  height: 100%;
+  min-height: 56px;
+}
+
+.ct-payment-top-row .ct-payment-change-widget {
+  align-self: stretch;
+  height: 100%;
+  min-height: 56px;
+}
+
 .ct-payment-top-row--with-client {
   grid-template-columns: minmax(0, 440px) minmax(240px, 1fr);
 }
@@ -2566,7 +2635,6 @@ html, body {
 }
 
 .ct-payment-amount-wrap {
-  position: relative;
   grid-column: 1 / -1;
   min-width: 0;
 }
@@ -2641,6 +2709,7 @@ html, body {
   justify-content: center;
   gap: 4px;
   min-height: 56px;
+  height: 100%;
   padding: 8px 12px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -2674,10 +2743,6 @@ html, body {
 
 .ct-payment-change-widget--due .ct-payment-change-value {
   color: #16a34a;
-}
-
-.ct-payment-numpad-wrap {
-  min-width: 0;
 }
 
 .ct-modal--payment .ct-numpad-key {
@@ -3291,6 +3356,148 @@ html, body {
   color: #718096;
 }
 
+/* Service messages modal */
+.ct-modal--service-messages {
+  width: min(620px, 94%);
+}
+
+.ct-modal--service-messages .ct-modal-shell-content,
+.ct-modal--service-messages .ct-service-msg-text {
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+.ct-service-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+}
+
+.ct-service-msg-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: #f8fafc;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: opacity 0.15s ease, background-color 0.12s ease;
+}
+
+.ct-service-msg-row--unread:hover {
+  background: #f1f5f9;
+}
+
+.ct-service-msg-row--read {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ct-service-msg-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ct-service-msg-icon-svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.ct-service-msg-icon--critical {
+  background: #ffe4e6;
+  color: #e11d48;
+}
+
+.ct-service-msg-icon--warning {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.ct-service-msg-icon--info {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.ct-service-msg-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.ct-service-msg-mark {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: color 0.12s ease, background-color 0.12s ease, transform 0.1s ease;
+}
+
+.ct-service-msg-mark-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.ct-service-msg-mark:hover {
+  color: #64748b;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.ct-service-msg-mark:active,
+.ct-service-msg-mark.btn-press:active {
+  transform: scale(0.92);
+}
+
+.ct-modal-shell-foot:has(.ct-service-messages-foot) {
+  justify-content: stretch;
+}
+
+.ct-service-messages-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+.ct-service-messages-foot > .ct-modal-btn--secondary:first-child:not(:only-child) {
+  margin-right: auto;
+}
+
+.ct-modal--service-messages .ct-modal-shell-foot {
+  margin-top: 10px;
+  padding-top: 10px;
+}
+
+.ct-modal--service-messages .ct-modal-btn {
+  border-radius: 12px;
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
 /* Legacy guest chips (unused in picker) */
 .ct-guest-btns {
   display: flex;
@@ -3491,15 +3698,6 @@ html, body {
 }
 
 /* Quantity modal (payment-style layout) */
-.ct-modal--quantity {
-  width: min(640px, 96%);
-  background: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-
 .ct-modal--quantity .ct-qty-header,
 .ct-modal--quantity .ct-qty-amount,
 .ct-modal--quantity .ct-qty-presets-label,
@@ -3518,28 +3716,11 @@ html, body {
   font-weight: 700;
 }
 
-.ct-qty-body {
-  padding: 14px 16px 16px;
-}
-
-.ct-qty-top-row {
-  margin-bottom: 14px;
-}
-
-.ct-qty-amount-wrap {
-  position: relative;
-  min-width: 0;
-}
-
 .ct-qty-keypad-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 118px;
+  grid-template-columns: minmax(0, 440px) minmax(118px, 1fr);
   gap: 14px;
   align-items: stretch;
-}
-
-.ct-qty-numpad-wrap {
-  min-width: 0;
 }
 
 .ct-qty-presets-panel {
@@ -3549,11 +3730,13 @@ html, body {
 }
 
 .ct-qty-presets-label {
+  display: block;
   margin-bottom: 8px;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-align: center;
   color: #94a3b8;
 }
 
@@ -3600,42 +3783,15 @@ html, body {
 }
 
 /* Discount modal (payment-style layout) */
-.ct-modal--discount {
-  width: min(480px, 96%);
-  background: #fff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
-}
-
 .ct-modal--discount .ct-discount-header,
 .ct-modal--discount .ct-discount-amount,
 .ct-modal--discount .ct-numpad-key {
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
-.ct-discount-body {
-  padding: 14px 16px 16px;
-}
-
-.ct-discount-top-row {
-  margin-bottom: 14px;
-}
-
-.ct-discount-amount-wrap {
-  position: relative;
-  min-width: 0;
-}
-
 .ct-discount-keypad-row {
   display: flex;
   justify-content: stretch;
-}
-
-.ct-discount-numpad-wrap {
-  width: 100%;
-  min-width: 0;
 }
 
 /* Honest sign */

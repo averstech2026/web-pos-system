@@ -3,6 +3,7 @@ import {
   POS_SOFTWARE_VERSION,
   POS_SUPPORT_PHONE,
 } from '../../shared/pos-channel.js';
+import { getUnreadServiceMessageCount } from '../services/service-messages.js';
 import { getPosHeaderContext } from '../core/header-context.js';
 import { renderRuntimeModeBadge, isRuntimeModeHidden, hideRuntimeModeBadge } from '../core/runtime-mode.js';
 import { formatClock, formatDateLong, formatOrderCreated, esc } from '../core/format.js';
@@ -73,13 +74,18 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
   `;
 
   if (isSales) {
+    const unreadCount = getUnreadServiceMessageCount(state.serviceMessages);
+    const supportBadgeHtml = unreadCount > 0
+      ? `<span class="ct-support-badge">${unreadCount}</span>`
+      : '';
+
     return `
       <header class="ct-header ct-header--sales">
         <div class="ct-header-top ct-header-top--sales">
           <div class="ct-header-left">
-            <button type="button" class="ct-support-btn btn-press" title="Техподдержка">
+            <button type="button" class="ct-support-btn btn-press" title="Служебные сообщения" data-action="open-service-messages">
               ${SUPPORT_ICON}
-              <span class="ct-support-badge">1</span>
+              ${supportBadgeHtml}
             </button>
             ${billInfoHtml}
           </div>
@@ -96,15 +102,22 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
 
   const brandHtml = `<img class="ct-logo" src="${logoUrl}" alt="AVERS TECHNOLOGY" />`;
   const headerClass = isAuth ? 'ct-header--auth' : '';
+  const unreadCount = getUnreadServiceMessageCount(state.serviceMessages);
+  const supportBadgeHtml = unreadCount > 0
+    ? `<span class="ct-support-badge">${unreadCount}</span>`
+    : '';
+  const supportBtnHtml = `
+    <button type="button" class="ct-support-btn btn-press" title="Служебные сообщения" data-action="open-service-messages">
+      ${SUPPORT_ICON}
+      ${supportBadgeHtml}
+    </button>
+  `;
 
   return `
     <header class="ct-header ${headerClass}">
       <div class="ct-header-top">
         <div class="ct-header-left">
-          <button type="button" class="ct-support-btn btn-press" title="Техподдержка">
-            ${SUPPORT_ICON}
-            <span class="ct-support-badge">1</span>
-          </button>
+          ${supportBtnHtml}
           ${billInfoHtml}
         </div>
         <div class="ct-header-center">
@@ -141,6 +154,16 @@ export function bindRuntimeModeFooter(root) {
     hideRuntimeModeBadge();
     root.querySelector('.ct-runtime-mode-wrap')?.remove();
     root.querySelector('.ct-footer')?.classList.remove('ct-footer--with-mode');
+  });
+}
+
+export function bindSupportMessagesBtn(root) {
+  root.querySelectorAll('[data-action="open-service-messages"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.modal = 'service_messages';
+      state.modalData = {};
+      window.dispatchEvent(new CustomEvent('ct:rerender'));
+    });
   });
 }
 

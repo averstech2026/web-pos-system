@@ -1,5 +1,5 @@
 import { POS_SOFTWARE_VERSION } from '../../shared/pos-channel.js';
-import { renderShellHeader, bindLiveClock } from '../components/shell.js';
+import { renderShellHeader, bindLiveClock, bindSupportMessagesBtn } from '../components/shell.js';
 import { renderCatalogSearchZone, bindCatalogSearchZone } from '../components/catalog-keyboard.js';
 import { renderModals, openProduct } from '../components/modals.js';
 import { TOOL_ICONS } from '../components/toolbar-icons.js';
@@ -478,6 +478,7 @@ export class SalesPage {
 
   bind() {
     const root = this.container;
+    bindSupportMessagesBtn(root);
 
     root.querySelectorAll('[data-line-id]').forEach(row => {
       row.addEventListener('click', e => {

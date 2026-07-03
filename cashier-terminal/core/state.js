@@ -1,3 +1,5 @@
+import { DEMO_SERVICE_MESSAGES } from '../services/service-messages.js';
+
 /** @typedef {{ id: string, productId: string, name: string, price: number, quantity: number, priceCategory: string, discountPct: number, honestSignCode?: string, honestSignMarked?: boolean, kitchenStatus: string }} ReceiptLine */
 
 /** @type {{
@@ -26,6 +28,7 @@
  *   pendingProduct: object|null,
  *   modal: string|null,
  *   modalData: object,
+ *   serviceMessages: { id: string, type: 'critical'|'warning'|'info', text: string, unread: boolean }[],
  *   paymentsLog: object[],
  *   currentOrder: { id: string, orderNumber: string, createdAt: Date }|null,
  *   savedCart: object|null,
@@ -56,6 +59,7 @@ export const state = {
   pendingProduct: null,
   modal: null,
   modalData: {},
+  serviceMessages: DEMO_SERVICE_MESSAGES.map(m => ({ ...m })),
   paymentsLog: [],
   currentOrder: null,
   savedCart: null,

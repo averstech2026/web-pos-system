@@ -1,4 +1,4 @@
-import { renderShellHeader, renderShellFooter, bindLiveClock, bindRuntimeModeFooter } from '../components/shell.js';
+import { renderShellHeader, renderShellFooter, bindLiveClock, bindRuntimeModeFooter, bindSupportMessagesBtn } from '../components/shell.js';
 import { renderNumpad, bindNumpad } from '../components/numpad.js';
 import { renderModals } from '../components/modals.js';
 import { esc, escAttr } from '../core/format.js';
@@ -48,13 +48,21 @@ export class AuthPage {
 
   renderPinMode() {
     return `
-      <div class="ct-auth-card">
-        <h1 class="ct-auth-title">Введите ваш код</h1>
-        <input class="ct-auth-input" id="ct-pin-display" value="${escAttr(state.pinInput)}" readonly />
-        ${renderNumpad({ value: state.pinInput, showDot: false, layout: 'auth' })}
-        <p class="ct-auth-switch">
-          <button type="button" class="ct-link-btn btn-press" data-action="switch-card">Войти по карте →</button>
-        </p>
+      <div class="ct-auth-card ct-auth-card--pin">
+        <div class="ct-modal-bar ct-modal-bar--auth ct-auth-pin-header">Введите ваш код</div>
+        <div class="ct-keypad-body">
+          <div class="ct-keypad-top-row">
+            <div class="ct-keypad-amount-wrap">
+              <input class="ct-payment-amount ct-auth-pin-input" id="ct-pin-display" value="${escAttr(state.pinInput)}" readonly />
+            </div>
+          </div>
+          <div class="ct-keypad-numpad-wrap">
+            ${renderNumpad({ value: state.pinInput, showDot: false, enterLabel: 'ВВОД', layout: 'payment' })}
+          </div>
+          <p class="ct-auth-switch">
+            <button type="button" class="ct-link-btn btn-press" data-action="switch-card">Войти по карте →</button>
+          </p>
+        </div>
       </div>
     `;
   }
@@ -83,6 +91,7 @@ export class AuthPage {
   bind() {
     const root = this.container;
     bindRuntimeModeFooter(root);
+    bindSupportMessagesBtn(root);
 
     root.querySelector('[data-action="switch-card"]')?.addEventListener('click', () => {
       state.authMode = 'card';
