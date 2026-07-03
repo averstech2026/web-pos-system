@@ -36,7 +36,7 @@ export class AuthPage {
     this.container.innerHTML = `
       <div class="kt-auth-wrap">
         <div class="kt-auth-logo">
-          ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH' })}
+          ${renderBrandLogo({ fallbackUrl: logoUrl })}
           <div class="kt-auth-sub">Кухонный терминал</div>
         </div>
 

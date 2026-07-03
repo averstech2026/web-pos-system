@@ -12,7 +12,11 @@ import { ensureKioskSession } from './services/auth.js';
 import { renderKioskMaintenanceIfNeeded } from './services/sales-channel.js';
 import { initDemoPreset } from '@shared/demo-preset.js';
 
-initDemoPreset({ applyTheme: true });
+initDemoPreset({
+  applyTheme: true,
+  fallbackLogoUrl: `${import.meta.env.BASE_URL || '/'}assets/logo.png`,
+  documentTitle: { page: 'Киоск самообслуживания', style: 'prefix' },
+});
 
 if (import.meta.env.DEV) {
   import('@shared/seed.js').then(({ seedStaffAuth, STAFF_DEMO_PASSWORD }) => {

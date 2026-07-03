@@ -1,7 +1,15 @@
 import { auth } from '../../shared/firebase.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 import { renderBrandLogo } from '../../shared/brand-logo.js';
-import { getBrandLogoUrl } from '../../shared/demo-preset.js';
+import { getBrandLogoUrl, getCompanyName } from '../../shared/demo-preset.js';
+
+/** @param {string} value */
+function escapeAttr(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;');
+}
 import cardIconUrl from '../../kiosk/public/assets/card.png';
 import {
   evaluateValidation,
@@ -164,7 +172,7 @@ export class ValidatorPage {
       <div class="vtd-shell">
         <div class="vtd-top">
           <header class="vtd-head">
-            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'vtd-logo' })}
+            ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'vtd-logo' })}
             <h1 class="vtd-head-title">Валидатор прохода</h1>
             <div class="vtd-head-meta">
               <span class="vtd-head-point">${esc(CHANNEL_POINT)}</span>
@@ -192,7 +200,7 @@ export class ValidatorPage {
     if (this.state === 'idle') {
       return `
         <div class="vtd-idle">
-          <img data-brand-logo class="vtd-idle-logo" src="${getBrandLogoUrl(logoUrl)}" alt="iFCM TECH" />
+          <img data-brand-logo class="vtd-idle-logo" src="${getBrandLogoUrl(logoUrl)}" alt="${escapeAttr(getCompanyName())}" />
           <div class="vtd-idle-prompt">
             <img class="vtd-idle-icon" src="${cardIconUrl}" alt="" width="340" height="303" />
             <p class="vtd-idle-text">Приложите пропуск</p>

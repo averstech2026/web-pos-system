@@ -6,6 +6,7 @@ import {
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../../shared/schema.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 import { STAFF_DEMO_PASSWORD } from '../../shared/seed.js';
 
@@ -24,7 +25,7 @@ export class AuthPage {
     this.container.innerHTML = `
       <div class="auth-wrap">
         <div class="auth-logo">
-          <img class="auth-logo-img" src="${logoUrl}" alt="iFCM TECH" />
+          ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'auth-logo-img' })}
           <div class="auth-logo-subtitle">Lunch System</div>
         </div>
 

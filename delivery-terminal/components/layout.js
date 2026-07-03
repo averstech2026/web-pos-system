@@ -15,7 +15,7 @@ export function renderDeliveryShell({ title, countHtml = '', bodyHtml }) {
     <div class="dt-shell">
       <div class="dt-top-fixed">
         <header class="dt-header">
-          ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'dt-logo' })}
+          ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'dt-logo' })}
           <h1 class="dt-title">${title}</h1>
           <div class="dt-clock">
             <span class="dt-clock-time" id="dt-clock-time">${fmtClock()}</span>

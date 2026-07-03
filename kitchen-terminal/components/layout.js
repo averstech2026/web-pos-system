@@ -16,7 +16,7 @@ export function renderKitchenShell({ title, activeTab, toolbarHtml = '', toolbar
     <div class="kt-shell">
       <div class="kt-top-fixed">
         <header class="kt-header">
-          ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'kt-logo' })}
+          ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'kt-logo' })}
           <h1 class="kt-title">${title}</h1>
           <div class="kt-clock">
             <span class="kt-clock-time" id="kt-clock-time">${fmtClock()}</span>

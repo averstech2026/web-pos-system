@@ -12,7 +12,11 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../shared/schema.js';
 
-initDemoPreset({ applyTheme: true, fallbackLogoUrl: logoUrl });
+initDemoPreset({
+  applyTheme: true,
+  fallbackLogoUrl: logoUrl,
+  documentTitle: { page: 'Админ-панель' },
+});
 
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedStaffAuth, patchDemoItemCategories, seedValidatorDemo }) => {

@@ -116,7 +116,7 @@ export function renderAdminShell({ active, title, subtitle = '', bodyHtml, toolb
       <aside class="admin-sidebar" id="admin-sidebar">
         <div class="admin-sidebar-head">
           <a class="admin-sidebar-brand" href="#/dashboard" data-path="/dashboard">
-            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'admin-sidebar-logo' })}
+            ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'admin-sidebar-logo' })}
           </a>
           <button
             type="button"

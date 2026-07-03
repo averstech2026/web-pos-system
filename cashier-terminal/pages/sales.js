@@ -326,6 +326,10 @@ export class SalesPage {
     const backDisabled = state.catalogView === 'preview'
       || (!state.catalogPath.length && state.catalogView !== 'search' && !state.searchQuery.trim());
     const section = this.resolveCatalogNavSection();
+    const tiles = this.getVisibleTiles(isFlat);
+    const maxPage = this.getMaxGridScrollPage(tiles);
+    const upDisabled = state.gridScrollPage <= 0;
+    const downDisabled = state.gridScrollPage >= maxPage;
 
     return `
       <div class="ct-catalog-nav ct-catalog-nav--flat">
@@ -334,8 +338,8 @@ export class SalesPage {
         <button type="button" class="ct-nav-flat btn-press ${section === 'favorites' ? 'ct-nav-flat--active' : ''}" data-action="cat-favorites" title="Избранное">${TOOL_ICONS.heart}</button>
         <button type="button" class="ct-nav-flat btn-press ${section === 'search' ? 'ct-nav-flat--active' : ''}" data-action="cat-search" title="Поиск">${TOOL_ICONS.search}</button>
         <div class="ct-catalog-nav-scroll">
-          <button type="button" class="ct-nav-scroll btn-press" data-action="grid-up">${TOOL_ICONS.chevUp}</button>
-          <button type="button" class="ct-nav-scroll btn-press" data-action="grid-down">${TOOL_ICONS.chevDown}</button>
+          <button type="button" class="ct-nav-scroll btn-press" data-action="grid-up" ${upDisabled ? 'disabled' : ''}>${TOOL_ICONS.chevUp}</button>
+          <button type="button" class="ct-nav-scroll btn-press" data-action="grid-down" ${downDisabled ? 'disabled' : ''}>${TOOL_ICONS.chevDown}</button>
         </div>
       </div>
     `;
@@ -349,14 +353,19 @@ export class SalesPage {
   }
 
   /** @param {object[]} tiles */
-  getPagedTiles(tiles) {
-    if (this.isCatalogSearchActive()) return tiles;
-    const page = state.gridScrollPage;
-    return tiles.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  getMaxGridScrollPage(tiles) {
+    if (!tiles.length) return 0;
+    return Math.ceil(tiles.length / PAGE_SIZE) - 1;
   }
 
-  isCatalogSearchActive() {
-    return Boolean(state.searchQuery.trim()) || state.catalogView === 'search';
+  /** @param {object[]} tiles */
+  getPagedTiles(tiles) {
+    const maxPage = this.getMaxGridScrollPage(tiles);
+    if (state.gridScrollPage > maxPage) {
+      state.gridScrollPage = maxPage;
+    }
+    const page = state.gridScrollPage;
+    return tiles.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   }
 
   refreshCatalogGrid() {
@@ -369,6 +378,17 @@ export class SalesPage {
     const tiles = this.getVisibleTiles(isFlat);
     grid.innerHTML = this.renderTiles(this.getPagedTiles(tiles), showPhotos);
     this.bindCatalogTileHandlers(grid);
+    this.refreshCatalogNavButtons(isFlat);
+  }
+
+  /** @param {boolean} isFlat */
+  refreshCatalogNavButtons(isFlat) {
+    const tiles = this.getVisibleTiles(isFlat);
+    const maxPage = this.getMaxGridScrollPage(tiles);
+    const up = this.container.querySelector('[data-action="grid-up"]');
+    const down = this.container.querySelector('[data-action="grid-down"]');
+    if (up) up.disabled = state.gridScrollPage <= 0;
+    if (down) down.disabled = state.gridScrollPage >= maxPage;
   }
 
   bindCatalogTileHandlers(scope = this.container) {
@@ -672,6 +692,11 @@ export class SalesPage {
     });
 
     root.querySelector('[data-action="grid-down"]')?.addEventListener('click', () => {
+      const channel = state.channel || {};
+      const isFlat = channel.catalogDisplay === POS_CATALOG_DISPLAY.FLAT;
+      const tiles = this.getVisibleTiles(isFlat);
+      const maxPage = this.getMaxGridScrollPage(tiles);
+      if (state.gridScrollPage >= maxPage) return;
       state.gridScrollPage += 1;
       this.render();
     });

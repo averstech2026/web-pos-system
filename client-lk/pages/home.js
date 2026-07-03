@@ -109,7 +109,7 @@ export class HomePage {
               🔔
               <span class="notif-badge" id="notif-badge" style="display:none"></span>
             </button>
-            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'header-logo' })}
+            ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'header-logo' })}
           </div>
         </header>
 

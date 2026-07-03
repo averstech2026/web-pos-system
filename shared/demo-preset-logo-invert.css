@@ -1,0 +1,67 @@
+/* White logo inversion on dark (or any) surfaces — toggled by preset slot classes on <html> */
+
+.preset-logo-invert-adminSidebar .admin-sidebar .brand-logo-img,
+.preset-logo-invert-adminSidebar .admin-sidebar [data-brand-logo] {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-adminAuth .admin-auth-logo .brand-logo-img,
+.preset-logo-invert-adminAuth .admin-auth-logo [data-brand-logo] {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-clientLkHeader .header-logo,
+.preset-logo-invert-clientLkHeader .lk-header .brand-logo-img,
+.preset-logo-invert-clientLkHeader .lk-header [data-brand-logo] {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-clientLkAuth .auth-logo .brand-logo-img,
+.preset-logo-invert-clientLkAuth .auth-logo [data-brand-logo] {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-kitchenHeader .kt-header .brand-logo-img,
+.preset-logo-invert-kitchenHeader .kt-header [data-brand-logo],
+.preset-logo-invert-kitchenHeader .kt-logo {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-deliveryHeader .dt-header .brand-logo-img,
+.preset-logo-invert-deliveryHeader .dt-header [data-brand-logo],
+.preset-logo-invert-deliveryHeader .dt-logo {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-queueHeader .qs-header .brand-logo-img,
+.preset-logo-invert-queueHeader .qs-header [data-brand-logo],
+.preset-logo-invert-queueHeader .qs-logo {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-validatorHeader .vtd-head .brand-logo-img,
+.preset-logo-invert-validatorHeader .vtd-head [data-brand-logo] {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-validatorIdle .vtd-idle-logo,
+.preset-logo-invert-validatorIdle .vtd-idle [data-brand-logo] {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-cashierHeader .ct-header .brand-logo-img,
+.preset-logo-invert-cashierHeader .ct-header [data-brand-logo],
+.preset-logo-invert-cashierHeader .ct-logo {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-kioskWelcome #screen-start .logo-img,
+.preset-logo-invert-kioskWelcome #screen-start [data-brand-logo] {
+  filter: brightness(0) invert(1);
+}
+
+.preset-logo-invert-kioskHeader .kiosk-app .logo-header.logo-img,
+.preset-logo-invert-kioskHeader .kiosk-app .logo-header[data-brand-logo],
+.preset-logo-invert-kioskHeader .kiosk-app img.logo-header {
+  filter: brightness(0) invert(1);
+}

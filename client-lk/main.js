@@ -11,7 +11,11 @@ import { auth } from '../shared/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import { renderWebChannelMaintenanceIfNeeded } from './services/sales-channel-guard.js';
 
-initDemoPreset({ applyTheme: true, fallbackLogoUrl: logoUrl });
+initDemoPreset({
+  applyTheme: true,
+  fallbackLogoUrl: logoUrl,
+  documentTitle: { page: 'Личный кабинет' },
+});
 
 // ── Dev helpers ───────────────────────────────────────────
 // In the browser console run: await seed()  or  await updateItemImages()

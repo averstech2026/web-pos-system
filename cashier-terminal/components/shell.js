@@ -1,9 +1,7 @@
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 import { renderBrandLogo } from '../../shared/brand-logo.js';
-import {
-  POS_SOFTWARE_VERSION,
-  POS_SUPPORT_PHONE,
-} from '../../shared/pos-channel.js';
+import { getSupportPhone } from '../../shared/demo-preset.js';
+import { POS_SOFTWARE_VERSION } from '../../shared/pos-channel.js';
 import { getUnreadServiceMessageCount } from '../services/service-messages.js';
 import { getPosHeaderContext } from '../core/header-context.js';
 import { renderRuntimeModeBadge, isRuntimeModeHidden, hideRuntimeModeBadge } from '../core/runtime-mode.js';
@@ -38,7 +36,7 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
           <div class="ct-bill-line" data-live-bill-line>
             Заказ № ${esc(header.orderNumber)} / Создан: <span data-live-order-created>${esc(header.createdAtLabel)}</span> / ${esc(header.pointName)}
           </div>
-          <div class="ct-bill-support">Техподдержка 24/7: ${esc(POS_SUPPORT_PHONE)}</div>
+          <div class="ct-bill-support" data-brand-support>Техподдержка 24/7: ${esc(getSupportPhone())}</div>
         </div>
       `;
     } else if (isAuth) {
@@ -69,7 +67,7 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
           <div class="ct-clock" data-live-clock>${formatClock()}</div>
           <div class="ct-date" data-live-date>${formatDateLong()}</div>
         </div>
-        ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'AVERS TECHNOLOGY', extraClass: 'ct-logo' })}
+        ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'ct-logo' })}
       </div>
     </div>
   `;
@@ -101,7 +99,7 @@ export function renderShellHeader({ variant, showBillInfo = false }) {
     `;
   }
 
-  const brandHtml = renderBrandLogo({ fallbackUrl: logoUrl, alt: 'AVERS TECHNOLOGY', extraClass: 'ct-logo' });
+  const brandHtml = renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'ct-logo' });
   const headerClass = isAuth ? 'ct-header--auth' : '';
   const unreadCount = getUnreadServiceMessageCount(state.serviceMessages);
   const supportBadgeHtml = unreadCount > 0
@@ -142,7 +140,7 @@ export function renderShellFooter({ showRuntimeMode = false } = {}) {
   const modeHtml = hasMode ? renderRuntimeModeBadge() : '';
   return `
     <footer class="ct-footer ${hasMode ? 'ct-footer--with-mode' : ''}">
-      <span class="ct-footer__support">Техподдержка 24/7: ${esc(POS_SUPPORT_PHONE)}</span>
+      <span class="ct-footer__support" data-brand-support>Техподдержка 24/7: ${esc(getSupportPhone())}</span>
       ${modeHtml}
       <span class="ct-footer__version">Версия: ${esc(POS_SOFTWARE_VERSION)}</span>
     </footer>

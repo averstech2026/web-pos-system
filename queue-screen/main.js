@@ -10,7 +10,11 @@ import { auth } from '../shared/firebase.js';
 import { ensureQueueSession, QUEUE_TERMINAL_EMAIL, QUEUE_TERMINAL_PASSWORD } from './services/auth.js';
 import { QueueBoard } from './pages/board.js';
 
-initDemoPreset({ applyTheme: true, fallbackLogoUrl: logoUrl });
+initDemoPreset({
+  applyTheme: true,
+  fallbackLogoUrl: logoUrl,
+  documentTitle: { page: 'Экран очереди' },
+});
 
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedStaffAuth }) => {

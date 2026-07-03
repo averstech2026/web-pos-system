@@ -113,8 +113,9 @@ service cloud.firestore {
 
     // ── settings (menu categories, allergens) ───────────────
     match /settings/{docId} {
-      allow read: if isAuth();
-      allow write: if isRole('admin') || isRole('manager');
+      // Demo preset runtime is public-read so kiosk/LK/terminals can brand before auth.
+      allow read: if isAuth() || docId == 'demo_preset_runtime';
+      allow write: if isRole('admin') || (isRole('manager') && docId != 'demo_preset_runtime');
     }
 
     // ── availability_rules (centralized schedules) ──────────

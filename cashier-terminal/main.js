@@ -32,7 +32,11 @@ import { shouldShowSalesChannelMaintenance } from '../shared/sales-channel-avail
 
 const app = document.getElementById('app');
 
-initDemoPreset({ applyTheme: false, fallbackLogoUrl: logoUrl });
+initDemoPreset({
+  applyTheme: false,
+  fallbackLogoUrl: logoUrl,
+  documentTitle: { page: 'Кассовый модуль' },
+});
 
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedStaffAuth, STAFF_DEMO_PASSWORD }) => {

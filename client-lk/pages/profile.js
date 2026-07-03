@@ -44,7 +44,7 @@ export class ProfilePage {
             <span class="subpage-title">Профиль</span>
           </div>
           <div class="lk-header-right">
-            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'header-logo' })}
+            ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'header-logo' })}
           </div>
         </header>
 

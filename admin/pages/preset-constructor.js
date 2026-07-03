@@ -1,5 +1,6 @@
 import { bindAdminShell, renderAdminShell } from '../components/layout.js';
 import { createPresetConstructorEditor } from '../components/preset-constructor-editor.js';
+import { setDocumentTitle } from '../../shared/demo-preset.js';
 
 export class PresetConstructorPage {
   constructor(container, navigate) {
@@ -26,6 +27,7 @@ export class PresetConstructorPage {
     const host = this.container.querySelector('#preset-constructor-host');
     if (!host) return;
     this.editor = createPresetConstructorEditor(host);
+    setDocumentTitle('Пресет демонстрации');
   }
 
   destroy() {

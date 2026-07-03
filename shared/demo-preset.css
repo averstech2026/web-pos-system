@@ -1,4 +1,5 @@
 /* White-label demo preset — theme + logo utilities */
+@import url('./demo-preset-logo-invert.css');
 
 :root {
   --theme-primary: #1E1B4B;
@@ -24,11 +25,6 @@
   max-width: 200px;
   object-fit: contain;
   display: block;
-}
-
-.admin-sidebar .brand-logo-wrap .brand-logo-img.brand-logo--custom,
-.admin-sidebar .brand-logo-wrap.brand-logo--custom .brand-logo-img {
-  filter: none;
 }
 
 /* Kiosk Tailwind navy aliases */

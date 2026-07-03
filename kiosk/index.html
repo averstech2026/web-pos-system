@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>IFCM TECH — Киоск самообслуживания</title>
+  <title>iFCM TECH — Киоск самообслуживания</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -17,7 +17,7 @@
             'pay-red': '#FF0000',
           },
           fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+            sans: ['Montserrat', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
           },
         },
       },
@@ -25,7 +25,7 @@
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="preload" as="image" href="assets/logo.png" />
   <link rel="preload" as="image" href="assets/card.png" />
   <link rel="stylesheet" href="./src/styles.css" />
@@ -40,7 +40,7 @@
       <div id="screen-start" class="screen active flex-col h-full">
         <div class="flex-1 flex flex-col items-center justify-center px-16 gap-10">
           <!-- Логотип -->
-          <img src="assets/logo.png" alt="FCM TECH" width="824" height="120" class="logo-img h-[120px] mt-8" />
+          <img src="assets/logo.png" alt="iFCM TECH" width="824" height="120" class="logo-img h-[120px] mt-8" />
 
           <p class="text-center text-[38px] font-medium leading-snug tracking-wide uppercase">
             Приложите карту<br/>или продолжите без неё
@@ -77,7 +77,7 @@
 
       <!-- ═══════════════════ ЭКРАН 1: МЕНЮ ═══════════════════ -->
       <div id="screen-menu" class="screen flex-col h-full relative">
-        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <img src="assets/logo.png" alt="iFCM TECH" class="logo-img logo-header logo-header-fixed" />
         <!-- Шапка -->
         <header class="flex flex-col gap-4 px-14 pt-12 pb-4 bg-kiosk shrink-0">
           <div class="flex items-center gap-4">
@@ -333,7 +333,7 @@
 
       <!-- ═══════════════════ ЭКРАН: КАРТОЧКА ТОВАРА ═══════════════════ -->
       <div id="screen-product" class="screen flex-col h-full bg-kiosk relative">
-        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <img src="assets/logo.png" alt="iFCM TECH" class="logo-img logo-header logo-header-fixed" />
         <div class="flex-1 flex flex-col min-h-0 px-10 pt-36 pb-0">
           <div class="flex-1 bg-white rounded-t-3xl rounded-b-3xl p-10 overflow-y-auto kiosk-scroll">
           <div class="flex gap-10">
@@ -399,7 +399,7 @@
 
       <!-- ═══════════════════ ЭКРАН 2: КОРЗИНА ═══════════════════ -->
       <div id="screen-cart" class="screen flex-col h-full bg-kiosk relative">
-        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <img src="assets/logo.png" alt="iFCM TECH" class="logo-img logo-header logo-header-fixed" />
         <header class="flex items-center px-14 pt-12 pb-8 bg-kiosk shrink-0 pr-[280px]">
           <h1 class="text-[52px] font-extrabold text-navy uppercase tracking-wide leading-none">Корзина</h1>
         </header>
@@ -473,7 +473,7 @@
 
       <!-- ═══════════════════ ЭКРАН 3: ОПЛАТА ═══════════════════ -->
       <div id="screen-payment" class="screen flex-col h-full bg-kiosk relative">
-        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <img src="assets/logo.png" alt="iFCM TECH" class="logo-img logo-header logo-header-fixed" />
         <header class="flex items-center px-14 pt-12 pb-6 shrink-0 pr-[280px]">
           <h1 class="text-[48px] font-extrabold text-navy uppercase tracking-wide leading-none">Оплатить покупку</h1>
         </header>
@@ -586,7 +586,7 @@
 
       <!-- ═══════════════════ ЭКРАН: ОПЛАТА УСПЕШНА ═══════════════════ -->
       <div id="screen-pay-success" class="screen flex-col h-full bg-kiosk relative">
-        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <img src="assets/logo.png" alt="iFCM TECH" class="logo-img logo-header logo-header-fixed" />
         <div class="flex-1 flex flex-col items-center justify-center px-14 gap-14">
           <h1 class="text-[52px] font-extrabold text-navy uppercase text-center leading-tight tracking-wide">
             Оплата прошла успешно!
@@ -608,7 +608,7 @@
 
       <!-- ═══════════════════ ЭКРАН: ОЦЕНКА СЕРВИСА ═══════════════════ -->
       <div id="screen-rating" class="screen flex-col h-full bg-kiosk relative">
-        <img src="assets/logo.png" alt="FCM TECH" class="logo-img logo-header logo-header-fixed" />
+        <img src="assets/logo.png" alt="iFCM TECH" class="logo-img logo-header logo-header-fixed" />
         <div class="flex-1 flex flex-col items-center justify-center px-16 gap-16">
           <h1 class="text-[42px] font-semibold text-navy text-center tracking-wide">Оцените наш сервис</h1>
           <div class="flex items-start justify-center gap-10 w-full max-w-[920px]">

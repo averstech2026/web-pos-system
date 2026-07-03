@@ -32,7 +32,7 @@ export class HistoryPage {
             <span class="subpage-title">История заказов</span>
           </div>
           <div class="lk-header-right">
-            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'header-logo' })}
+            ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'header-logo' })}
           </div>
         </header>
 

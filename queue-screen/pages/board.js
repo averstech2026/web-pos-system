@@ -134,7 +134,7 @@ export class QueueBoard {
       <div class="qs-shell">
         <header class="qs-header">
           <div class="qs-brand">
-            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'qs-logo' })}
+            ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'qs-logo' })}
             <div class="qs-brand-text">
               <span class="qs-brand-title">Экран очереди</span>
               <span class="qs-brand-sub">Следите за номером заказа</span>

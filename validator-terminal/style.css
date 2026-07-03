@@ -379,11 +379,13 @@ body {
   text-align: center;
 }
 
-.vtd-auth-logo img {
+.vtd-auth-logo img,
+.vtd-auth-logo .brand-logo-img {
   height: 56px;
   width: auto;
   display: inline-block;
   object-fit: contain;
+  max-width: 220px;
 }
 
 .vtd-auth-sub {

@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../../shared/schema.js';
 import { STAFF_DEMO_PASSWORD } from '../../shared/seed.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 const STAFF_ROLES = [ROLES.CASHIER, ROLES.ADMIN, ROLES.MANAGER];
 const DEMO_EMAIL = 'cashier@ifcm.demo';
@@ -32,7 +33,7 @@ export class AuthPage {
     this.container.innerHTML = `
       <div class="dt-auth-wrap">
         <div class="dt-auth-logo">
-          <img src="${logoUrl}" alt="iFCM TECH" />
+          ${renderBrandLogo({ fallbackUrl: logoUrl })}
           <div class="dt-auth-sub">Терминал выдачи</div>
         </div>
 

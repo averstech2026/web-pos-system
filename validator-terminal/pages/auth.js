@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../../shared/schema.js';
 import { STAFF_DEMO_PASSWORD } from '../../shared/seed.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
+import { renderBrandLogo } from '../../shared/brand-logo.js';
 
 const STAFF_ROLES = [ROLES.COOK, ROLES.CASHIER, ROLES.ADMIN, ROLES.MANAGER];
 const DEMO_EMAIL = 'cook@ifcm.demo';
@@ -32,7 +33,7 @@ export class AuthPage {
     this.container.innerHTML = `
       <div class="vtd-auth-wrap">
         <div class="vtd-auth-logo">
-          <img src="${logoUrl}" alt="iFCM TECH" />
+          ${renderBrandLogo({ fallbackUrl: logoUrl })}
           <div class="vtd-auth-sub">Терминал валидатора</div>
         </div>
 

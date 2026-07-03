@@ -37,7 +37,7 @@ export class AuthPage {
     this.container.innerHTML = `
       <div class="admin-auth-wrap">
         <div class="admin-auth-logo">
-          ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'admin-auth-logo-img' })}
+          ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'admin-auth-logo-img' })}
           <div class="admin-auth-sub">Админ-панель</div>
         </div>
 

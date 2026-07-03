@@ -6,7 +6,7 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   background: var(--ct-backdrop-bg, #5a7285);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -101,7 +101,7 @@ html, body {
   border-bottom: none;
   font-size: 11px;
   flex-shrink: 0;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-header-top {
@@ -433,7 +433,7 @@ html, body {
   background: transparent;
   box-shadow: none;
   padding: 0;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 9px;
   font-weight: 500;
   line-height: 1;
@@ -483,7 +483,7 @@ html, body {
 }
 
 .ct-auth-screen {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-auth-card--card {
@@ -514,7 +514,7 @@ html, body {
 }
 
 .ct-auth-card--pin .ct-numpad-key {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-auth-card-body {
@@ -1033,7 +1033,7 @@ html, body {
   padding: 8px 10px 8px 14px;
   background: rgba(236, 253, 245, 0.6);
   border-bottom: 1px solid rgba(148, 163, 184, 0.22);
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   flex-shrink: 0;
 }
 
@@ -1204,7 +1204,7 @@ html, body {
 .ct-receipt-component__name {
   grid-column: 1 / -1;
   padding-left: 2.5rem;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 12px;
   font-weight: 400;
   line-height: 1.35;
@@ -1220,7 +1220,7 @@ html, body {
 /* Composite lunch modal — POS variant */
 .composite-lunch-overlay--pos {
   z-index: 200;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .composite-lunch-modal--pos {
@@ -1251,7 +1251,7 @@ html, body {
   background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.35);
   color: #fff;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1261,7 +1261,7 @@ html, body {
 
 .composite-lunch-title--pos {
   margin: 0;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 22px;
   font-weight: 700;
   line-height: 1.2;
@@ -1271,7 +1271,7 @@ html, body {
 
 .composite-lunch-price--pos {
   margin: 0;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.92);
@@ -1279,7 +1279,7 @@ html, body {
 
 .composite-lunch-body--pos {
   padding: 18px 20px;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .composite-lunch-step-title--pos {
@@ -1288,7 +1288,7 @@ html, body {
   align-items: baseline;
   gap: 6px;
   margin: 0 0 12px;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -1331,7 +1331,7 @@ html, body {
   border-radius: 12px;
   background: #f8fafc;
   color: #1e293b;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 13px;
   font-weight: 600;
   text-align: center;
@@ -1393,7 +1393,7 @@ html, body {
   border-radius: 12px;
   min-height: 48px;
   padding: 12px 28px;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1833,7 +1833,7 @@ html, body {
   flex-shrink: 0;
   min-height: 52px;
   padding: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-totals-cell {
@@ -1844,7 +1844,7 @@ html, body {
   padding: 4px 10px;
   gap: 0;
   min-width: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-totals-cell:not(:last-child)::after {
@@ -1864,7 +1864,7 @@ html, body {
 }
 
 .ct-totals-label {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 11px;
   font-style: normal;
   font-weight: 500;
@@ -1876,7 +1876,7 @@ html, body {
 }
 
 .ct-totals-amount {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.25;
@@ -1890,7 +1890,7 @@ html, body {
 }
 
 .ct-currency {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   margin-left: 4px;
@@ -1928,7 +1928,7 @@ html, body {
 }
 
 .ct-totals-pay-row--main .ct-totals-label {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 11px;
   font-weight: 800;
   line-height: 1.2;
@@ -1938,7 +1938,7 @@ html, body {
 
 .ct-totals-pay-row--main .ct-totals-amount,
 .ct-totals-amount--main {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 16px;
   font-weight: 800;
   line-height: 1.15;
@@ -2102,8 +2102,13 @@ html, body {
   transition: background-color 0.12s ease;
 }
 
-.ct-nav-scroll:hover {
+.ct-nav-scroll:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.55);
+}
+
+.ct-nav-scroll:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .ct-catalog-body {
@@ -2125,7 +2130,7 @@ html, body {
   padding: 12px 10px 10px;
   background: rgba(241, 245, 249, 0.82);
   border-top: 1px solid #e2e8f0;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .dynamic-keyboard-zone--collapsed .ct-catalog-keyboard {
@@ -2505,7 +2510,7 @@ html, body {
 }
 
 .ct-modal-bar--pay {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -2513,7 +2518,7 @@ html, body {
 
 .ct-modal-bar--auth {
   background: var(--ct-modal-accent, #7a9eb8);
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -2625,7 +2630,7 @@ html, body {
 .ct-modal--honest-sign .ct-modal-shell-content,
 .ct-modal--honest-sign .ct-modal-shell-body,
 .ct-modal--honest-sign .ct-modal-shell-foot {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-modal-shell-foot {
@@ -2766,7 +2771,7 @@ html, body {
 .ct-modal--error .ct-modal-shell-content,
 .ct-modal--error .ct-modal-shell-body,
 .ct-modal--error .ct-modal-shell-foot {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-modal--error .ct-modal-message {
@@ -2901,7 +2906,7 @@ html, body {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-keypad-body,
@@ -2944,7 +2949,7 @@ html, body {
 .ct-modal--payment .ct-payment-methods-empty,
 .ct-modal--payment .ct-payment-client-panel,
 .ct-modal--payment .ct-payment-wallet-card {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-payment-body {
@@ -3022,7 +3027,7 @@ html, body {
   font-size: 30px;
   font-weight: 600;
   text-align: right;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   background: #fff;
   color: var(--ct-text);
   font-variant-numeric: tabular-nums;
@@ -3119,7 +3124,7 @@ html, body {
 }
 
 .ct-modal--payment .ct-numpad-key {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-payment-right-col {
@@ -3170,7 +3175,7 @@ html, body {
   font-size: 12px;
   line-height: 1.25;
   cursor: pointer;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   text-align: center;
   position: relative;
   color: #334155;
@@ -3390,7 +3395,7 @@ html, body {
   padding: 8px 12px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
   font-size: 12px;
   font-weight: 500;
   background: #fff;
@@ -3483,7 +3488,7 @@ html, body {
 
 .ct-modal--guest-picker .ct-modal-shell-content,
 .ct-modal--guest-picker .ct-modal-shell-head {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-guest-picker-layout {
@@ -3736,7 +3741,7 @@ html, body {
 
 .ct-modal--service-messages .ct-modal-shell-content,
 .ct-modal--service-messages .ct-service-msg-text {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-service-messages-list {
@@ -3943,7 +3948,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-guest-detail-profile {
@@ -4076,7 +4081,7 @@ html, body {
 .ct-modal--quantity .ct-qty-presets-label,
 .ct-modal--quantity .ct-qty-preset-card,
 .ct-modal--quantity .ct-numpad-key {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-qty-header {
@@ -4165,7 +4170,7 @@ html, body {
 .ct-modal--discount .ct-qty-presets-label,
 .ct-modal--discount .ct-qty-preset-card,
 .ct-modal--discount .ct-numpad-key {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-discount-keypad-row {
@@ -4387,7 +4392,7 @@ html, body {
 .ct-modal--terminal-wait .ct-modal-shell-content,
 .ct-modal--terminal-wait .ct-modal-shell-body,
 .ct-modal--terminal-wait .ct-modal-shell-foot {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-modal--terminal-wait .ct-modal-shell-body {
@@ -4532,7 +4537,7 @@ html, body {
 .ct-modal--payments-log .ct-modal-shell-content,
 .ct-modal--payments-log .ct-modal-shell-body,
 .ct-modal--payments-log .ct-modal-shell-foot {
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
 }
 
 .ct-modal--payments-log .ct-modal-shell-body {

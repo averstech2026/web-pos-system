@@ -67,7 +67,7 @@ export class NotificationsPage {
           </div>
           <div class="lk-header-right">
             <button class="header-btn header-btn-text btn-press" id="btn-mark-read">Прочитать все</button>
-            ${renderBrandLogo({ fallbackUrl: logoUrl, alt: 'iFCM TECH', extraClass: 'header-logo' })}
+            ${renderBrandLogo({ fallbackUrl: logoUrl, extraClass: 'header-logo' })}
           </div>
         </header>
 
