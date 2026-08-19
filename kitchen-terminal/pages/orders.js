@@ -25,11 +25,13 @@ export class OrdersPage {
     this._searchUnsub = null;
     this._timers = [];
     this._subscribeError = false;
+    this._ordersLoaded = false;
     this.init();
   }
 
   init() {
     this._searchUnsub = kitchenSearch.subscribe(() => this.render());
+    this.render();
     this.loadUsers();
     this.subscribe();
   }
@@ -38,35 +40,44 @@ export class OrdersPage {
     try {
       const snap = await getDocs(collection(db, COL.USERS));
       this.usersById = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
-      if (!this._subscribeError) this.render();
+      if (this._ordersLoaded && !this._subscribeError) this.render();
     } catch (err) {
       console.error('[kitchen] users load', err);
     }
   }
 
+  applyOrdersSnap(snap) {
+    this._subscribeError = false;
+    this._ordersLoaded = true;
+    this.orders = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(o => {
+        const pay = String(o.paymentStatus || '').toLowerCase();
+        return pay === PAYMENT_STATUS.PAID || Boolean(o.checkId);
+      });
+    this.render();
+  }
+
+  showSubscribeError(err) {
+    console.error('Orders subscribe error:', err);
+    if (this._ordersLoaded) return;
+    this._subscribeError = true;
+    this.container.innerHTML = `
+      <div class="kt-error card">
+        <p>Не удалось загрузить заказы.</p>
+        <p class="kt-error-hint">${err?.message || 'Проверьте правила Firestore и индексы.'}</p>
+      </div>`;
+  }
+
   subscribe() {
-    // Single-field query: compound paid+status needs a composite index and
-    // silently looks empty if the snapshot errors after users load.
     const q = query(
       collection(db, COL.ORDERS),
       where('status', '==', ORDER_STATUS.COOKING),
     );
 
-    this._unsub = onSnapshot(q, snap => {
-      this._subscribeError = false;
-      this.orders = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(o => o.paymentStatus === PAYMENT_STATUS.PAID);
-      this.render();
-    }, err => {
-      this._subscribeError = true;
-      console.error('Orders subscribe error:', err);
-      this.container.innerHTML = `
-        <div class="kt-error card">
-          <p>Не удалось загрузить заказы.</p>
-          <p class="kt-error-hint">Проверьте правила Firestore и индексы.</p>
-        </div>`;
-    });
+    getDocs(q).then(snap => this.applyOrdersSnap(snap)).catch(err => this.showSubscribeError(err));
+
+    this._unsub = onSnapshot(q, snap => this.applyOrdersSnap(snap), err => this.showSubscribeError(err));
   }
 
   filteredOrders() {
@@ -167,11 +178,25 @@ export class OrdersPage {
     const orders = this.filteredOrders();
     const filter = kitchenSearch.getFilter();
 
+    let listHtml;
+    if (!this._ordersLoaded) {
+      listHtml = `<p class="kt-empty">Загрузка заказов…</p>`;
+    } else if (orders.length === 0) {
+      listHtml = `<p class="kt-empty">${filter?.orderIds?.length ? 'По вашему запросу заказов нет среди текущих' : 'Нет заказов на готовку'}</p>`;
+    } else {
+      listHtml = `<div class="kt-orders-grid">${orders.map(o => {
+        try {
+          return this.renderOrderCard(o);
+        } catch (err) {
+          console.error('[kitchen] card render', o.id, err);
+          return `<article class="kt-order-card card"><p>Заказ № ${o.orderNumber || '—'}</p></article>`;
+        }
+      }).join('')}</div>`;
+    }
+
     const bodyHtml = `
       ${this.renderSearchBanner()}
-      ${orders.length === 0
-        ? `<p class="kt-empty">${filter?.orderIds?.length ? 'По вашему запросу заказов нет среди текущих' : 'Нет заказов на готовку'}</p>`
-        : `<div class="kt-orders-grid">${orders.map(o => this.renderOrderCard(o)).join('')}</div>`}
+      ${listHtml}
     `;
 
     this.container.innerHTML = renderKitchenShell({

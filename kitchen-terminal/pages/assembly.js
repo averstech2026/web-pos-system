@@ -48,12 +48,18 @@ export class AssemblyPage {
       where('status', '==', ORDER_STATUS.COOKING),
     );
 
-    this._unsub = onSnapshot(q, snap => {
+    const apply = snap => {
       this.orders = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(o => o.paymentStatus === PAYMENT_STATUS.PAID);
+        .filter(o => {
+          const pay = String(o.paymentStatus || '').toLowerCase();
+          return pay === PAYMENT_STATUS.PAID || Boolean(o.checkId);
+        });
       this.render();
-    });
+    };
+
+    getDocs(q).then(apply).catch(err => console.error('[kitchen] assembly load', err));
+    this._unsub = onSnapshot(q, apply, err => console.error('[kitchen] assembly subscribe', err));
   }
 
   getCategory(item) {

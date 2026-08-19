@@ -48,8 +48,9 @@ export function renderLunchSelectionsHtml(selections = [], { className = 'order-
 export function expandOrderItemLines(items = []) {
   /** @type {Array<{ key: string, dishId: string, name: string, price?: number, parentName?: string, stepName?: string, isCompositePart?: boolean }>} */
   const lines = [];
+  const list = Array.isArray(items) ? items : [];
 
-  items.forEach(item => {
+  list.forEach(item => {
     const qty = Math.max(1, Number(item.quantity) || 1);
     for (let unit = 0; unit < qty; unit += 1) {
       if (hasLunchSelections(item)) {
