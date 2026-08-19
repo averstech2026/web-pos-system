@@ -2,7 +2,7 @@ import { auth, db } from '../../shared/firebase.js';
 import {
   collection, query, where, onSnapshot, doc, updateDoc, writeBatch, serverTimestamp, getDocs,
 } from 'firebase/firestore';
-import { COL, ORDER_STATUS, createOrderReadyNotificationDoc } from '../../shared/schema.js';
+import { COL, ORDER_STATUS, PAYMENT_STATUS, createOrderReadyNotificationDoc } from '../../shared/schema.js';
 import {
   renderKitchenShell, startClock, stopClock, bindKitchenNav,
 } from '../components/layout.js';
@@ -24,6 +24,7 @@ export class OrdersPage {
     this._unsub = null;
     this._searchUnsub = null;
     this._timers = [];
+    this._subscribeError = false;
     this.init();
   }
 
@@ -37,23 +38,28 @@ export class OrdersPage {
     try {
       const snap = await getDocs(collection(db, COL.USERS));
       this.usersById = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
-      this.render();
+      if (!this._subscribeError) this.render();
     } catch (err) {
       console.error('[kitchen] users load', err);
     }
   }
 
   subscribe() {
+    // Single-field query: compound paid+status needs a composite index and
+    // silently looks empty if the snapshot errors after users load.
     const q = query(
       collection(db, COL.ORDERS),
-      where('paymentStatus', '==', 'paid'),
       where('status', '==', ORDER_STATUS.COOKING),
     );
 
     this._unsub = onSnapshot(q, snap => {
-      this.orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      this._subscribeError = false;
+      this.orders = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(o => o.paymentStatus === PAYMENT_STATUS.PAID);
       this.render();
     }, err => {
+      this._subscribeError = true;
       console.error('Orders subscribe error:', err);
       this.container.innerHTML = `
         <div class="kt-error card">

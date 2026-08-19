@@ -2,7 +2,7 @@ import { db } from '../../shared/firebase.js';
 import {
   collection, query, where, onSnapshot, getDocs,
 } from 'firebase/firestore';
-import { COL, ORDER_STATUS } from '../../shared/schema.js';
+import { COL, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
 import {
   renderKitchenShell, startClock, stopClock, bindKitchenNav,
 } from '../components/layout.js';
@@ -45,12 +45,13 @@ export class AssemblyPage {
   subscribe() {
     const q = query(
       collection(db, COL.ORDERS),
-      where('paymentStatus', '==', 'paid'),
       where('status', '==', ORDER_STATUS.COOKING),
     );
 
     this._unsub = onSnapshot(q, snap => {
-      this.orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      this.orders = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(o => o.paymentStatus === PAYMENT_STATUS.PAID);
       this.render();
     });
   }

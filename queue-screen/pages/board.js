@@ -2,7 +2,7 @@ import { db } from '../../shared/firebase.js';
 import {
   collection, query, where, onSnapshot,
 } from 'firebase/firestore';
-import { COL, ORDER_STATUS } from '../../shared/schema.js';
+import { COL, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
 import { ensureQueueSession } from '../services/auth.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 import { renderBrandLogo } from '../../shared/brand-logo.js';
@@ -36,19 +36,19 @@ export class QueueBoard {
   subscribe() {
     const cookingQ = query(
       collection(db, COL.ORDERS),
-      where('paymentStatus', '==', 'paid'),
       where('status', '==', ORDER_STATUS.COOKING),
     );
 
     const readyQ = query(
       collection(db, COL.ORDERS),
-      where('paymentStatus', '==', 'paid'),
       where('status', '==', ORDER_STATUS.READY),
     );
 
     this._unsubs.push(
       onSnapshot(cookingQ, snap => {
-        this.cookingOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        this.cookingOrders = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(o => o.paymentStatus === PAYMENT_STATUS.PAID);
         this.error = null;
         this.renderBoard();
       }, err => this.handleSubscribeError(err)),
@@ -56,7 +56,9 @@ export class QueueBoard {
 
     this._unsubs.push(
       onSnapshot(readyQ, snap => {
-        const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const orders = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(o => o.paymentStatus === PAYMENT_STATUS.PAID);
         const nextIds = new Set(orders.map(o => o.id));
         const newlyReady = orders.filter(o => !this._prevReadyIds.has(o.id));
         this._prevReadyIds = nextIds;

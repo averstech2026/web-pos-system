@@ -53,12 +53,13 @@ export class QueuePage {
   subscribe() {
     const q = query(
       collection(db, COL.ORDERS),
-      where('paymentStatus', '==', 'paid'),
       where('status', '==', ORDER_STATUS.READY),
     );
 
     this._unsub = onSnapshot(q, snap => {
-      this.orders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      this.orders = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(o => o.paymentStatus === 'paid');
       this.render();
     }, err => {
       console.error('Delivery orders subscribe error:', err);
