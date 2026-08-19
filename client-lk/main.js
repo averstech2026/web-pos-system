@@ -19,6 +19,16 @@ initDemoPreset({
 });
 installSeedStaffAuthHelper();
 
+// PWA: allow "Install app" on mobile browsers.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('./sw.js')
+      .then(() => console.info('[pwa] service worker registered'))
+      .catch(err => console.warn('[pwa] service worker registration failed', err));
+  });
+}
+
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedDatabase, updateItemImages, updateItemNutrition, seedStaffAuth }) => {
     window.seed = seedDatabase;

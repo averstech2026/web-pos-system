@@ -1277,7 +1277,7 @@ export function createPresetConstructorEditor(host, options = {}) {
           const approxBytes = estimateDataUrlBytes(compressed);
 
           // Keep a safe margin under Firestore error threshold (~104857).
-          if (approxBytes > 98000) {
+          if (approxBytes > 103000) {
             alert('Логотип слишком большой. Уменьшите картинку (лучше до 80–100KB) и попробуйте снова.');
             return;
           }
@@ -1486,7 +1486,10 @@ function escapeHtml(value) {
 function estimateDataUrlBytes(dataUrl) {
   // Rough estimate: base64 payload bytes ~ base64Len * 3 / 4.
   const base64 = String(dataUrl).split(',')[1] || '';
-  return Math.floor((base64.length * 3) / 4);
+  if (!base64) return 0;
+  // Better estimate: base64 bytes = base64Len * 3/4 - paddingBytes
+  const padding = base64.endsWith('==') ? 2 : (base64.endsWith('=') ? 1 : 0);
+  return Math.floor((base64.length * 3) / 4 - padding);
 }
 
 /**
@@ -1549,7 +1552,7 @@ async function compressLogoToJpegDataUrl(file) {
       if (file.type === 'image/png') {
         const outPng = canvas.toDataURL('image/png');
         // Keep consistent with the safe threshold used on save.
-        if (estimateDataUrlBytes(outPng) <= 98000) {
+        if (estimateDataUrlBytes(outPng) <= 103000) {
           resolve(outPng);
           return;
         }

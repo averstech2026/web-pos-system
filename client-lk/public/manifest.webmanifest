@@ -1,0 +1,11 @@
+{
+  "name": "Личный кабинет — iFCM Lunch",
+  "short_name": "ЛК iFCM",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1E1B4B",
+  "lang": "ru"
+}
+

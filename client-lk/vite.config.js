@@ -6,6 +6,7 @@ export default defineConfig({
   base: pagesBase('client-lk'),
   define: firebaseAppDefine('lk'),
   plugins: [productsStaticPlugin()],
+  publicDir: resolve(__dirname, 'public'),
   server: {
     ...devServer,
     port: 3001,
