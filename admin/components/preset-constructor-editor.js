@@ -1263,16 +1263,34 @@ export function createPresetConstructorEditor(host, options = {}) {
       const file = /** @type {HTMLInputElement} */ (event.target).files?.[0];
       if (!file) return;
       if (!file.type.startsWith('image/')) {
-        alert('Выберите файл изображения.');
+        alert('Выберите файл изображения (PNG/JPG).');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        draft.logoDataUrl = typeof reader.result === 'string' ? reader.result : null;
-        persistDraft();
-        render();
-      };
-      reader.readAsDataURL(file);
+
+      // Prevent quotaExceededError / Firestore string size limit:
+      // see console errors: `logoDataUrl longer than 104857 bytes`
+      // and: `Failed to execute 'setItem' on 'Storage' ... exceeded the quota`
+      (async () => {
+        try {
+          host.querySelector('#dpc-logo-input')?.setAttribute('disabled', 'true');
+          const compressed = await compressLogoToJpegDataUrl(file);
+          const approxBytes = estimateDataUrlBytes(compressed);
+
+          // Keep a safe margin under Firestore error threshold (~104857).
+          if (approxBytes > 98000) {
+            alert('Логотип слишком большой. Уменьшите картинку (лучше до 80–100KB) и попробуйте снова.');
+            return;
+          }
+
+          draft.logoDataUrl = compressed || null;
+          persistDraft();
+          render();
+        } catch (err) {
+          alert(err?.message || 'Ошибка загрузки/сжатия логотипа.');
+        } finally {
+          host.querySelector('#dpc-logo-input')?.removeAttribute('disabled');
+        }
+      })();
     });
 
     host.querySelector('#dpc-logo-clear')?.addEventListener('click', () => {
@@ -1463,4 +1481,75 @@ function escapeHtml(value) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+function estimateDataUrlBytes(dataUrl) {
+  // Rough estimate: base64 payload bytes ~ base64Len * 3 / 4.
+  const base64 = String(dataUrl).split(',')[1] || '';
+  return Math.floor((base64.length * 3) / 4);
+}
+
+/**
+ * Compress uploaded logo to keep it within Firestore/localStorage limits.
+ * Output format: JPEG (to reduce size).
+ *
+ * @param {File} file
+ * @returns {Promise<string>} jpeg data url
+ */
+async function compressLogoToJpegDataUrl(file) {
+  if (!file) throw new Error('No file');
+
+  // SVG -> canvas can be unreliable; keep behavior strict.
+  if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') {
+    throw new Error('Нужно PNG/JPG изображение.');
+  }
+
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error('File read failed'));
+    reader.readAsDataURL(file);
+  });
+
+  // If it’s already small enough, keep as-is.
+  // (Console showed Firestore limit ~104857 bytes for logoDataUrl.)
+  const approxBytes = estimateDataUrlBytes(dataUrl);
+  if (approxBytes <= 90000) return dataUrl;
+
+  const img = new Image();
+  img.decoding = 'async';
+
+  return await new Promise((resolve, reject) => {
+    img.onload = () => {
+      const MAX_SIDE = 420; // quality/size trade-off
+      const srcW = img.naturalWidth || img.width;
+      const srcH = img.naturalHeight || img.height;
+      if (!srcW || !srcH) {
+        reject(new Error('Не удалось прочитать изображение.'));
+        return;
+      }
+
+      const scale = Math.min(1, MAX_SIDE / Math.max(srcW, srcH));
+      const width = Math.max(1, Math.round(srcW * scale));
+      const height = Math.max(1, Math.round(srcH * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Не удалось создать canvas.'));
+        return;
+      }
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // JPEG reduces size dramatically; quality tuned for logos.
+      const out = canvas.toDataURL('image/jpeg', 0.72);
+      resolve(out);
+    };
+    img.onerror = () => reject(new Error('Не удалось загрузить изображение.'));
+    img.src = dataUrl;
+  });
 }
