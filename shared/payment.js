@@ -9,6 +9,7 @@ import {
   collection,
   runTransaction,
   serverTimestamp,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from './firebase.js';
 import {
@@ -137,16 +138,6 @@ export async function processOrderPayment(orderId, options = false) {
         wallets,
         balance: totalWalletBalance(wallets, { spendableOnly: true }),
       });
-
-      const historyRef = doc(collection(userRef, USER_SUB.WALLET_HISTORY));
-      transaction.set(historyRef, createWalletHistoryDoc({
-        walletId,
-        walletName: paidWalletName,
-        type: WALLET_OP_TYPE.WITHDRAW,
-        amount: balanceUsed,
-        comment: `Оплата заказа №${order.orderNumber || orderId}`,
-        performedBy,
-      }));
     }
 
     const paymentParts = { balance: balanceUsed, card: cardUsed };
@@ -198,7 +189,6 @@ export async function processOrderPayment(orderId, options = false) {
       paymentStatus: PAYMENT_STATUS.PAID,
       status: ORDER_STATUS.COOKING,
       paidAt: serverTimestamp(),
-      ...(paidWalletId ? { paidWalletId, paidWalletName } : {}),
     });
 
     return {
@@ -208,6 +198,22 @@ export async function processOrderPayment(orderId, options = false) {
       walletName: paidWalletName || undefined,
     };
   });
+
+  if (result.walletId) {
+    try {
+      const historyRef = doc(collection(db, COL.USERS, result.check.userId, USER_SUB.WALLET_HISTORY));
+      await setDoc(historyRef, createWalletHistoryDoc({
+        walletId: result.walletId,
+        walletName: result.walletName,
+        type: WALLET_OP_TYPE.WITHDRAW,
+        amount: result.check.paymentParts?.balance || 0,
+        comment: `Оплата заказа`,
+        performedBy,
+      }));
+    } catch {
+      // Client may not have wallet_history create until rules are published.
+    }
+  }
 
   return result;
 }
