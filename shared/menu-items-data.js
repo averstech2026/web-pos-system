@@ -26,10 +26,11 @@ export async function fetchWebMenuItems() {
 export async function fetchKioskMenuItems() {
   const snap = await getDocs(query(
     collection(db, COL.ITEMS),
-    where('visibleInKiosk', '==', true),
     where('isAvailable', '==', true),
   ));
-  return snap.docs.map(d => normalizeCatalogItem({ id: d.id, ...d.data() }));
+  return snap.docs
+    .map(d => normalizeCatalogItem({ id: d.id, ...d.data() }))
+    .filter(item => item.visibleInKiosk === true);
 }
 
 /**

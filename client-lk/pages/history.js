@@ -51,18 +51,21 @@ export class HistoryPage {
     const baseQ = query(
       collection(db, COL.ORDERS),
       where('userId', '==', auth.currentUser.uid),
-      where('status', 'in', [ORDER_STATUS.COMPLETED, ORDER_STATUS.CANCELLED]),
     );
 
     this._unsub = onSnapshot(baseQ, snap => {
       const el = document.getElementById('history-list');
       if (!el) return;
 
-      const docs = [...snap.docs].sort((a, b) => {
-        const ta = a.data().createdAt?.toMillis?.() ?? 0;
-        const tb = b.data().createdAt?.toMillis?.() ?? 0;
-        return tb - ta;
-      }).slice(0, 50);
+      const historyStatuses = [ORDER_STATUS.COMPLETED, ORDER_STATUS.CANCELLED];
+      const docs = [...snap.docs]
+        .filter(d => historyStatuses.includes(d.data().status))
+        .sort((a, b) => {
+          const ta = a.data().createdAt?.toMillis?.() ?? 0;
+          const tb = b.data().createdAt?.toMillis?.() ?? 0;
+          return tb - ta;
+        })
+        .slice(0, 50);
 
       if (docs.length === 0) {
         el.innerHTML = `<p class="empty-text">Завершённых заказов пока нет</p>`;

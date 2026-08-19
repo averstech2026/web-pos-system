@@ -339,18 +339,19 @@ export class HomePage {
     const q = query(
       collection(db, COL.ORDERS),
       where('userId', '==', this.user.uid),
-      where('status', 'in', statusesToShow),
     );
 
     this._unsubOrders = onSnapshot(q, snap => {
       const el = document.getElementById('orders-list');
       if (!el) return;
 
-      const docs = [...snap.docs].sort((a, b) => {
-        const ta = a.data().createdAt?.toMillis?.() ?? 0;
-        const tb = b.data().createdAt?.toMillis?.() ?? 0;
-        return tb - ta;
-      });
+      const docs = [...snap.docs]
+        .filter(d => statusesToShow.includes(d.data().status))
+        .sort((a, b) => {
+          const ta = a.data().createdAt?.toMillis?.() ?? 0;
+          const tb = b.data().createdAt?.toMillis?.() ?? 0;
+          return tb - ta;
+        });
 
       this._orderDocs = docs;
 
@@ -432,13 +433,12 @@ export class HomePage {
     const q = query(
       collection(db, COL.NOTIFICATIONS),
       where('userId', '==', this.user.uid),
-      where('read', '==', false),
     );
 
     this._unsubNotif = onSnapshot(q, snap => {
       const badge = document.getElementById('notif-badge');
       if (!badge) return;
-      const count = snap.size;
+      const count = snap.docs.filter(d => d.data().read === false).length;
       if (count > 0) {
         badge.textContent = count > 9 ? '9+' : String(count);
         badge.style.display = 'flex';

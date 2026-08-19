@@ -1,6 +1,6 @@
 import { auth, db } from '../../shared/firebase.js';
 import {
-  collection, query, where, onSnapshot, doc, updateDoc, writeBatch, serverTimestamp, getDocs,
+  collection, query, where, onSnapshot, doc, updateDoc, addDoc, serverTimestamp, getDocs,
 } from 'firebase/firestore';
 import { COL, ORDER_STATUS, createOrderReadyNotificationDoc } from '../../shared/schema.js';
 import {
@@ -275,22 +275,25 @@ export class OrdersPage {
     if (!allLinesPrepared(order.items, order.preparedLines)) return;
 
     try {
-      const batch = writeBatch(db);
-      batch.update(doc(db, COL.ORDERS, orderId), {
+      await updateDoc(doc(db, COL.ORDERS, orderId), {
         status: ORDER_STATUS.READY,
         readyAt: serverTimestamp(),
       });
-      if (order.userId && order.userId !== 'kiosk-guest') {
-        const notifRef = doc(collection(db, COL.NOTIFICATIONS));
-        batch.set(notifRef, createOrderReadyNotificationDoc({
-          userId: order.userId,
-          orderNumber: order.orderNumber,
-        }));
-      }
-      await batch.commit();
     } catch (err) {
       console.error('Mark ready error:', err);
       alert('Не удалось отметить заказ готовым.');
+      return;
+    }
+
+    if (order.userId && order.userId !== 'kiosk-guest') {
+      try {
+        await addDoc(collection(db, COL.NOTIFICATIONS), createOrderReadyNotificationDoc({
+          userId: order.userId,
+          orderNumber: order.orderNumber,
+        }));
+      } catch (err) {
+        console.error('Ready notification error:', err);
+      }
     }
   }
 

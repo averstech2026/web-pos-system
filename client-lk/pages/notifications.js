@@ -144,13 +144,13 @@ export class NotificationsPage {
     const q = query(
       collection(db, COL.NOTIFICATIONS),
       where('userId', '==', auth.currentUser.uid),
-      where('read', '==', false),
     );
     const snap = await getDocs(q);
-    if (snap.empty) return;
+    const unread = snap.docs.filter(d => d.data().read === false);
+    if (!unread.length) return;
 
     const batch = writeBatch(db);
-    snap.docs.forEach(d => batch.update(d.ref, { read: true }));
+    unread.forEach(d => batch.update(d.ref, { read: true }));
     await batch.commit();
   }
 
