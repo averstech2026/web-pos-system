@@ -1,11 +1,23 @@
 {
   "name": "Личный кабинет — iFCM Lunch",
   "short_name": "ЛК iFCM",
-  "start_url": "./",
+  "start_url": "./?utm_source=pwa",
   "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#1E1B4B",
-  "lang": "ru"
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%27192%27%20height%3D%27192%27%20viewBox%3D%270%200%20192%20192%27%3E%3Crect%20width%3D%27192%27%20height%3D%27192%27%20rx%3D%2724%27%20fill%3D%27%231E1B4B%27/%3E%3Ccircle%20cx%3D%2796%27%20cy%3D%2792%27%20r%3D%2748%27%20fill%3D%27%23E11D48%27/%3E%3Ccircle%20cx%3D%2796%27%20cy%3D%2792%27%20r%3D%2722%27%20fill%3D%27%23FFFFFF%27/%3E%3Ccircle%20cx%3D%2796%27%20cy%3D%2792%27%20r%3D%2712%27%20fill%3D%27%231E1B4B%27/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%27512%27%20height%3D%27512%27%20viewBox%3D%270%200%20512%20512%27%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%2756%27%20fill%3D%27%231E1B4B%27/%3E%3Ccircle%20cx%3D%27256%27%20cy%3D%27256%27%20r%3D%27160%27%20fill%3D%27%23E11D48%27/%3E%3Ccircle%20cx%3D%27256%27%20cy%3D%27256%27%20r%3D%2772%27%20fill%3D%27%23FFFFFF%27/%3E%3Ccircle%20cx%3D%27256%27%20cy%3D%27256%27%20r%3D%2740%27%20fill%3D%27%231E1B4B%27/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
 }
 
