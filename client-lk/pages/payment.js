@@ -284,7 +284,7 @@ export class PaymentPage {
   }
 
   renderSplit(total, walletBalance) {
-    const used = this.useBalance ? Math.min(balance, total) : 0;
+    const used = this.useBalance ? Math.min(walletBalance, total) : 0;
     const card = total - used;
 
     if (used === 0) {

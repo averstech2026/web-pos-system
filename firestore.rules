@@ -63,7 +63,7 @@ service cloud.firestore {
 
       match /wallet_history/{entryId} {
         allow read: if isOwner(userId) || isStaff();
-        allow create: if isRole('admin') || isRole('manager') || isStaff();
+        allow create: if isOwner(userId) || isRole('admin') || isRole('manager') || isStaff();
         allow update, delete: if isRole('admin');
       }
     }
@@ -183,7 +183,8 @@ service cloud.firestore {
         && request.resource.data.checkId.size() > 0
         && request.resource.data.items == resource.data.items
         && request.resource.data.userId == resource.data.userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkId', 'paymentStatus', 'status', 'paidAt']);
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['checkId', 'paymentStatus', 'status', 'paidAt', 'paidWalletId', 'paidWalletName']);
     }
 
     function isKioskGuestOrderPayment() {
@@ -196,7 +197,8 @@ service cloud.firestore {
         && request.resource.data.checkId.size() > 0
         && request.resource.data.items == resource.data.items
         && request.resource.data.userId == resource.data.userId
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['checkId', 'paymentStatus', 'status', 'paidAt']);
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['checkId', 'paymentStatus', 'status', 'paidAt', 'paidWalletId', 'paidWalletName']);
     }
 
     // Paid orders on the public queue board (cooking / ready only).
