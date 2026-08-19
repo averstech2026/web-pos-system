@@ -1545,9 +1545,23 @@ async function compressLogoToJpegDataUrl(file) {
       ctx.clearRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
 
-      // JPEG reduces size dramatically; quality tuned for logos.
-      const out = canvas.toDataURL('image/jpeg', 0.72);
-      resolve(out);
+      // If input is PNG, try preserving transparency first.
+      if (file.type === 'image/png') {
+        const outPng = canvas.toDataURL('image/png');
+        // Keep consistent with the safe threshold used on save.
+        if (estimateDataUrlBytes(outPng) <= 98000) {
+          resolve(outPng);
+          return;
+        }
+      }
+
+      // JPEG reduces size dramatically but it doesn't support transparency.
+      // Fill background to avoid "black box" artifacts.
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, height);
+
+      const outJpeg = canvas.toDataURL('image/jpeg', 0.72);
+      resolve(outJpeg);
     };
     img.onerror = () => reject(new Error('Не удалось загрузить изображение.'));
     img.src = dataUrl;
