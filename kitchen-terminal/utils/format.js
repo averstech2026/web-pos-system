@@ -1,3 +1,5 @@
+import { expandOrderItemLines } from '../../shared/composite-order-display.js';
+
 /** Compact date/time for order card header */
 export function fmtOrderCreatedShort(ts) {
   if (!ts?.toDate) return '—';
@@ -73,7 +75,27 @@ export function orderIssueSeconds(order) {
 }
 
 /** Expand order items into individual prep lines */
-export { expandOrderItemLines as expandItemLines } from '../../shared/composite-order-display.js';
+export function expandItemLines(items) {
+  return expandOrderItemLines(items);
+}
+
+/** @returns {string} YYYY-MM-DD in local time */
+export function localDateIso(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Paid cooking orders for today or a future pickup slot. */
+export function isKitchenMonitorOrder(order) {
+  const pay = String(order?.paymentStatus || '').toLowerCase();
+  const paid = pay === 'paid' || Boolean(order?.checkId);
+  if (!paid) return false;
+  const slot = order?.dateSlot;
+  if (!slot) return true;
+  return String(slot) >= localDateIso();
+}
 
 export function isLinePrepared(preparedLines, key) {
   return Array.isArray(preparedLines) && preparedLines.includes(key);

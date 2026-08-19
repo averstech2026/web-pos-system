@@ -2,14 +2,14 @@ import { auth, db } from '../../shared/firebase.js';
 import {
   collection, query, where, onSnapshot, doc, updateDoc, writeBatch, serverTimestamp, getDocs,
 } from 'firebase/firestore';
-import { COL, ORDER_STATUS, PAYMENT_STATUS, createOrderReadyNotificationDoc } from '../../shared/schema.js';
+import { COL, ORDER_STATUS, createOrderReadyNotificationDoc } from '../../shared/schema.js';
 import {
   renderKitchenShell, startClock, stopClock, bindKitchenNav,
 } from '../components/layout.js';
 import { openKitchenOrderSearch } from '../components/search.js';
 import { kitchenSearch } from '../store.js';
 import {
-  expandItemLines, isLinePrepared, allLinesPrepared,
+  expandItemLines, isLinePrepared, allLinesPrepared, isKitchenMonitorOrder,
   formatElapsed, orderPrepSeconds, fmtOrderCreatedShort, clientDisplayName,
 } from '../utils/format.js';
 import { renderTerminalLineNameHtml } from '../../shared/composite-order-display.js';
@@ -51,10 +51,7 @@ export class OrdersPage {
     this._ordersLoaded = true;
     this.orders = snap.docs
       .map(d => ({ id: d.id, ...d.data() }))
-      .filter(o => {
-        const pay = String(o.paymentStatus || '').toLowerCase();
-        return pay === PAYMENT_STATUS.PAID || Boolean(o.checkId);
-      });
+      .filter(isKitchenMonitorOrder);
     this.render();
   }
 
@@ -184,14 +181,7 @@ export class OrdersPage {
     } else if (orders.length === 0) {
       listHtml = `<p class="kt-empty">${filter?.orderIds?.length ? 'По вашему запросу заказов нет среди текущих' : 'Нет заказов на готовку'}</p>`;
     } else {
-      listHtml = `<div class="kt-orders-grid">${orders.map(o => {
-        try {
-          return this.renderOrderCard(o);
-        } catch (err) {
-          console.error('[kitchen] card render', o.id, err);
-          return `<article class="kt-order-card card"><p>Заказ № ${o.orderNumber || '—'}</p></article>`;
-        }
-      }).join('')}</div>`;
+      listHtml = `<div class="kt-orders-grid">${orders.map(o => this.renderOrderCard(o)).join('')}</div>`;
     }
 
     const bodyHtml = `

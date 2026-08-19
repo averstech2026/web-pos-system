@@ -2,12 +2,13 @@ import { db } from '../../shared/firebase.js';
 import {
   collection, query, where, onSnapshot, getDocs,
 } from 'firebase/firestore';
-import { COL, ORDER_STATUS, PAYMENT_STATUS } from '../../shared/schema.js';
+import { COL, ORDER_STATUS } from '../../shared/schema.js';
 import {
   renderKitchenShell, startClock, stopClock, bindKitchenNav,
 } from '../components/layout.js';
 import { openKitchenOrderSearch } from '../components/search.js';
 import { hasLunchSelections } from '../../shared/composite-order-display.js';
+import { isKitchenMonitorOrder } from '../utils/format.js';
 
 const CATEGORY_ORDER = [
   'Салаты',
@@ -51,10 +52,7 @@ export class AssemblyPage {
     const apply = snap => {
       this.orders = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .filter(o => {
-          const pay = String(o.paymentStatus || '').toLowerCase();
-          return pay === PAYMENT_STATUS.PAID || Boolean(o.checkId);
-        });
+        .filter(isKitchenMonitorOrder);
       this.render();
     };
 
