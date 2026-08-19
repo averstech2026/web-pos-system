@@ -138,3 +138,13 @@ export function pagesBase(appSlug) {
   if (repo) return `/${repo}/${appSlug}/`;
   return '/';
 }
+
+/**
+ * Isolate Firebase Auth per frontend app.
+ * All apps share one Firebase project; without a unique app name they also
+ * share one Auth session on the same origin (GitHub Pages) and signOut in
+ * admin/kitchen/kiosk immediately logs the client LK out.
+ */
+export function firebaseAppDefine(appName) {
+  return { __FIREBASE_APP_NAME__: JSON.stringify(appName) };
+}

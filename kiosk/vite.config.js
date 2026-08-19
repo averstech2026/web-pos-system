@@ -1,10 +1,11 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { devServer, pagesBase, productsStaticPlugin } from '../vite.shared.js';
+import { devServer, firebaseAppDefine, pagesBase, productsStaticPlugin } from '../vite.shared.js';
 
 export default defineConfig({
   root: resolve(__dirname),
   base: pagesBase('kiosk'),
+  define: firebaseAppDefine('kiosk'),
   plugins: [productsStaticPlugin()],
   cacheDir: '../node_modules/.vite/kiosk',
   server: {

@@ -53,8 +53,8 @@ export class HomePage {
     this.user = auth.currentUser;
     if (!this.user) { this.navigate('/auth'); return; }
 
-    const snap = await getDoc(doc(db, COL.USERS, this.user.uid));
-    this.userData = snap.exists()
+    const snap = await getDoc(doc(db, COL.USERS, this.user.uid)).catch(() => null);
+    this.userData = snap?.exists()
       ? snap.data()
       : { name: this.user.email.split('@')[0], balance: 0, role: 'client' };
 
@@ -80,6 +80,7 @@ export class HomePage {
 
   renderShell() {
     const u = this.userData;
+    const displayName = String(u?.name || this.user.email?.split('@')[0] || 'Клиент').trim() || 'Клиент';
     const shortCode = this.user.uid.slice(0, 12).toUpperCase();
     const balanceDisplay = (u.balance ?? 0).toLocaleString('ru-RU', { minimumFractionDigits: 2 }) + ' ₽';
 
@@ -100,8 +101,8 @@ export class HomePage {
           <div class="lk-header-left">
             <button class="header-btn" id="btn-menu-toggle" aria-label="Меню">☰</button>
             <button class="header-profile-btn btn-press" id="btn-profile" type="button">
-              <div class="header-avatar">${u.name.charAt(0).toUpperCase()}</div>
-              <span class="header-name">${u.name}</span>
+              <div class="header-avatar">${displayName.charAt(0).toUpperCase()}</div>
+              <span class="header-name">${displayName}</span>
             </button>
           </div>
           <div class="lk-header-right">
@@ -154,9 +155,9 @@ export class HomePage {
         <div class="drawer-overlay" id="drawer-overlay" style="display:none"></div>
         <nav class="drawer" id="drawer" aria-label="Навигация">
           <div class="drawer-header">
-            <div class="header-avatar">${u.name.charAt(0).toUpperCase()}</div>
+            <div class="header-avatar">${displayName.charAt(0).toUpperCase()}</div>
             <div>
-              <div class="drawer-name">${u.name}</div>
+              <div class="drawer-name">${displayName}</div>
               <div class="drawer-email">${this.user.email}</div>
             </div>
           </div>

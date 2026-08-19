@@ -504,6 +504,11 @@ const STAFF_ACCOUNTS = [
   { email: 'queue@ifcm.demo',   name: 'Экран очереди',   role: ROLES.CASHIER },
 ];
 
+const CLIENT_ACCOUNTS = [
+  { email: 'ivanov@ifcm.demo', sourceId: 'demo-client-001' },
+  { email: 'petrova@ifcm.demo', sourceId: 'demo-client-002' },
+];
+
 /**
  * Create Firebase Auth users + Firestore docs with staff roles.
  * Run once from the browser console (kitchen or LK, while logged out):
@@ -566,6 +571,50 @@ export async function seedStaffAuth(password = STAFF_DEMO_PASSWORD) {
       await signOut(auth).catch(() => {});
     }
 
+    for (const acc of CLIENT_ACCOUNTS) {
+      const template = DEMO_USERS.find(u => u.id === acc.sourceId) || {
+        name: acc.email.split('@')[0],
+        email: acc.email,
+        role: ROLES.CLIENT,
+        balance: 500,
+      };
+
+      let uid;
+      let created = false;
+      try {
+        const cred = await signInWithEmailAndPassword(auth, acc.email, password);
+        uid = cred.user.uid;
+      } catch (signInErr) {
+        const notFound = signInErr.code === 'auth/user-not-found'
+          || signInErr.code === 'auth/invalid-login-credentials';
+        if (!notFound) {
+          const badPass = signInErr.code === 'auth/invalid-credential'
+            || signInErr.code === 'auth/wrong-password';
+          if (badPass) {
+            console.warn(`[seed] ${acc.email} — аккаунт есть, но пароль не "${password}".`);
+            continue;
+          }
+          throw signInErr;
+        }
+        const cred = await createUserWithEmailAndPassword(auth, acc.email, password);
+        uid = cred.user.uid;
+        created = true;
+      }
+
+      if (!uid) continue;
+
+      const { id: _ignoredId, ...templateFields } = template;
+      await setDoc(doc(db, COL.USERS, uid), {
+        ...templateFields,
+        id: uid,
+        email: acc.email,
+        role: ROLES.CLIENT,
+      }, { merge: true });
+
+      console.log(`[seed] ${created ? 'Created' : 'Updated'} client: ${acc.email}`);
+      await signOut(auth).catch(() => {});
+    }
+
     // kiosk-guest — Firestore doc for card payments (no Auth account)
     await signInWithEmailAndPassword(auth, 'admin@ifcm.demo', password).catch(async () => {
       await signInWithEmailAndPassword(auth, 'kiosk@ifcm.demo', password);
@@ -587,7 +636,8 @@ export async function seedStaffAuth(password = STAFF_DEMO_PASSWORD) {
       'Kiosk login: kiosk@ifcm.demo / demo1234\n' +
       'POS terminal: pos@ifcm.demo / demo1234\n' +
       'Queue screen: queue@ifcm.demo / demo1234\n' +
-      'Also: admin@ifcm.demo, manager@ifcm.demo, cashier@ifcm.demo\n' +
+      'Client LK: ivanov@ifcm.demo / demo1234\n' +
+      'Also: admin@ifcm.demo, manager@ifcm.demo, cashier@ifcm.demo, petrova@ifcm.demo\n' +
       'Перелогиньтесь в админке: admin@ifcm.demo / demo1234',
       'color:#1E1B4B;font-weight:bold',
     );

@@ -6,7 +6,7 @@ import './style.css';
 import { initDemoPreset } from '../shared/demo-preset.js';
 import logoUrl from '../shared/assets/logo-ifcm-tech.png';
 import { auth, db } from '../shared/firebase.js';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../shared/schema.js';
 
@@ -65,9 +65,12 @@ async function renderRoute(path) {
   }
 
   if (!(await isValidatorStaff(user))) {
-    alert('Доступ только для персонала столовой (cook / cashier / manager / admin).');
-    await signOut(auth);
-    navigate('/auth');
+    if (path !== '/auth') {
+      navigate('/auth');
+      return;
+    }
+    const { AuthPage } = await import('./pages/auth.js');
+    currentPage = new AuthPage(app, navigate);
     return;
   }
 

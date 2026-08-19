@@ -4,7 +4,7 @@ import {
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { COL, ROLES } from '../../shared/schema.js';
+import { COL, ROLES, USER_STATUS, createUserDoc } from '../../shared/schema.js';
 import logoUrl from '../../shared/assets/logo-ifcm-tech.png';
 import { renderBrandLogo } from '../../shared/brand-logo.js';
 
@@ -104,19 +104,22 @@ export class AuthPage {
     btn.textContent = this.mode === 'login' ? 'Вхожу...' : 'Создаю аккаунт...';
 
     try {
+      if (typeof auth.authStateReady === 'function') {
+        await auth.authStateReady();
+      }
       if (this.mode === 'login') {
         await signInWithEmailAndPassword(auth, email, password);
-        // Ensure Firestore user doc exists (e.g. demo user created via console)
         await this.ensureUserDoc();
       } else {
         const name = document.getElementById('auth-name')?.value.trim() || email.split('@')[0];
         if (!name) { throw { code: 'app/no-name' }; }
         const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await this.createUserDoc(cred.user.uid, name, email);
+        await this.writeClientProfile(cred.user.uid, name, email);
       }
       this.navigate('/home');
     } catch (err) {
-      errorEl.textContent = this.errMsg(err.code);
+      if (!document.getElementById('auth-submit')) return;
+      errorEl.textContent = this.errMsg(err.code, err.message);
       errorEl.style.display = 'block';
       btn.disabled = false;
       btn.textContent = this.mode === 'login' ? 'Войти' : 'Создать аккаунт';
@@ -128,30 +131,34 @@ export class AuthPage {
     if (!user) return;
     const ref = doc(db, COL.USERS, user.uid);
     const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, {
-        id: user.uid,
-        name: user.email.split('@')[0],
-        email: user.email,
-        role: ROLES.CLIENT,
-        balance: 500,
-        printReceipt: true,
-      });
-    }
+    if (snap.exists()) return;
+
+    await setDoc(ref, createUserDoc({
+      id: user.uid,
+      name: user.displayName || user.email.split('@')[0],
+      email: user.email,
+      role: ROLES.CLIENT,
+      balance: 500,
+      status: USER_STATUS.ACTIVE,
+      allowsWebAccess: true,
+      printReceipt: true,
+    }));
   }
 
-  async createUserDoc(uid, name, email) {
-    await setDoc(doc(db, COL.USERS, uid), {
+  async writeClientProfile(uid, name, email) {
+    await setDoc(doc(db, COL.USERS, uid), createUserDoc({
       id: uid,
       name,
       email,
       role: ROLES.CLIENT,
       balance: 500,
+      status: USER_STATUS.ACTIVE,
+      allowsWebAccess: true,
       printReceipt: true,
-    });
+    }));
   }
 
-  errMsg(code) {
+  errMsg(code, fallback) {
     const map = {
       'auth/user-not-found': 'Пользователь не найден',
       'auth/wrong-password': 'Неверный пароль',
@@ -161,7 +168,8 @@ export class AuthPage {
       'auth/weak-password': 'Пароль слишком короткий (минимум 6 символов)',
       'auth/too-many-requests': 'Слишком много попыток. Попробуйте позже',
       'app/no-name': 'Введите ваше имя',
+      'permission-denied': 'Нет доступа к профилю. Обновите страницу или выполните await seedStaffAuth() в консоли.',
     };
-    return map[code] || `Ошибка: ${code}`;
+    return map[code] || fallback || `Ошибка: ${code}`;
   }
 }

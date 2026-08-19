@@ -8,15 +8,17 @@ import { initDemoPreset } from '../shared/demo-preset.js';
 import logoUrl from '../shared/assets/logo-ifcm-tech.png';
 
 import { auth, db } from '../shared/firebase.js';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { COL, ROLES } from '../shared/schema.js';
+import { installSeedStaffAuthHelper } from '../shared/install-seed-helpers.js';
 
 initDemoPreset({
   applyTheme: true,
   fallbackLogoUrl: logoUrl,
   documentTitle: { page: 'Админ-панель' },
 });
+installSeedStaffAuthHelper();
 
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedStaffAuth, patchDemoItemCategories, seedValidatorDemo }) => {
@@ -28,6 +30,8 @@ if (import.meta.env.DEV) {
       'color:#1E1B4B;font-weight:bold',
     );
   });
+} else {
+  console.info('%cSeed: await seedStaffAuth()', 'color:#1E1B4B;font-weight:bold');
 }
 
 const ADMIN_ROLES = [ROLES.ADMIN, ROLES.MANAGER];
@@ -68,9 +72,12 @@ async function renderRoute(path) {
   }
 
   if (!(await isAdminUser(user))) {
-    alert('Доступ только для администратора или менеджера.');
-    await signOut(auth);
-    navigate('/auth');
+    if (path !== '/auth') {
+      navigate('/auth');
+      return;
+    }
+    const { AuthPage } = await import('./pages/auth.js');
+    currentPage = new AuthPage(app, navigate);
     return;
   }
 

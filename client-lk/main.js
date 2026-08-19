@@ -10,15 +10,15 @@ import logoUrl from '../shared/assets/logo-ifcm-tech.png';
 import { auth } from '../shared/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import { renderWebChannelMaintenanceIfNeeded } from './services/sales-channel-guard.js';
+import { installSeedStaffAuthHelper } from '../shared/install-seed-helpers.js';
 
 initDemoPreset({
   applyTheme: true,
   fallbackLogoUrl: logoUrl,
   documentTitle: { page: 'Личный кабинет' },
 });
+installSeedStaffAuthHelper();
 
-// ── Dev helpers ───────────────────────────────────────────
-// In the browser console run: await seed()  or  await updateItemImages()
 if (import.meta.env.DEV) {
   import('../shared/seed.js').then(({ seedDatabase, updateItemImages, updateItemNutrition, seedStaffAuth }) => {
     window.seed = seedDatabase;
@@ -34,6 +34,8 @@ if (import.meta.env.DEV) {
       'color:#1E1B4B;font-weight:bold'
     );
   });
+} else {
+  console.info('%cSeed: await seedStaffAuth()', 'color:#1E1B4B;font-weight:bold');
 }
 
 const app = document.getElementById('app');
@@ -51,10 +53,14 @@ export function navigate(path) {
 }
 
 let currentPage = null;
+let authReady = false;
+let lastAuthUid = undefined;
+let renderSeq = 0;
 
 async function renderRoute(path, params) {
-  // Destroy previous page if it has cleanup
+  const seq = ++renderSeq;
   currentPage?.destroy?.();
+  currentPage = null;
   app.innerHTML = '';
 
   const user = auth.currentUser;
@@ -71,6 +77,7 @@ async function renderRoute(path, params) {
   if (user && path !== '/auth') {
     try {
       if (await renderWebChannelMaintenanceIfNeeded(app)) {
+        if (seq !== renderSeq) return;
         currentPage = null;
         return;
       }
@@ -79,41 +86,58 @@ async function renderRoute(path, params) {
     }
   }
 
+  if (seq !== renderSeq) return;
+
   // Lazy-load page modules to keep initial bundle small
   if (path === '/auth') {
     const { AuthPage } = await import('./pages/auth.js');
+    if (seq !== renderSeq) return;
     currentPage = new AuthPage(app, navigate);
   } else if (path === '/menu') {
     const { MenuPage } = await import('./pages/menu.js');
+    if (seq !== renderSeq) return;
     currentPage = new MenuPage(app, navigate, params);
   } else if (path === '/payment') {
     const { PaymentPage } = await import('./pages/payment.js');
+    if (seq !== renderSeq) return;
     currentPage = new PaymentPage(app, navigate, params);
   } else if (path === '/history') {
     const { HistoryPage } = await import('./pages/history.js');
+    if (seq !== renderSeq) return;
     currentPage = new HistoryPage(app, navigate);
   } else if (path === '/notifications') {
     const { NotificationsPage } = await import('./pages/notifications.js');
+    if (seq !== renderSeq) return;
     currentPage = new NotificationsPage(app, navigate);
   } else if (path === '/profile') {
     const { ProfilePage } = await import('./pages/profile.js');
+    if (seq !== renderSeq) return;
     currentPage = new ProfilePage(app, navigate);
   } else {
     const { HomePage } = await import('./pages/home.js');
+    if (seq !== renderSeq) return;
     currentPage = new HomePage(app, navigate);
   }
 }
 
-// Wait for Firebase auth state before first render
-let authReady = false;
-onAuthStateChanged(auth, () => {
-  const { path, params } = parseHash();
+onAuthStateChanged(auth, user => {
+  const uid = user?.uid ?? null;
   authReady = true;
+  if (window.__SEED_STAFF_AUTH__) return;
+  if (lastAuthUid === uid && currentPage) return;
+  lastAuthUid = uid;
+  const { path, params } = parseHash();
   renderRoute(path, params);
 });
 
 window.addEventListener('hashchange', () => {
-  if (!authReady) return;
+  if (!authReady || window.__SEED_STAFF_AUTH__) return;
   const { path, params } = parseHash();
   renderRoute(path, params);
+});
+
+window.addEventListener('seed-staff-auth-done', () => {
+  lastAuthUid = undefined;
+  if (!authReady) return;
+  navigate('/auth');
 });
